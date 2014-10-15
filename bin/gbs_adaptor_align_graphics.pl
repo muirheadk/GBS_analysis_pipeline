@@ -9,9 +9,10 @@ use Bio::SearchIO;
 use Bio::SeqFeature::Generic;
 use File::Basename;
 
-my ($adaptor_blastn_infile, $output_dir);
+my ($adaptor_blastn_infile, $gbs_sequence_length, $output_dir);
 GetOptions(
       'i=s'    => \$adaptor_blastn_infile,
+      'l=s'    => \$gbs_sequence_length,
       'o=s'    => \$output_dir,
 );
 # Needs either fastafile parser or gbs adaptor blast to add lengths so that this file becomes more generic. Needs to have adaptor sequence trimmed 2-AGCT-6 cut correctly. Needs to be incorporated twice in pipeline. Once after blast and once after the trimming to see which sequences ended up getting trimmed.
@@ -38,7 +39,6 @@ OPTIONS:
 USAGE
 }
 
-my $gbs_sequence_length;
 $gbs_sequence_length = 100 unless defined $gbs_sequence_length;
 
 # Create output directory if it doesn't already exist.
@@ -76,97 +76,96 @@ my $panel = Bio::Graphics::Panel->new(
 
 foreach my $target_name (keys %blast_entries){
 
-      warn "Processing blast results for " . $target_name . "....\n";
-
+	warn "Processing blast results for " . $target_name . "....\n";
 
 	my ($fastq_sequence_length, $full_length);
-
 	my $i = 0;
 	foreach my $blast_entry (@{$blast_entries{$target_name}}){
-    my @split_blast_entry = split(/\t/, $blast_entry);
-    my ($query_id,$target_id,$query_coverage,$percent_identity,$align_length,$num_mismatch,$num_gaps,$query_start,
-    $query_end,$target_start,$target_end,$e_value,$bit_score,$glyph_colour) = @split_blast_entry;
+		my @split_blast_entry = split(/\t/, $blast_entry);
+		my ($query_id,$target_id,$query_coverage,$percent_identity,$align_length,$num_mismatch,$num_gaps,$query_start,
+		$query_end,$target_start,$target_end,$e_value,$bit_score,$glyph_colour) = @split_blast_entry;
 
-    if($query_start > $query_end){
-        warn "Found hit in antisense direction for query_id, so skipping because we aren't interested in this alignment....\n";
-        next;
-    }
-    if($target_start > $target_end){
-        warn "Found hit in antisense direction for target_id, so skipping because we aren't interested in this alignment....\n";
-        next;
-    }
-    if($num_mismatch > 0){
-        warn "Found hit with number of mismatches greater than 0, so skipping because we aren't interested in this alignment....\n";
-        next;
-    }
-    if($num_gaps > 0){
-        warn "Found hit with number of gaps greater than 0, so skipping because we aren't interested in this alignment....\n";
-        next;
-    }
-	if($i eq 0){
-		   if($target_name =~ m/length=(\d+)/){
-		$fastq_sequence_length = $1;
-    }
-      $full_length = Bio::SeqFeature::Generic->new(
-	    -start        => 1,
-	    -end          => $fastq_sequence_length,
-	    -display_name => $target_name,
-      );
+		if($query_start > $query_end){
+			warn "Found hit in antisense direction for query_id, so skipping because we aren't interested in this alignment....\n";
+			next;
+		}
+		if($target_start > $target_end){
+			warn "Found hit in antisense direction for target_id, so skipping because we aren't interested in this alignment....\n";
+			next;
+		}
+		if($num_mismatch > 0){
+			warn "Found hit with number of mismatches greater than 0, so skipping because we aren't interested in this alignment....\n";
+			next;
+		}
+		if($num_gaps > 0){
+			warn "Found hit with number of gaps greater than 0, so skipping because we aren't interested in this alignment....\n";
+			next;
+		}
+		if($i eq 0){
+			if($target_name =~ m/length=(\d+)/){
+				$fastq_sequence_length = $1;
+			}
+			
+			$full_length = Bio::SeqFeature::Generic->new(
+				-start        => 1,
+				-end          => $fastq_sequence_length,
+				-display_name => $target_name,
+			);
 
-      $panel->add_track(
-	    $full_length,
-	    -glyph   => 'arrow',
-	    -tick    => 2,
-	    -fgcolor => 'black',
-	    -double  => 1,
-	    -label   => 1,
-      );
-	}
+			$panel->add_track(
+				$full_length,
+				-glyph   => 'arrow',
+				-tick    => 2,
+				-fgcolor => 'black',
+				-double  => 1,
+				-label   => 1,
+			);
+		}
 
-    my ($query_name, $adaptor_sequence, $description);  
-    if($query_id =~ m/([\w_]+)_([ACGT]+)/) {
-	($query_name, $adaptor_sequence) = ($1, $2);
-	my $adaptor_end = length($adaptor_sequence);
-	my $adaptor_sub_sequence = get_subseq($adaptor_sequence, $query_start, $query_end);
-	my $adaptor_start_sequence = get_subseq($adaptor_sequence, 1, ($query_start - 1));
-	my $adaptor_end_sequence = get_subseq($adaptor_sequence, ($query_end + 1), $adaptor_end);
+		my ($query_name, $adaptor_sequence, $description);  
+		if($query_id =~ m/([\w_]+)_([ACGT]+)/){
+			($query_name, $adaptor_sequence) = ($1, $2);
+			my $adaptor_end = length($adaptor_sequence);
+			my $adaptor_sub_sequence = get_subseq($adaptor_sequence, $query_start, $query_end);
+			my $adaptor_start_sequence = get_subseq($adaptor_sequence, 1, ($query_start - 1));
+			my $adaptor_end_sequence = get_subseq($adaptor_sequence, ($query_end + 1), $adaptor_end);
 
 
-	my $adaptor_concatenated_sequence  = join("-", $adaptor_start_sequence, $query_start, $adaptor_sub_sequence, $query_end, $adaptor_end_sequence);
-    	$description = join("; ", join("=", "sequence", $adaptor_concatenated_sequence), join("=", "query_coverage", $query_coverage), join("=", "percent_idenity", $percent_identity), join("=", "sequence_start", $target_start), join("=", "sequence_end", $target_end), join("=", "sequence_length", $align_length));
-    }else{
-	$query_name = $query_id;
-	$description = join("; ", join("=", "sequence_start", $target_start), join("=", "sequence_end", $target_end), join("=", "sequence_length", $align_length));
-    }
+			my $adaptor_concatenated_sequence  = join("-", $adaptor_start_sequence, $query_start, $adaptor_sub_sequence, $query_end, $adaptor_end_sequence);
+				$description = join("; ", join("=", "sequence", $adaptor_concatenated_sequence), join("=", "query_coverage", $query_coverage), join("=", "percent_idenity", $percent_identity), join("=", "sequence_start", $target_start), join("=", "sequence_end", $target_end), join("=", "sequence_length", $align_length));
+		}else{
+			$query_name = $query_id;
+			$description = join("; ", join("=", "sequence_start", $target_start), join("=", "sequence_end", $target_end), join("=", "sequence_length", $align_length));
+		}
 
-      my $track = $panel->add_track(
-	    -glyph       => 'graded_segments',
-	    -label       => 1,
-	    -connector   => 'dashed',
-	    -bgcolor     => $glyph_colour,
-	    -fgcolor     => 'black',
-	    -font2color  => 'red',
-	    -sort_order  => 'high_score',
-	    -description => sub {
-		  my $feature = shift;
-		  return unless $feature->has_tag('description');
-		  my $description = $feature->each_tag_value('description');
-		  "$description";
-	    },
-      );
-    my $feature = Bio::SeqFeature::Generic->new(
-      -start        => $target_start,
-      -end          => $target_end,
-      -score        => $bit_score,
-      -display_name => $query_name,
-      -tag          => {
-        description => $description
-      },
-    );
-
-    $track->add_feature($feature);
-	
-	$i++;
+		my $track = $panel->add_track(
+			-glyph       => 'graded_segments',
+			-label       => 1,
+			-connector   => 'dashed',
+			-bgcolor     => $glyph_colour,
+			-fgcolor     => 'black',
+			-font2color  => 'red',
+			-sort_order  => 'high_score',
+			-description => sub {
+				my $feature = shift;
+				return unless $feature->has_tag('description');
+				my $description = $feature->each_tag_value('description');
+				my $score = $feature->score;
+				"$description";
+			},
+		);
+		my $feature = Bio::SeqFeature::Generic->new(
+			-start        => $target_start,
+			-end          => $target_end,
+			-score        => $bit_score,
+			-display_name => $query_name,
+			-tag          => {
+				description => $description
+			},
+		);
+		$track->add_feature($feature);
+		
+		$i++;
 
 	}
 }
