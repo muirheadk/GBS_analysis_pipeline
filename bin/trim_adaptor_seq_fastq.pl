@@ -8,14 +8,14 @@ use IPC::Open2;
 use Math::Round;
 use List::Compare;
 
-# perl trim_adaptor_seq_fastq.pl -i ~/workspace/GBS_data-08-10-2013/PROJECT_LEADER_DIR -c 7 -o ~/workspace/GBS_data-08-10-2013/TRIM_ADAPTOR_SEQ_FASTQ_DIR
+# perl trim_adaptor_seq_fastq.pl -i ~/workspace/GBS_data-08-10-2013/PROJECT_LEADER_DIR -c 7 -o ~/workspace/GBS_data-08-10-2013/TRIMMED_ADAPTOR_FASTQ_DIR
 my ($project_leader_dir, $fastq_adaptor_sequence, $gbs_sequence_length, $adaptor_length_min_threshold, $adaptor_length_max_threshold, $adaptor_trim_offset, $blast_num_cpu, $output_dir);
 GetOptions(
       'i=s'    => \$project_leader_dir,
       'a=s'    => \$fastq_adaptor_sequence,
       'l=s'    => \$gbs_sequence_length,
       'n=s'    => \$adaptor_length_min_threshold,
-      'm=s'    => \$adaptor_length_max_threshold,
+#       'm=s'    => \$adaptor_length_max_threshold,
       't=s'    => \$adaptor_trim_offset,
       'c=s'    => \$blast_num_cpu,
       'o=s'    => \$output_dir,
@@ -28,8 +28,7 @@ usage() unless (
 
 $fastq_adaptor_sequence = 'CCGAGATCGGAAGAGCGGGGACTTTAAGC' unless defined $fastq_adaptor_sequence;
 $gbs_sequence_length = 100 unless defined $gbs_sequence_length;
-$adaptor_length_min_threshold = 16 unless defined $adaptor_length_min_threshold;
-$adaptor_length_max_threshold = 18 unless defined $adaptor_length_max_threshold;
+$adaptor_length_min_threshold = 18 unless defined $adaptor_length_min_threshold;
 $adaptor_trim_offset = 5 unless defined $adaptor_trim_offset;
 $blast_num_cpu = 2 unless defined $blast_num_cpu;
 
@@ -58,7 +57,7 @@ OPTIONS:
 
 	-n adaptor_length_min_threshold -
 
-	-m adaptor_length_max_threshold - 
+# 	-m adaptor_length_max_threshold - 
 
 	-t adaptor_trim_offset - 
 
@@ -104,14 +103,20 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 	}
 
 	# Create output directory if it doesn't already exist.
-	my $trimmed_output_dir = join('/',$project_leader_dir, "TRIMMED_OUTPUT_FILES");
+	my $trimmed_output_dir = join('/', $project_leader_dir, "TRIMMED_OUTPUT_FILES");
 	unless(-d $trimmed_output_dir){# Need this to make the bulk fastq sequence file.
 		mkdir($trimmed_output_dir, 0777) or die "Can't make directory: $!";
 	}
 
 	my $trimmed_fastq_bulk_outfile = join('/', $trimmed_output_dir, join("_", $project_leader, "trimmed") . ".fastq");
- 	open(BULK_OUTFILE, ">$trimmed_fastq_bulk_outfile") or die "Couldn't open file $trimmed_fastq_bulk_outfile for writting, $!";
+ 	open(TRIMMED_BULK_OUTFILE, ">$trimmed_fastq_bulk_outfile") or die "Couldn't open file $trimmed_fastq_bulk_outfile for writting, $!";
+ 	my $trimmed_seqs_layout_outfile = join('/', $trimmed_output_dir, join("_", $project_leader, "trimmed_seqs_layout") . ".txt");
+ 	open(TRIMMED_LAYOUT_OUTFILE, ">$trimmed_seqs_layout_outfile") or die "Couldn't open file $trimmed_seqs_layout_outfile for writting, $!";
+ 	print TRIMMED_LAYOUT_OUTFILE join("\t", "sequence_id", "trimmed_fastq_start", "trimmed_fastq_end", "trimmed_fastq_length", "trimmed_adaptor_start", "trimmed_adaptor_end", 
+ 		"trimmed_adaptor_length", "adaptor_seq_start", "adaptor_seq_end", "adaptor_seq_length") . "\n";
 	my @trimmed_fastq_files = ();
+	my %fastq_seq_counter = ();
+	my %adaptor_length_counter = ();
 	foreach my $fastq_infile (sort @{$project_fastq_files->{$project_leader}}){
 
 		warn $fastq_infile . "\n";
@@ -181,19 +186,18 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 		my ($adaptor_blastn_tsv_outfile, $adaptor_blastn_aln_outfile, $adaptor_sequence_length) = generate_adaptor_blastn($fastq_adaptor_sequence, $fasta_target_outfile, $blast_num_cpu, $blastn_output_dir);
 
 		# Create output directory if it doesn't already exist.
-		my $adaptor_graphics_output_dir = join('/', $blastn_output_dir, "ADAPTOR_BLASTN_GRAPHICS_FILES");
-		unless(-d $adaptor_graphics_output_dir){
-			mkdir($adaptor_graphics_output_dir, 0777) or die "Can't make directory: $!";
-		}
+# 		my $adaptor_graphics_output_dir = join('/', $blastn_output_dir, "ADAPTOR_BLASTN_GRAPHICS_FILES");
+# 		unless(-d $adaptor_graphics_output_dir){
+# 			mkdir($adaptor_graphics_output_dir, 0777) or die "Can't make directory: $!";
+# 		}
 
-		generate_adaptor_blast_graphics($adaptor_blastn_tsv_outfile, $adaptor_graphics_output_dir);
+# 		generate_adaptor_blast_graphics($adaptor_blastn_tsv_outfile, $adaptor_graphics_output_dir);
 
 		# Create output directory if it doesn't already exist.
 		my $trimmed_blastn_output_dir = join('/', $trimmed_output_dir, "TRIMMED_ADAPTOR_BLASTN_FILES");
 		unless(-d $trimmed_blastn_output_dir){
 			mkdir($trimmed_blastn_output_dir, 0777) or die "Can't make directory: $!";
 		}
-
 		
 		# Parse the tab-delimited adaptor blast output so that we can trimm the fastq sequences that contain the GBS adaptor sequence.
 		# Create new adaptor blastn files so that we can visualize where we trimmed the sequence.
@@ -249,7 +253,7 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 # 				$min_threshold_coverage = round((($adaptor_length_min_threshold/($adaptor_sequence_length + 1)) * 100));
 # 				$max_threshold_coverage = round((($adaptor_length_max_threshold/($adaptor_sequence_length + 1)) * 100));
 # 				die join("\t", "query_coverage=$query_coverage", "threshold_coverage=$max_threshold_coverage");
-				if($align_length >= $adaptor_length_max_threshold){
+				if($align_length >= $adaptor_length_min_threshold){
 					$trimmed_fastq_sequence = get_subseq($fastq_sequence, 1, (($target_start - $adaptor_trim_offset) - 1));
 					$trimmed_fastq_quality_scores = get_subseq($fastq_quality_scores, 1, (($target_start - $adaptor_trim_offset) - 1));
 					
@@ -263,11 +267,29 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 					my $trimmed_adaptor_sequence_length = length($trimmed_adaptor_sequence);
 					my $trimmed_fastq_blastn = join("\t", join("_", "trimmed_fastq_sequence_offset", $adaptor_trim_offset), $target_name, $query_coverage, $percent_identity, $trimmed_fastq_sequence_length, $num_mismatch, $num_gaps, 1, (($target_start - $adaptor_trim_offset) - 1), 1, (($target_start - $adaptor_trim_offset) - 1), $e_value, $bit_score, "blue");
 					my $trimmed_adaptor_blastn = join("\t", join("_", "trimmed_adaptor_sequence_offset", $adaptor_trim_offset), $target_name, $query_coverage, $percent_identity, $trimmed_adaptor_sequence_length, $num_mismatch, $num_gaps, ($target_start - $adaptor_trim_offset), $fastq_sequence_length, ($target_start - $adaptor_trim_offset), $fastq_sequence_length, $e_value, $bit_score, "red");
-					my $original_adaptor_sequence = join("\t", $query_name, $target_name, $query_coverage, $percent_identity, $align_length, $num_mismatch,
+					my $original_adaptor_blastn = join("\t", $query_name, $target_name, $query_coverage, $percent_identity, $align_length, $num_mismatch,
 						$num_gaps, $query_start, $query_end, $target_start, $target_end, $e_value, $bit_score, "orange");
 					print OUTFILE $trimmed_fastq_blastn . "\n";
-					print OUTFILE $original_adaptor_sequence . "\n";
+					print OUTFILE $original_adaptor_blastn . "\n";
 					print OUTFILE $trimmed_adaptor_blastn . "\n";
+					
+					my $trimmed_fastq_header = $fastq_header;
+					my $trimmed_seqs_layout_header = join("_", $fasta_filename, $trimmed_fastq_header);
+					print TRIMMED_LAYOUT_OUTFILE join("\t", $trimmed_seqs_layout_header, 1, (($target_start - $adaptor_trim_offset) - 1), $trimmed_fastq_sequence_length, ($target_start - $adaptor_trim_offset), $fastq_sequence_length, $trimmed_adaptor_sequence_length, $target_start, $target_end, $align_length) . "\n";
+					
+					my $adaptor_concatenated_sequence;  
+					if($query_name =~ m/([\w_]+)_([ACGT]+)/){
+						my ($query_id, $adaptor_sequence) = ($1, $2);
+						my $adaptor_end = length($adaptor_sequence);
+						my $adaptor_sub_sequence = get_subseq($adaptor_sequence, $query_start, $query_end);
+						my $adaptor_start_sequence = get_subseq($adaptor_sequence, 1, ($query_start - 1));
+						my $adaptor_end_sequence = get_subseq($adaptor_sequence, ($query_end + 1), $adaptor_end);
+
+
+						$adaptor_concatenated_sequence  = join("-", $adaptor_start_sequence, $query_start, $adaptor_sub_sequence, $query_end, $adaptor_end_sequence);
+					}
+					
+					$adaptor_length_counter{$align_length}{$adaptor_concatenated_sequence}++;
 					push(@trimmed_fastq_list, $fastq_header);
 				}
 			}
@@ -298,12 +320,12 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 		}
 		
 		# Create output directory if it doesn't already exist.
-		my $trimmed_adaptor_graphics_output_dir = join('/', $trimmed_output_dir, "TRIMMED_ADAPTOR_BLASTN_GRAPHICS_FILES");
-		unless(-d $trimmed_adaptor_graphics_output_dir){
-			mkdir($trimmed_adaptor_graphics_output_dir, 0777) or die "Can't make directory: $!";
-		}
+# 		my $trimmed_adaptor_graphics_output_dir = join('/', $trimmed_output_dir, "TRIMMED_ADAPTOR_BLASTN_GRAPHICS_FILES");
+# 		unless(-d $trimmed_adaptor_graphics_output_dir){
+# 			mkdir($trimmed_adaptor_graphics_output_dir, 0777) or die "Can't make directory: $!";
+# 		}
 		
-		generate_adaptor_blast_graphics($trimmed_adaptor_blastn_outfile, $trimmed_adaptor_graphics_output_dir);
+# 		generate_adaptor_blast_graphics($trimmed_adaptor_blastn_outfile, $trimmed_adaptor_graphics_output_dir);
 
 		# Create output directory if it doesn't already exist.
 		my $trimmed_fastq_output_dir = join('/', $trimmed_output_dir, "TRIMMED_FASTQ_FILES");
@@ -314,7 +336,7 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 		my $trimmed_fastq_outfile = join("/", $trimmed_fastq_output_dir, join("_", $fasta_filename, "trimmed") . ".fastq");
 		open(OUTFILE, ">$trimmed_fastq_outfile") or die "Couldn't open file $trimmed_fastq_outfile for writting, $!";
 		# Print out trimmed fastq sequences first so that we can see what was trimmed.
-		foreach my $fastq_header (keys %trimmed_fastq_sequences){
+		foreach my $fastq_header (sort keys %trimmed_fastq_sequences){
 			
 			my $fastq_sequence = $trimmed_fastq_sequences{$fastq_header}{'FASTQ_SEQUENCE'};
 			my $fastq_plus = $trimmed_fastq_sequences{$fastq_header}{'PLUS'};
@@ -327,9 +349,11 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 			print OUTFILE  $fastq_plus . "\n";
 			print OUTFILE  $fastq_quality_scores . "\n";
 
+			$fastq_seq_counter{$fasta_filename}{'TRIMMED'}++;
+			
 		}
 		# Print out the rest of the sequences that were not trimmed because they either did not have an alignment or a significant alignment that passed the trimming threshold.
-		foreach my $fastq_header (keys %untrimmed_fastq_sequences){
+		foreach my $fastq_header (sort keys %untrimmed_fastq_sequences){
 			
 			my $fastq_sequence = $untrimmed_fastq_sequences{$fastq_header}{'FASTQ_SEQUENCE'};
 			my $fastq_plus = $untrimmed_fastq_sequences{$fastq_header}{'PLUS'};
@@ -341,6 +365,8 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 			print OUTFILE  $fastq_sequence . "\n";
 			print OUTFILE  $fastq_plus . "\n";
 			print OUTFILE  $fastq_quality_scores . "\n";
+			
+			$fastq_seq_counter{$fasta_filename}{'UNTRIMMED'}++;
 
 		}
 		close(OUTFILE) or die "Couldn't close file $trimmed_fastq_outfile";
@@ -348,7 +374,7 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 		open(INFILE, "<$trimmed_fastq_outfile") or die "Couldn't open file $trimmed_fastq_outfile for reading, $!";
 		while(<INFILE>){
 			chomp $_;
-			print BULK_OUTFILE $_ . "\n";
+			print TRIMMED_BULK_OUTFILE $_ . "\n";
 		}
 		close(INFILE) or die "Couldn't close file $trimmed_fastq_outfile";
 
@@ -360,8 +386,40 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 		@fastq_sequence_list = ();
 		@untrimmed_fastq_sequence_list = ();
  	}
-
- 	close(BULK_OUTFILE) or die "Couldn't close file $trimmed_fastq_bulk_outfile";
+ 	close(TRIMMED_BULK_OUTFILE) or die "Couldn't close file $trimmed_fastq_bulk_outfile";
+ 	close(TRIMMED_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_layout_outfile";
+ 	
+ 	my $fastq_seq_counts_outfile = join("/", $trimmed_output_dir, join("_", $project_leader, "fastq_seq_counts") . ".txt");
+	open(OUTFILE, ">$fastq_seq_counts_outfile") or die "Couldn't open file $fastq_seq_counts_outfile for writting, $!";
+	print OUTFILE join("\t", "fastq_file_name", "total_num_seqs", "num_untrimmed_seqs", "percent_untrimmed_seqs", "num_trimmed_seqs", "percent_trimmed_seqs") . "\n";
+	foreach my $fasta_filename (sort keys %fastq_seq_counter){
+	
+		my $num_untrimmed_seqs = $fastq_seq_counter{$fasta_filename}{'UNTRIMMED'};
+		my $num_trimmed_seqs = $fastq_seq_counter{$fasta_filename}{'TRIMMED'};
+		
+		my $total_num_seqs = ($num_untrimmed_seqs + $num_trimmed_seqs);
+		
+		my $percent_untrimmed_seqs = (($num_untrimmed_seqs/$total_num_seqs) * 100);
+		my $percent_trimmed_seqs = (($num_trimmed_seqs/$total_num_seqs) * 100);
+		
+		print OUTFILE join("\t", $fasta_filename, $total_num_seqs, $num_untrimmed_seqs, $percent_untrimmed_seqs, $num_trimmed_seqs, $percent_trimmed_seqs) . "\n";
+	}
+ 	close(OUTFILE) or die "Couldn't close file $fastq_seq_counts_outfile";
+ 	
+	my $adaptor_length_counts_outfile = join("/", $trimmed_output_dir, join("_", $project_leader, "adaptor_length_counts") . ".txt");
+	open(OUTFILE, ">$adaptor_length_counts_outfile") or die "Couldn't open file $adaptor_length_counts_outfile for writting, $!";
+	print OUTFILE join("\t", "adapter_sequence_id", "adapter_length", "adaptor_sequence_count") . "\n";
+	foreach my $adaptor_length (sort {$b <=> $a} keys %adaptor_length_counter){
+		foreach my $adaptor_concatenated_sequence (keys %{$adaptor_length_counter{$adaptor_length}}){
+			my $adaptor_sequence_count = $adaptor_length_counter{$adaptor_length}{$adaptor_concatenated_sequence};
+	 		print OUTFILE join("\t", $adaptor_concatenated_sequence, $adaptor_length, $adaptor_sequence_count) . "\n";
+		}
+		
+	}
+ 	close(OUTFILE) or die "Couldn't close file $adaptor_length_counts_outfile";
+ 	
+ 	%fastq_seq_counter = ();
+ 	%adaptor_length_counter = ();
 }
 
 my $subject = "\"$0 Process Complete\"";
@@ -371,25 +429,6 @@ send_mail($subject, $message, 'both');
 # warn "$num_of_files out of $file_count .fastq files copied successfully....\n";
 
 # print $fastq_header_counter . "\n";
-
-=head1 SUBROUTINES
- 
-(\%music_files, $file_count) = find_music_files($ipod_music_dir) - Find all music files in the specified iPod music folder with the extension *.m4a.
-
-Input paramater(s):
- 
-$ipod_music_dir - iPod music input directory.
- 
-Output paramater(s):
-
-\%music_files - A hash reference containing all the files with file extension *.m4a in key/value pairs.
- 
- key => filename [A-Z]{4}.m4a ( e.g. ABCD.m4a )
- value => absolue filepath /path/to/[A-Z]{4} ( e.g. /path/to/ABCD.m4a )
- 
-$file_count - The number of files stored with file extension *.m4a.
- 
-=cut
 sub find_fastq_files{
     
 	my $project_leader_dir = shift;
@@ -427,11 +466,12 @@ sub makeblastdb_nuc{
 	$fastadbNHR = $fastadb . '.nhr';
 	unless(-s $fastadbNIN and -s $fastadbNSQ and -s $fastadbNHR){
 		warn "Calling makeblastdb for $fastadb....\n";
-		warn "$makeblastdb -in $fastadb -dbtype nucl\n\n";
+		my $makeblastdbCmd = "$makeblastdb -in $fastadb -dbtype nucl";
+		warn $makeblastdbCmd . "\n\n";
 		system($makeblastdb, 
 			'-in', $fastadb, 
 			'-dbtype', 'nucl'
-		) == 0 or die "Error calling $makeblastdb -in $fastadb -dbtype nucl: $?";
+		) == 0 or die "Error calling $makeblastdbCmd: $?";
 	}
 
 }
@@ -496,6 +536,7 @@ sub generate_adaptor_blastn{
 	unless(-d $blastn_aln_output_dir){
 		mkdir($blastn_aln_output_dir, 0777) or die "Can't make directory: $!";
 	}
+	
 	my $adaptor_blastn_aln_outfile = join('/', $blastn_aln_output_dir, $fasta_target_name . ".gbs_adaptor_blastn.aln.txt");
 	unless(-s $adaptor_blastn_aln_outfile){
 		warn "Generating primer blastn alignment file....\n";
@@ -517,11 +558,12 @@ sub generate_adaptor_blast_graphics{
 
 	
 	warn "Calling gbs_adaptor_align_graphics.pl for $adaptor_blastn_tsv_outfile....\n";
-	warn "$gbs_adaptor_align_graphics -i $adaptor_blastn_tsv_outfile -o $adaptor_graphics_output_dir\n\n";
+	my $gbsAdaptorAlignGraphicsCmd  = "$gbs_adaptor_align_graphics -i $adaptor_blastn_tsv_outfile -o $adaptor_graphics_output_dir";
+	warn $gbsAdaptorAlignGraphicsCmd . "\n\n";
 	system($gbs_adaptor_align_graphics, 
 		'-i', $adaptor_blastn_tsv_outfile, 
 		'-o', $adaptor_graphics_output_dir
-	) == 0 or die "Error calling $gbs_adaptor_align_graphics -i $adaptor_blastn_tsv_outfile -o $adaptor_graphics_output_dir: $?";
+	) == 0 or die "Error calling $gbsAdaptorAlignGraphicsCmd: $?";
 }
 
 # my $seq = get_subseq("AGCTTGCGTT", 3, 8);
@@ -548,16 +590,13 @@ sub get_subseq{
 }
 
 sub send_mail{
+
 	my $subject = shift or die "lost email subject";
 	my $message = shift or die "lost email message";
 	my $email_type = shift or die "lost email type";
 	
-    
-	warn "$send_mail -s $subject -m $message -t $email_type\n\n";
-	system($send_mail, 
-		'-s', $subject, 
-		'-m', $message, 
-		'-t', $email_type
-	) == 0 or die "Error calling $send_mail -s $subject -m $message -t $email_type: $?";
+	my $sendMailCmd  = "$send_mail -s $subject -m $message -t $email_type";
+	warn $sendMailCmd . "\n\n";
+	system($sendMailCmd) == 0 or die "Error calling $sendMailCmd: $?";
 
 }
