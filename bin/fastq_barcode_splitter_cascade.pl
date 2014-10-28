@@ -65,10 +65,10 @@ while(<INFILE>){
 	warn $_ . "\n";
 	if($i ne 0){
 		my @split_row_entry = split(/\t/, $_);
-		my ($fastq_plate_num, $fastq_well_num, $fastq_run_id, $fastq_project_leader, $fastq_barcode_seq) = ($split_row_entry[0], $split_row_entry[1], $split_row_entry[2], $split_row_entry[3], $split_row_entry[4]);
+		my ($fastq_plate_num, $fastq_well_row, $fastq_well_column, $fastq_run_id, $fastq_project_leader, $fastq_barcode_seq) = ($split_row_entry[0], $split_row_entry[1], $split_row_entry[2], $split_row_entry[3], $split_row_entry[4], $split_row_entry[5]);
 
 		my $barcode_seq_length = length($fastq_barcode_seq);
-		my $fastq_barcode_name = join("_", $fastq_run_id, $fastq_barcode_seq, $fastq_plate_num, $fastq_well_num);
+		my $fastq_barcode_name = join("_", $fastq_run_id, $fastq_barcode_seq, $fastq_plate_num, join("", $fastq_well_row, $fastq_well_column));
 		push(@{$barcode_data{$barcode_seq_length}},  join("\t", $fastq_barcode_name, $fastq_barcode_seq, $fastq_project_leader));
 		
 	}

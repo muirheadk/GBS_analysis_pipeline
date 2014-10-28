@@ -33,8 +33,8 @@ $adaptor_trim_offset = 5 unless defined $adaptor_trim_offset;
 $blast_num_cpu = 2 unless defined $blast_num_cpu;
 
 my ($makeblastdb, $blastn, $gbs_adaptor_align_graphics, $send_mail);
-$makeblastdb 			= '/usr/bin/makeblastdb';
-$blastn				= '/usr/bin/blastn';
+$makeblastdb 			= '/usr/local/bin/makeblastdb';
+$blastn				= '/usr/local/bin/blastn';
 $gbs_adaptor_align_graphics	= '/GBS_analysis_pipeline/bin/gbs_adaptor_align_graphics.pl';
 $send_mail			= '/GBS_analysis_pipeline/bin/send_mail.pl';
 
@@ -133,7 +133,7 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 		my $fastq_counter = 0;
 		while(<INFILE>){
 			chomp $_;
-		# 	warn $_ . "\n";
+			#warn $_ . "\n";
 			if($_ =~ m/^\@[A-Za-z0-9-_]+:\d+:[A-Za-z0-9]+:\d+:\d+:\d+:\d+ \d:[A-Z]:\d:[ACGTRYKMSWBDHVN]*$/){ # @HWI-ST767:215:C30VBACXX:8:1101:1801:1484 1:N:0:
 				$fastq_header = $_;
 #  				die $fastq_header;
@@ -212,7 +212,7 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 		while(<INFILE>){
 			chomp $_;
 			if($i ne 0){
-		 		warn $_ . "\n";
+		 		#warn $_ . "\n";
 				my @adaptor_blastn_hit =  split(/\t/, $_);
 				my ($query_name, $target_name, $query_coverage, $percent_identity, $align_length, $num_mismatch,
 					$num_gaps, $query_start, $query_end, $target_start, $target_end, $e_value, $bit_score, $gylph_colour) = @adaptor_blastn_hit;
@@ -285,8 +285,13 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 						my $adaptor_start_sequence = get_subseq($adaptor_sequence, 1, ($query_start - 1));
 						my $adaptor_end_sequence = get_subseq($adaptor_sequence, ($query_end + 1), $adaptor_end);
 
-
-						$adaptor_concatenated_sequence  = join("-", $adaptor_start_sequence, $query_start, $adaptor_sub_sequence, $query_end, $adaptor_end_sequence);
+						if($adaptor_start_sequence eq ""){
+							$adaptor_concatenated_sequence  = join("-", $query_start, $adaptor_sub_sequence, $query_end, $adaptor_end_sequence);
+						}elsif($adaptor_end_sequence eq ""){
+							$adaptor_concatenated_sequence  = join("-", $adaptor_start_sequence, $query_start, $adaptor_sub_sequence, $query_end);
+						}else{
+							$adaptor_concatenated_sequence  = join("-", $adaptor_start_sequence, $query_start, $adaptor_sub_sequence, $query_end, $adaptor_end_sequence);
+						}
 					}
 					
 					$adaptor_length_counter{$align_length}{$adaptor_concatenated_sequence}++;
@@ -417,7 +422,7 @@ foreach my $project_leader (sort keys %{$project_fastq_files}){
 		
 	}
  	close(OUTFILE) or die "Couldn't close file $adaptor_length_counts_outfile";
- 	
+
  	%fastq_seq_counter = ();
  	%adaptor_length_counter = ();
 }
@@ -502,7 +507,10 @@ sub generate_adaptor_blastn{
 		my $adaptorBlastnCmd  = "echo -e \"$fastq_adaptor_sequence\" | $blastn -query - -db $fasta_target -task blastn -word_size 7 -dust no -evalue 1000 -outfmt '6 qseqid salltitles qcovhsp pident length mismatch gapopen qstart qend sstart send evalue bitscore' -num_threads $blast_num_cpu";
 		warn $adaptorBlastnCmd . "\n\n";
 
-		my @adaptor_blastn_results = ();
+
+		open(OUTFILE, ">$adaptor_blastn_tsv_outfile") or die "Couldn't open file $adaptor_blastn_tsv_outfile for writting, $!";
+                print OUTFILE join("\t", "query_name", "target_name", "query_coverage", "percent_identity", "align_length", "num_mismatch",
+                "num_gaps", "query_start", "query_end", "target_start", "target_end", "e_value", "bit_score", "graphics_colour") . "\n";
 		local (*ADAPTOR_BLASTN_OUT, *ADAPTOR_BLASTN_IN);
 		my $pid = open2(\*ADAPTOR_BLASTN_OUT,\*ADAPTOR_BLASTN_IN, $adaptorBlastnCmd) or die "Error calling open2: $!";
 		close ADAPTOR_BLASTN_IN or die "Error closing STDIN to adaptor blastn process: $!";
@@ -513,22 +521,13 @@ sub generate_adaptor_blastn{
 			$num_gaps, $query_start, $query_end, $target_start, $target_end, $e_value, $bit_score) = @adaptor_blastn_hit;
 			my $glyph_colour = "blue";
 
-	    		my $adaptor_blastn_entry = join("\t", join("_", "GBS_adaptor_sequence", $fastq_adaptor_sequence), $target_name, $query_coverage, $percent_identity, $align_length, $num_mismatch, 
-				$num_gaps, $query_start, $query_end, $target_start, $target_end, $e_value, $bit_score, $glyph_colour);
-# 			warn $adaptor_blastn_entry . "\n";
+	    		print OUTFILE join("\t", join("_", "GBS_adaptor_sequence", $fastq_adaptor_sequence), $target_name, $query_coverage, $percent_identity, $align_length, $num_mismatch, 
+				$num_gaps, $query_start, $query_end, $target_start, $target_end, $e_value, $bit_score, $glyph_colour) . "\n";
 
-	    		push(@adaptor_blastn_results, [split(/\t/, $adaptor_blastn_entry)]);
 		
 		}
 		close ADAPTOR_BLASTN_OUT or die "Error closing STDOUT from adaptor blastn process: $!";
 		wait;
-		
-		open(OUTFILE, ">$adaptor_blastn_tsv_outfile") or die "Couldn't open file $adaptor_blastn_tsv_outfile for writting, $!";
-		print OUTFILE join("\t", "query_name", "target_name", "query_coverage", "percent_identity", "align_length", "num_mismatch", 
-		"num_gaps", "query_start", "query_end", "target_start", "target_end", "e_value", "bit_score", "graphics_colour") . "\n"; 
-		foreach my $adaptor_blastn_entry (sort {$b->[12] <=> $a->[12]} @adaptor_blastn_results){
-			print OUTFILE join("\t", @$adaptor_blastn_entry) . "\n";
-		}
 		close(OUTFILE) or die "Couldn't close file $adaptor_blastn_tsv_outfile";
 	}
 	
