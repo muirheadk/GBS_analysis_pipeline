@@ -129,7 +129,7 @@ unless(-s $uneak_fastq_barcodes_infile){
 }
 
 # ./tagCounts/ (for output from UQseqToTagCountPlugin OR UFastqToTagCountPlugin OR UMergeTaxaTagCountPlugin)
-# Create the fastq barcodes key output directory if it doesn't already exist.
+# Create the tag counts output directory if it doesn't already exist.
 my $tag_counts_output_dir = join('/', $uneak_project_dir, "tagCounts");
 unless(-d $tag_counts_output_dir){
       mkdir($tag_counts_output_dir, 0777) or die "Can't make directory: $!";
@@ -139,15 +139,39 @@ ufastq_to_tag_counts($uneak_project_dir, $project_name, $fastq_barcodes_infile, 
 	$tassel_num_ram, $tag_counts_output_dir);
 	
 # ./mergedTagCounts/ (for output fromUMergeTaxaTagCountPlugin)
-# 
-# ./tagPair/ (for output fromUTagCountToTagPairPlugin)
-# 
-# ./tagsByTaxa/ (for output fromUTBTToMapInfoPlugin)
-# 
-# ./mapInfo/ (for output from UTBTToMapInfoPlugin)
-#  
-# ./hapMap/ (for output from TagsToSNPByAlignmentPlugin)
+# Create the merged tag counts output directory if it doesn't already exist.
+my $merged_tag_counts_output_dir = join('/', $uneak_project_dir, "mergedTagCounts");
+unless(-d $merged_tag_counts_output_dir){
+      mkdir($merged_tag_counts_output_dir, 0777) or die "Can't make directory: $!";
+}
 
+# ./tagPair/ (for output fromUTagCountToTagPairPlugin)
+# Create the tag pair output directory if it doesn't already exist.
+my $tag_pair_output_dir = join('/', $uneak_project_dir, "tagPair");
+unless(-d $tag_pair_output_dir){
+      mkdir($tag_pair_output_dir, 0777) or die "Can't make directory: $!";
+}
+
+# ./tagsByTaxa/ (for output fromUTBTToMapInfoPlugin)
+# Create the tags by taxa output directory if it doesn't already exist.
+my $tags_by_taxa_output_dir = join('/', $uneak_project_dir, "tagsByTaxa");
+unless(-d $tags_by_taxa_output_dir){
+      mkdir($tags_by_taxa_output_dir, 0777) or die "Can't make directory: $!";
+}
+
+# ./mapInfo/ (for output from UTBTToMapInfoPlugin)
+# Create the map info output directory if it doesn't already exist.
+my $map_info_output_dir = join('/', $uneak_project_dir, "mapInfo");
+unless(-d $map_info_output_dir){
+      mkdir($map_info_output_dir, 0777) or die "Can't make directory: $!";
+} 
+
+# ./hapMap/ (for output from TagsToSNPByAlignmentPlugin)
+# Create the hap map output directory if it doesn't already exist.
+my $hap_map_output_dir = join('/', $uneak_project_dir, "hapMap");
+unless(-d $hap_map_output_dir){
+      mkdir($hap_map_output_dir, 0777) or die "Can't make directory: $!";
+}
 
 
 # uneak_create_working_dir($uneak_project_dir);
@@ -205,6 +229,38 @@ sub ufastq_to_tag_counts{
 
 #run umergetaxatagcounts plugin from the current directory (-w), using a read depth cutoff of 5 (-c). You can change the cutoff to whatever you like.
 # run_pipeline.pl -Xmx4g -fork1 -UMergeTaxaTagCountPlugin -w ./ -c 5 -endPlugin -runfork1 > UmergeTagCount.log
+sub umerge_taxa_tag_counts{
+
+        my $uneak_working_dir = shift;
+        die "Error lost the UNEAK working directory" unless defined $uneak_working_dir;
+        
+        my $project_name = shift;
+        die "Error lost the project name" unless defined $project_name;
+        
+        my $fastq_barcodes_infile = shift;
+        die "Error lost the key file listing barcodes for each sample and plate layout" unless defined $fastq_barcodes_infile;
+
+        my $restriction_enzymes = shift;
+        die "Error lost the enzyme(s) used to create the GBS library" unless defined $restriction_enzymes;
+        
+        my $max_num_barcode_reads = shift;
+        die "Error lost the maximum number of good barcoded reads per lane" unless defined $max_num_barcode_reads;
+        
+        my $min_num_present_tag = shift;
+        die "Error lost the minimum number of times a tag must be present to be output" unless defined $min_num_present_tag;
+        
+        my $tassel_num_ram = shift;
+        die "Error lost the amount of tassel memory" unless defined $tassel_num_ram;
+        
+        my $tag_count_output_dir = shift;
+        die "Error lost the output directory to contain output .cnt (tag count) files, one per input FASTQ file" unless defined $tag_count_output_dir;
+        
+        my $uneak_fastq_to_tag_counts_log_outfile = join('/', $tag_count_output_dir, join("_", $project_name, "UFastqToTagCounts.log"));
+	warn "Generating the UNEAK tag counts list file using the UFastqToTagCountPlugin.....\n";
+	my $fastqToTagCountsCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -UFastqToTagCountPlugin -w $uneak_working_dir -e $restriction_enzymes -s $max_num_barcode_reads -c $min_num_present_tag -endPlugin -runfork1 > $uneak_fastq_to_tag_counts_log_outfile");
+	warn $fastqToTagCountsCmd . "\n\n";
+	system($fastqToTagCountsCmd) == 0 or die "Error calling $fastqToTagCountsCmd: $?";
+}
 
 #run binarytotext plugin to make the umergetaxatagcount result from above human readable
 # run_pipeline.pl -Xmx4g -fork1 -BinaryToTextPlugin -i ./mergedTagCounts/mergeAll.cnt -o ./mergedTagCounts/mergeAll_cnt.txt -t TagCounts -endPlugin -runfork1 >> ./bintotex.log

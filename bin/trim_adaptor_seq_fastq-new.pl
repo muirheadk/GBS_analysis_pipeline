@@ -5,7 +5,7 @@ use Getopt::Long;
 
 use File::Basename;
 use IPC::Open2;
-use Math::Round;
+#use Math::Round;
 use List::Compare;
 
 # perl trim_adaptor_seq_fastq-new.pl -i ~/workspace/GBS_data-08-10-2013/PROJECT_LEADER_DIR/CHRISTIANNE_MCDONALD -p CHRISTIANNE_MCDONALD -c 7 -o ~/workspace/GBS_data-08-10-2013/TRIMMED_ADAPTOR_FASTQ_DIR-2014-10-29
@@ -39,8 +39,7 @@ my ($gzip, $makeblastdb, $blastn, $gbs_adaptor_align_graphics, $send_mail);
 $gzip 				= '/bin/gzip';
 $makeblastdb 			= '/usr/local/bin/makeblastdb';
 $blastn				= '/usr/local/bin/blastn';
-$gbs_adaptor_align_graphics	= '/GBS_analysis_pipeline/bin/gbs_adaptor_align_graphics.pl';
-$send_mail			= '/GBS_analysis_pipeline/bin/send_mail.pl';
+# $gbs_adaptor_align_graphics	= '/GBS_analysis_pipeline/bin/gbs_adaptor_align_graphics.pl';
 
 sub usage {
 
@@ -114,14 +113,14 @@ unless(-d $trimmed_output_dir){# Need this to make the bulk fastq sequence file.
 	mkdir($trimmed_output_dir, 0777) or die "Can't make directory: $!";
 }
 
-my $trimmed_fastq_bulk_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed") . ".fastq");
+my $trimmed_fastq_bulk_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset) . ".fastq");
 push(@fastq_files2gzip, $trimmed_fastq_bulk_outfile);
 open(TRIMMED_BULK_OUTFILE, ">$trimmed_fastq_bulk_outfile") or die "Couldn't open file $trimmed_fastq_bulk_outfile for writting, $!";
-my $trimmed_seqs_layout_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_seqs_layout") . ".txt");
+my $trimmed_seqs_layout_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset, "trimmed_seqs_layout") . ".txt");
 open(TRIMMED_LAYOUT_OUTFILE, ">$trimmed_seqs_layout_outfile") or die "Couldn't open file $trimmed_seqs_layout_outfile for writting, $!";
 print TRIMMED_LAYOUT_OUTFILE join("\t", "sequence_id", "trimmed_fastq_start", "trimmed_fastq_end", "trimmed_fastq_length", "trimmed_adaptor_start", "trimmed_adaptor_end",
 "trimmed_adaptor_length", "adaptor_seq_start", "adaptor_seq_end", "adaptor_seq_length") . "\n";
-my $removed_seqs_layout_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "removed_seqs_layout") . ".txt");
+my $removed_seqs_layout_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset, "removed_seqs_layout") . ".txt");
 open(REMOVED_LAYOUT_OUTFILE, ">$removed_seqs_layout_outfile") or die "Couldn't open file $removed_seqs_layout_outfile for writting, $!";
 print REMOVED_LAYOUT_OUTFILE join("\t", "sequence_id", "trimmed_fastq_start", "trimmed_fastq_end", "trimmed_fastq_length", "trimmed_adaptor_start", "trimmed_adaptor_end",
 "trimmed_adaptor_length", "adaptor_seq_start", "adaptor_seq_end", "adaptor_seq_length") . "\n";
@@ -404,7 +403,7 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   		mkdir($trimmed_fastq_output_dir, 0777) or die "Can't make directory: $!";
   	}
   
-  	my $trimmed_fastq_outfile = join("/", $trimmed_fastq_output_dir, join("_", $fasta_filename, "trimmed") . ".fastq");
+  	my $trimmed_fastq_outfile = join("/", $trimmed_fastq_output_dir, join("_", $fasta_filename, "trimmed_offset", $adaptor_trim_offset) . ".fastq");
   	open(OUTFILE, ">$trimmed_fastq_outfile") or die "Couldn't open file $trimmed_fastq_outfile for writting, $!";
   	# Print out trimmed fastq sequences first so that we can see what was trimmed.
   	foreach my $fastq_header (sort keys %trimmed_fastq_sequences){
@@ -457,7 +456,7 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   		mkdir($removed_fastq_output_dir, 0777) or die "Can't make directory: $!";
   	}
   	
-  	my $removed_fastq_outfile = join("/", $removed_fastq_output_dir, join("_", $fasta_filename, "removed_sequences") . ".fastq");
+  	my $removed_fastq_outfile = join("/", $removed_fastq_output_dir, join("_", $fasta_filename, "trimmed_offset", $adaptor_trim_offset, "removed_sequences") . ".fastq");
   	open(OUTFILE, ">$removed_fastq_outfile") or die "Couldn't open file $trimmed_fastq_outfile for writting, $!";
   	foreach my $fastq_header (sort keys %removed_fastq_sequences){
   	
@@ -488,68 +487,72 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   	undef @untrimmed_fastq_sequence_list;
   	undef @fastq_list2remove;
 }
-  close(TRIMMED_BULK_OUTFILE) or die "Couldn't close file $trimmed_fastq_bulk_outfile";
-  close(TRIMMED_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_layout_outfile";
-  close(REMOVED_LAYOUT_OUTFILE) or die "Couldn't close file $removed_seqs_layout_outfile";
-  
-  my $fastq_seq_counts_outfile = join("/", $trimmed_output_dir, join("_", $project_name, "fastq_seq_counts") . ".txt");
-  open(OUTFILE, ">$fastq_seq_counts_outfile") or die "Couldn't open file $fastq_seq_counts_outfile for writting, $!";
-  print OUTFILE join("\t", "fastq_file_name", "total_num_seqs", "num_untrimmed_seqs", "percent_untrimmed_seqs", "num_trimmed_seqs", "percent_trimmed_seqs", "num_removed_seqs", "percent_removed_seqs") . "\n";
-  foreach my $fasta_filename (sort keys %fastq_seq_counter){
-  
-  	my $num_untrimmed_seqs = $fastq_seq_counter{$fasta_filename}{'UNTRIMMED'};
-  	my $num_trimmed_seqs = $fastq_seq_counter{$fasta_filename}{'TRIMMED'};
-  	my $num_removed_seqs = $fastq_seq_counter{$fasta_filename}{'REMOVED'};
-  	
-  	my $total_num_seqs = ($num_untrimmed_seqs + $num_trimmed_seqs + $num_removed_seqs);
-  	
-  	my $percent_untrimmed_seqs = (($num_untrimmed_seqs/$total_num_seqs) * 100);
-  	my $percent_trimmed_seqs = (($num_trimmed_seqs/$total_num_seqs) * 100);
-  	my $percent_removed_seqs = (($num_removed_seqs/$total_num_seqs) * 100);
-  	
-  	# If trimmed or removed sequence counters how zero count reflect in either percent and number of sequence variables.
-  	$num_trimmed_seqs = 0 unless(defined($num_trimmed_seqs));
-  	$percent_trimmed_seqs = 0.00 unless(defined($num_trimmed_seqs));
-  	$num_removed_seqs = 0 unless(defined($num_removed_seqs));
-  	$percent_removed_seqs = 0.00 unless(defined($num_removed_seqs));
-  	
-  	die "The number of sequences are not equal to 100.00 percent.....\n" . join("\t", $percent_untrimmed_seqs, $percent_trimmed_seqs, $percent_removed_seqs, ($percent_untrimmed_seqs + $percent_trimmed_seqs + $percent_removed_seqs)) if(($percent_untrimmed_seqs + $percent_trimmed_seqs + $percent_removed_seqs) ne 100.00);
-  	print OUTFILE join("\t", $fasta_filename, $total_num_seqs, $num_untrimmed_seqs, $percent_untrimmed_seqs, $num_trimmed_seqs, $percent_trimmed_seqs, $num_removed_seqs, $percent_removed_seqs) . "\n";
-  }
-  close(OUTFILE) or die "Couldn't close file $fastq_seq_counts_outfile";
-  
-  my $adaptor_length_counts_outfile = join("/", $trimmed_output_dir, join("_", $project_name, "adaptor_length_counts") . ".txt");
-  open(OUTFILE, ">$adaptor_length_counts_outfile") or die "Couldn't open file $adaptor_length_counts_outfile for writting, $!";
-  print OUTFILE join("\t", "adapter_sequence_id", "adapter_length", "adaptor_sequence_count") . "\n";
-  foreach my $adaptor_length (sort {$b <=> $a} keys %adaptor_length_counter){
-  	foreach my $adaptor_concatenated_sequence (keys %{$adaptor_length_counter{$adaptor_length}}){
-  		my $adaptor_sequence_count = $adaptor_length_counter{$adaptor_length}{$adaptor_concatenated_sequence};
-  		print OUTFILE join("\t", $adaptor_concatenated_sequence, $adaptor_length, $adaptor_sequence_count) . "\n";
-  	}
-  	
-  }
-  close(OUTFILE) or die "Couldn't close file $adaptor_length_counts_outfile";
-  
-  # Iterate through each trimmed fastq file and compress them using gzip.
-  foreach my $fastq_file (sort @fastq_files2gzip){
-  	gzip_fastq_file($fastq_file);
-  }
-  
-#  # Grab all the blastdb and fasta formatted files to remove to save space because we don't need them anymore. 
-#  my $blastdb_files = find_blastdb_files($fasta_output_dir);
-#  
-#  # Iterate through all the blastdb and fasta formatted files and remove them.
-#  foreach my $blastdb_file (sort @{$blastdb_files}){
-#  	 unlink($blastdb_file) or die "Could not unlink $blastdb_file: $!";
-#  }
-#  
-#  # Remove the fasta file directory because we don't need it anymore.
-#  rmdir($fasta_output_dir) or die "Could not remove directory $fasta_output_dir: $!";
+close(TRIMMED_BULK_OUTFILE) or die "Couldn't close file $trimmed_fastq_bulk_outfile";
+close(TRIMMED_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_layout_outfile";
+close(REMOVED_LAYOUT_OUTFILE) or die "Couldn't close file $removed_seqs_layout_outfile";
 
-  # Empty all hash and array containers for garbage collection purposes.
-  undef @fastq_files2gzip;
-  undef %fastq_seq_counter;
-  undef %adaptor_length_counter;
+my $fastq_seq_counts_outfile = join("/", $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset, "fastq_seq_counts") . ".txt");
+open(OUTFILE, ">$fastq_seq_counts_outfile") or die "Couldn't open file $fastq_seq_counts_outfile for writting, $!";
+print OUTFILE join("\t", "fastq_file_name", "total_num_seqs", "num_untrimmed_seqs", "percent_untrimmed_seqs", "num_trimmed_seqs", "percent_trimmed_seqs", "num_removed_seqs", "percent_removed_seqs") . "\n";
+foreach my $fasta_filename (sort keys %fastq_seq_counter){
+
+    my $num_untrimmed_seqs = $fastq_seq_counter{$fasta_filename}{'UNTRIMMED'};
+    my $num_trimmed_seqs = $fastq_seq_counter{$fasta_filename}{'TRIMMED'};
+    my $num_removed_seqs = $fastq_seq_counter{$fasta_filename}{'REMOVED'};
+
+
+    # If trimmed or removed sequence counters how zero count reflect in number of sequence variables.
+    $num_untrimmed_seqs = 0 unless(defined($num_untrimmed_seqs));
+    $num_trimmed_seqs = 0 unless(defined($num_trimmed_seqs));
+    $num_removed_seqs = 0 unless(defined($num_removed_seqs));
+
+    my $total_num_seqs = ($num_untrimmed_seqs + $num_trimmed_seqs + $num_removed_seqs);
+
+    my $percent_untrimmed_seqs = (($num_untrimmed_seqs/$total_num_seqs) * 100);
+    my $percent_trimmed_seqs = (($num_trimmed_seqs/$total_num_seqs) * 100);
+    my $percent_removed_seqs = (($num_removed_seqs/$total_num_seqs) * 100);
+
+    # If trimmed or removed sequence counters how zero count reflect in either percent of sequence variables.
+    $percent_untrimmed_seqs = 0.00 unless(defined($num_untrimmed_seqs));
+    $percent_trimmed_seqs = 0.00 unless(defined($num_trimmed_seqs));
+    $percent_removed_seqs = 0.00 unless(defined($num_removed_seqs));
+
+    die "The number of sequences are not equal to 100.00 percent.....\n" . join("\t", $percent_untrimmed_seqs, $percent_trimmed_seqs, $percent_removed_seqs, ($percent_untrimmed_seqs + $percent_trimmed_seqs + $percent_removed_seqs)) if(($percent_untrimmed_seqs + $percent_trimmed_seqs + $percent_removed_seqs) ne 100.00);
+    print OUTFILE join("\t", $fasta_filename, $total_num_seqs, $num_untrimmed_seqs, $percent_untrimmed_seqs, $num_trimmed_seqs, $percent_trimmed_seqs, $num_removed_seqs, $percent_removed_seqs) . "\n";
+}
+close(OUTFILE) or die "Couldn't close file $fastq_seq_counts_outfile";
+
+my $adaptor_length_counts_outfile = join("/", $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset, "adaptor_length_counts") . ".txt");
+open(OUTFILE, ">$adaptor_length_counts_outfile") or die "Couldn't open file $adaptor_length_counts_outfile for writting, $!";
+print OUTFILE join("\t", "adapter_sequence_id", "adapter_length", "adaptor_sequence_count") . "\n";
+foreach my $adaptor_length (sort {$b <=> $a} keys %adaptor_length_counter){
+    foreach my $adaptor_concatenated_sequence (keys %{$adaptor_length_counter{$adaptor_length}}){
+        my $adaptor_sequence_count = $adaptor_length_counter{$adaptor_length}{$adaptor_concatenated_sequence};
+        print OUTFILE join("\t", $adaptor_concatenated_sequence, $adaptor_length, $adaptor_sequence_count) . "\n";
+    }
+}
+close(OUTFILE) or die "Couldn't close file $adaptor_length_counts_outfile";
+
+# Iterate through each trimmed fastq file and compress them using gzip.
+foreach my $fastq_file (sort @fastq_files2gzip){
+    gzip_fastq_file($fastq_file);
+}
+  
+# Grab all the blastdb and fasta formatted files to remove to save space because we don't need them anymore.
+my $blastdb_files = find_blastdb_files($fasta_output_dir);
+
+# Iterate through all the blastdb and fasta formatted files and remove them.
+foreach my $blastdb_file (@{$blastdb_files}){
+    unlink($blastdb_file) or die "Could not unlink $blastdb_file: $!";
+}
+
+# Remove the fasta file directory because we don't need it anymore.
+rmdir($fasta_output_dir) or die "Could not remove directory $fasta_output_dir: $!";
+
+# Empty all hash and array containers for garbage collection purposes.
+undef @fastq_files2gzip;
+undef %fastq_seq_counter;
+undef %adaptor_length_counter;
 
 
 # my $subject = "\"$0 Process Complete\"";
@@ -565,10 +568,10 @@ sub find_fastq_files{
 	$file_count = 0;
 	opendir(DIR, $fastq_file_dir) || die "Error in opening dir $fastq_file_dir\n";
 	while( my $file_name = readdir(DIR)){
-		my $fastq_file_name = join('/', $fastq_file_dir, $file_name) if ($file_name =~ m/.fastq$/);
-		warn "$fastq_file_name\n" if ($file_name =~ m/.fastq$/);
-		$fastq_files{$file_name} = $fastq_file_name if ($file_name =~ m/.fastq$/);
-		$file_count++ if ($file_name =~ m/.fastq$/);
+		my $fastq_file_name = join('/', $fastq_file_dir, $file_name) if ($file_name =~ m/\.fastq$/);
+		warn "$fastq_file_name\n" if ($file_name =~ m/\.fastq$/);
+		$fastq_files{$file_name} = $fastq_file_name if ($file_name =~ m/\.fastq$/);
+		$file_count++ if ($file_name =~ m/\.fastq$/);
 	}
 	closedir(DIR);
 	return (\%fastq_files, $file_count);
@@ -578,18 +581,16 @@ sub find_blastdb_files{
     
 	my $blastdb_dir = shift;
 	die "Error lost blastdb file directory" unless defined $blastdb_dir;
-
-	my (@blastdb_files, $file_count);
-	$file_count = 0;
+    
+	my @blastdb_files = ();
 	opendir(DIR, $blastdb_dir) || die "Error in opening dir $blastdb_dir\n";
 	while( my $file_name = readdir(DIR)){
-		my $blastdb_file_name = join('/', $blastdb_dir, $file_name) if ($file_name =~ m/.fasta$/ or $file_name =~ m/.nin$/ or $file_name =~ m/.nsq$/ or $file_name =~ m/.nhr$/);
-		warn "$blastdb_file_name\n" if ($file_name =~ m/.fasta$/ or $file_name =~ m/.nin$/ or $file_name =~ m/.nsq$/ or $file_name =~ m/.nhr$/);
-		push(@blastdb_files, $blastdb_file_name) if ($file_name =~ m/.fasta$/ or $file_name =~ m/.nin$/ or $file_name =~ m/.nsq$/ or $file_name =~ m/.nhr$/);
-		$file_count++ if ($file_name =~ m/.fasta$/ or $file_name =~ m/.nin$/ or $file_name =~ m/.nsq$/ or $file_name =~ m/.nhr$/);
+		my $blastdb_file_name = join('/', $blastdb_dir, $file_name) if ($file_name =~ m/\.fasta$/ or $file_name =~ m/\.nin$/ or $file_name =~ m/\.nsq$/ or $file_name =~ m/\.nhr$/);
+		warn "$blastdb_file_name\n" if ($file_name =~ m/\.fasta$/ or $file_name =~ m/\.nin$/ or $file_name =~ m/\.nsq$/ or $file_name =~ m/\.nhr$/);
+		push(@blastdb_files, $blastdb_file_name) if ($file_name =~ m/\.fasta$/ or $file_name =~ m/\.nin$/ or $file_name =~ m/\.nsq$/ or $file_name =~ m/\.nhr$/);
 	}
 	closedir(DIR);
-	return (\@blastdb_files, $file_count);
+	return \@blastdb_files;
 }
 
 # makeblastdb -in ncbi_nr_db_2014-05-30_organisms.fasta -dbtype 'nucl' -out ncbi_nr_db_2014-05-30_organisms.fasta
@@ -640,7 +641,7 @@ sub generate_adaptor_blastn{
 	my $adaptor_blastn_tsv_outfile = join('/', $blastn_output_dir, $fasta_target_name . ".gbs_adaptor_blastn.tsv");
 	unless(-s $adaptor_blastn_tsv_outfile){
 		warn join(" ", "Generating blast tab-delimited file", join("", $fasta_target_name, ".gbs_adaptor_blastn", ".tsv"), "using adaptor blastn.....") . "\n";
-		my $adaptorBlastnCmd  = "echo -e \"$fastq_adaptor_sequence\" | $blastn -query - -db $fasta_target -task blastn -strand plus -word_size 7 -dust no -evalue 1000000000 -max_target_seqs $max_target_seqs -perc_identity 100 -outfmt '6 qseqid salltitles qcovhsp pident length mismatch gapopen qstart qend sstart send evalue bitscore' -num_threads $blast_num_cpu";
+		my $adaptorBlastnCmd  = "echo -e \"$fastq_adaptor_sequence\" | $blastn -query - -db $fasta_target -task blastn -strand plus -word_size 7 -dust no -evalue 100000000 -max_target_seqs $max_target_seqs -perc_identity 100 -outfmt '6 qseqid salltitles qcovhsp pident length mismatch gapopen qstart qend sstart send evalue bitscore' -num_threads $blast_num_cpu";
 		warn $adaptorBlastnCmd . "\n\n";
 		open(OUTFILE, ">$adaptor_blastn_tsv_outfile") or die "Couldn't open file $adaptor_blastn_tsv_outfile for writting, $!";
                 print OUTFILE join("\t", "query_name", "target_name", "query_coverage", "percent_identity", "align_length", "num_mismatch",
@@ -696,6 +697,7 @@ sub gzip_fastq_file{
 		'-9', $fastq_file,
 	) == 0 or die "Error calling $gzipCmd: $?";
 }
+
 # my $seq = get_subseq("AGCTTGCGTT", 3, 8);
 # warn $seq . "\n";
 sub get_subseq{
@@ -718,15 +720,3 @@ sub get_subseq{
 
         return uc($trimmed_seq);
 }
-
-# sub send_mail{
-# 
-# 	my $subject = shift or die "lost email subject";
-# 	my $message = shift or die "lost email message";
-# 	my $email_type = shift or die "lost email type";
-# 	
-# 	my $sendMailCmd  = "$send_mail -s $subject -m $message -t $email_type";
-# 	warn $sendMailCmd . "\n\n";
-# 	system($sendMailCmd) == 0 or die "Error calling $sendMailCmd: $?";
-# 
-# }
