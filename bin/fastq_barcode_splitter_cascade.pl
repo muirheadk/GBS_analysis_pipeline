@@ -3,6 +3,7 @@ use warnings;
 use strict;
 use Getopt::Long;
 use File::Copy;
+use File::Basename;
 
 # perl fastq_barcode_splitter_cascade.pl -i ~/workspace/GBS_data-08-10-2013/HI.1405.008.GQ03122013-5_R1.fastq -b ~/workspace/GBS_data-08-10-2013/GBS_barcodes-2013-10-09.csv -o ~/workspace/GBS_data-08-10-2013
 my ($fastq_infile, $barcode_infile, $num_mismatches, $output_dir);
@@ -23,7 +24,6 @@ $num_mismatches = 1 unless defined $num_mismatches;
 my ($gunzip, $fastx_barcode_splitter, $send_mail);
 $gunzip				= '/bin/gunzip';
 $fastx_barcode_splitter 	= '/usr/local/bin/fastx_barcode_splitter.pl';
-$send_mail			= '/TRIA-NetUtils/bin/send_mail.pl';
 
 sub usage {
     
@@ -50,6 +50,10 @@ unless(-d $output_dir){
       mkdir($output_dir, 0777) or die "Can't make directory: $!";
 }
 
+if($fastq_infile =~ m/\.gz$/){
+	my $uncompressed_fastq_file = gunzip_fastq_file($fastq_infile);
+	$fastq_infile = $uncompressed_fastq_file;
+}
 
 # Create output directory if it doesn't already exist.
 my $split_fastq_output_dir = join('/', $output_dir, "SPLIT_FASTQ_OUTFILES");
@@ -133,11 +137,6 @@ foreach my $fastq_project_leader (sort keys %barcode_filenames){
 	}
 }
 
-    my $subject = "$0 Process Complete";
-    my $message = "$0 process finished successfully! You can find the fastq output files for each project leader in the $split_fastq_output_dir/PROJECT_LEADER_DIR directory.";
-send_mail($subject, $message, 'email');
-
-
 sub fastx_barcode_splitter{
 	
 	my $fastq_infile = shift;
@@ -158,17 +157,19 @@ sub fastx_barcode_splitter{
 	my $status = system($fastx_barcode_splitterCmd) == 0 or die "Error calling $fastx_barcode_splitter: $?";
 }
 
-sub send_mail{
-    my $subject = shift or die "lost email subject";
-    my $message = shift or die "lost email message";
-    my $email_type = shift or die "lost email type";
-    
-    
-		warn "$send_mail -s $subject -m $message -t $email_type\n\n";
-		system($send_mail, 
-			'-s', "\"$subject\"", 
-			'-m', "\"$message\"", 
-			'-t', $email_type
-		) == 0 or die "Error calling $send_mail -s $subject -m $message -t $email_type: $?";
-
+sub gunzip_fastq_file{
+	
+	my $fastq_file = shift;
+	die "Error lost the fastq file to compress using gunzip" unless defined $fastq_file;
+	
+	my ($fastq_filename, $fastq_dir) = fileparse($fastq_file, ".gz");
+	
+	my $uncompressed_fastq_file = join('/', $fastq_dir, $fastq_filename);
+	
+	warn "Calling gunzip for $fastq_file....\n";
+	my $gunzipCmd  = "$gunzip -c $fastq_file > $uncompressed_fastq_file";
+	warn $gunzipCmd . "\n\n";
+	system($gunzipCmd) == 0 or die "Error calling $gunzipCmd: $?";
+	
+	return $uncompressed_fastq_file;
 }
