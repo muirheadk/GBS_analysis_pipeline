@@ -48,29 +48,27 @@ die <<"USAGE";
 
 Usage: $0 -i fastq_file_dir -p project_name -a fastq_adaptor_sequence -l gbs_sequence_length -m adaptor_length_min_threshold -t adaptor_trim_offset -q min_trimmed_fastq_sequence_length -c blast_num_cpu -o output_dir
 
-Description - 
+DESCRIPTION - 
 
 OPTIONS:
 
-	-i fastq_file_dir - 
-	
-	-p project_name -
-	
-	-a fastq_adaptor_sequence -
+-i fastq_file_dir - 
 
-	-l gbs_sequence_length - 
+-p project_name -
 
-	-m adaptor_length_min_threshold -
+-a fastq_adaptor_sequence -
 
-	-t adaptor_trim_offset - 
-	
-	-q min_trimmed_fastq_sequence_length - 
-	
-	-c blast_num_cpu -
+-l gbs_sequence_length - 
 
-	-o output_dir -
+-m adaptor_length_min_threshold -
 
+-t adaptor_trim_offset - 
 
+-q min_trimmed_fastq_sequence_length - 
+
+-c blast_num_cpu -
+
+-o output_dir -
 
 USAGE
 }

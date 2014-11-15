@@ -67,27 +67,51 @@ sub usage {
 die <<"USAGE";
 
 
-Usage: $0 -i fastq_infile -k fastq_barcodes_infile -e restriction_enzymes -s max_num_barcode_reads -c min_num_present_tag -m tassel_num_ram -p bwa_num_cpu -o gbs_output_dir
+Full Usage: $0 -i fastq_infile -n project_name -g reference_genome_infile -k fastq_barcodes_infile -e restriction_enzymes -s max_num_barcode_reads -c min_num_present_fastq_to_tag -u min_num_present_merge_multiple_tag -t max_num_tags_tbt -f min_minor_allele_freq_tag_to_snp -a min_minor_allele_freq_gbs_hap_map -r min_minor_allele_count -x max_num_sites -h start_chromosome -y genotypic_mismat_thres -z min_site_coverage -m tassel_num_ram -p bwa_num_cpu -o gbs_output_dir
 
-Description - 
+Minumum Usage: $0 -i fastq_infile -n project_name -g reference_genome_infile -k fastq_barcodes_infile -o gbs_output_dir
+
+DESCRIPTION - 
 
 OPTIONS:
 
-	-i fastq_infile - 
-	
-	-k barcodes_infile -
-	
-	-e restriction_enzymes -
+-i fastq_infile - 
 
-	-s max_num_barcode_reads - 
+-n project_name - 
 
-	-c min_num_present_tag -
+-g reference_genome_infile -  
 
-	-m tassel_num_ram - 
-	
-	-p bwa_num_cpu -
+-k fastq_barcodes_infile - 
 
-	-o gbs_output_dir -
+-e restriction_enzymes - 
+
+-s max_num_barcode_reads - 
+
+-c min_num_present_fastq_to_tag - 
+
+-u min_num_present_merge_multiple_tag - 
+
+-t max_num_tags_tbt - 
+
+-f min_minor_allele_freq_tag_to_snp - 
+
+-a min_minor_allele_freq_gbs_hap_map - 
+
+-r min_minor_allele_count - 
+
+-x max_num_sites - 
+
+-h start_chromosome - 
+
+-y genotypic_mismat_thres - 
+
+-z min_site_coverage - 
+
+-m tassel_num_ram - 
+
+-p bwa_num_cpu - 
+
+-o gbs_output_dir - 
 
 USAGE
 }
@@ -253,7 +277,7 @@ sub fastq_to_tag_counts{
 	}
 	
 	unless(($non_zero_tag_count_files eq $tag_count_file_counter) and ($tag_count_file_counter ne 0)){
-		warn "Generating tag counts list file using the FastqToTagCountPlugin.....\n";
+		warn "Generating tag counts list file using the FastqToTagCountPlugin.....\n\n";
 		my $fastqToTagCountsCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -FastqToTagCountPlugin -i $fastq_infile_dir -k $fastq_barcodes_infile -e $restriction_enzymes -s $max_num_barcode_reads -c $min_num_present_tag -o $tag_count_output_dir -endPlugin -runfork1 1> $fastq_to_tag_counts_stdout_log_outfile 2> $fastq_to_tag_counts_stderr_log_outfile");
 		warn $fastqToTagCountsCmd . "\n\n";
 		system($fastqToTagCountsCmd) == 0 or die "Error calling $fastqToTagCountsCmd: $?";
@@ -299,7 +323,7 @@ sub merge_multiple_tag_counts{
 	
 	my $merged_multiple_tag_counts_fasta_outfile = $merged_multiple_tag_counts_outfile . ".fq";
 	unless(-s $merged_multiple_tag_counts_fasta_outfile){
-		warn "Generating merged multiple tag counts fasta list file using the MergeMultipleTagCountPlugin.....\n";
+		warn "Generating merged multiple tag counts fasta list file using the MergeMultipleTagCountPlugin.....\n\n";
 		my $mergeMultipleTagCountFastaCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -MergeMultipleTagCountPlugin -i $tag_count_input_dir -o $merged_multiple_tag_counts_outfile -c $min_num_present_merge_multiple_tag -t -endPlugin -runfork1 1> $merge_multiple_tag_fastq_counts_stdout_log_outfile 2> $merge_multiple_tag_fastq_counts_stderr_log_outfile");
 		warn $mergeMultipleTagCountFastaCmd . "\n\n";
 		system($mergeMultipleTagCountFastaCmd) == 0 or die "Error calling $mergeMultipleTagCountFastaCmd: $?";
@@ -336,7 +360,7 @@ sub merge_multiple_tag_counts_to_fastq{
         my $merge_multiple_tag_counts_to_fastq_stderr_log_outfile = join('/', $gbs_output_dir, join("_", $project_name, "MergeMultipleTagCountsToFastq.stderr.log"));
         
         unless(-s $merged_multiple_tag_counts_to_fastq_outfile){
-		warn "Generating tag counts to fastq list file using the TagCountToFastqPlugin.....\n";
+		warn "Generating tag counts to fastq list file using the TagCountToFastqPlugin.....\n\n";
 		my $mergeMultipleTagCountToFastqCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -TagCountToFastqPlugin -i $merged_multiple_tag_counts_infile -o $merged_multiple_tag_counts_to_fastq_outfile -c $min_num_present_merge_multiple_tag -endPlugin -runfork1 1> $merge_multiple_tag_counts_to_fastq_stdout_log_outfile 2> $merge_multiple_tag_counts_to_fastq_stderr_log_outfile");
 		warn $mergeMultipleTagCountToFastqCmd . "\n\n";
 		system($mergeMultipleTagCountToFastqCmd) == 0 or die "Error calling $mergeMultipleTagCountToFastqCmd: $?";
@@ -355,7 +379,7 @@ sub convert_reference_genome_to_bwa_tassel{
 	my $reference_genome_output_dir = shift;
 	die "Error lost reference genome to bwa-tassel output directory" unless defined $reference_genome_output_dir;
 
-	warn "Calling reformat_refgen_to_bwatassel for $reference_genome_fasta_infile....\n";
+	warn "Calling reformat_refgen_to_bwatassel for $reference_genome_fasta_infile....\n\n";
 	my $reference_genome_fasta_filename = fileparse($reference_genome_fasta_infile);
 
 	my $reference_genome_fasta_outfile = join('/', $reference_genome_output_dir, join("_", $project_name, $reference_genome_fasta_filename . ".fasta"));
@@ -437,7 +461,7 @@ sub bwa_index{
 	$renum_ref_gen_fastadbSA = $renumbered_reference_genome_fasta_infile . '.sa';
 	unless(-s $renum_ref_gen_fastadbAMB and -s $renum_ref_gen_fastadbANN and -s $renum_ref_gen_fastadbBWT 
 		and -s $renum_ref_gen_fastadbPAC and -s $renum_ref_gen_fastadbSA){
-		warn "Generating the bwa index file.....\n";
+		warn "Generating the bwa index file.....\n\n";
 		my $bwaIndexCmd  = "$bwa index -a bwtsw $renumbered_reference_genome_fasta_infile";
 		warn $bwaIndexCmd . "\n\n"; 
 		system($bwaIndexCmd) == 0 or die "Error calling $bwaIndexCmd: $?";
@@ -465,7 +489,7 @@ sub bwa_aln{
         my $bwa_alignment_outfile = join('/', $merged_multiple_tag_count_output_dir, join("_", "Aligned", $project_name, "Tags.sai"));
         
         unless(-s $bwa_alignment_outfile){
-		warn "Generating the bwa alignment file.....\n";
+		warn "Generating the bwa alignment file.....\n\n";
 		my $bwaAlnCmd  = "$bwa aln -t $bwa_num_cpu $renumbered_reference_genome_fasta_infile $merged_multiple_tag_counts_fasta_infile > $bwa_alignment_outfile";
 		warn $bwaAlnCmd . "\n\n";
 		system($bwaAlnCmd) == 0 or die "Error calling $bwaAlnCmd: $?";
@@ -493,7 +517,7 @@ sub bwa_samse{
 	
         my $bwa_aligned_master_outfile = join('/', $merged_multiple_tag_count_output_dir, join("_", "AlignedMasterTags", $project_name . ".sam"));
 	unless(-s $bwa_aligned_master_outfile){
-		warn "Generating the bwa sam file.....\n";
+		warn "Generating the bwa sam file.....\n\n";
 		my $bwaSamseCmd  = "$bwa samse $renumbered_reference_genome_fasta_infile $bwa_alignment_infile $merged_multiple_tag_counts_fasta_infile > $bwa_aligned_master_outfile";
 		warn $bwaSamseCmd . "\n\n";
 		system($bwaSamseCmd) == 0 or die "Error calling $bwaSamseCmd: $?";
@@ -526,7 +550,7 @@ sub sam_converter{
         my $sam_convert_stderr_log_outfile = join('/', $gbs_output_dir, join("_", $project_name, "SAMConvert.stderr.log"));
         
         unless(-s $topm_outfile){
-		warn "Generating tags on physical map file using the SAMConverterPlugin.....\n";
+		warn "Generating tags on physical map file using the SAMConverterPlugin.....\n\n";
 		my $SAMConverterCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -SAMConverterPlugin -i $bwa_aligned_master_infile -o $topm_outfile -endPlugin -runfork1 1> $sam_convert_stdout_log_outfile 2> $sam_convert_stderr_log_outfile");
 		warn $SAMConverterCmd . "\n\n";
 		system($SAMConverterCmd) == 0 or die "Error calling $SAMConverterCmd: $?";
@@ -574,7 +598,7 @@ sub fastq_to_tags_by_taxa{
 	}
 	
 	unless(($non_zero_tbt_files eq $tbt_file_counter) and ($tbt_file_counter ne 0)){
-		warn "Generating tags by taxa file using the FastqToTBTPlugin.....\n";
+		warn "Generating tags by taxa file using the FastqToTBTPlugin.....\n\n";
 		my $FastqToTBTCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -FastqToTBTPlugin -i $fastq_infile_dir -k $fastq_barcodes_infile -e $restriction_enzymes -o $tbt_output_dir -y -m $topm_infile -endPlugin -runfork1 1> $tags_by_taxa_stdout_log_outfile 2> $tags_by_taxa_stderr_log_outfile");
 		warn $FastqToTBTCmd . "\n\n";
 		system($FastqToTBTCmd) == 0 or die "Error calling $FastqToTBTCmd: $?";
@@ -608,7 +632,7 @@ sub merge_tags_by_taxa_files{
         my $merged_tags_by_taxa_stderr_log_outfile = join('/', $gbs_output_dir, join("_", $project_name, "MergeTagsByTaxa.stderr.log"));
         
         unless(-s $merged_tags_by_taxa_outfile){
-		warn "Generating merged tags by taxa file using the MergeTagsByTaxaFilesPlugin.....\n";
+		warn "Generating merged tags by taxa file using the MergeTagsByTaxaFilesPlugin.....\n\n";
 		my $mergeTagsByTaxaFilesCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -MergeTagsByTaxaFilesPlugin -i $tbt_input_dir -o $merged_tags_by_taxa_outfile -s $max_num_tags_tbt -endPlugin -runfork1 1> $merged_tags_by_taxa_stdout_log_outfile 2> $merged_tags_by_taxa_stderr_log_outfile");
 		warn $mergeTagsByTaxaFilesCmd . "\n\n";
 		system($mergeTagsByTaxaFilesCmd) == 0 or die "Error calling $mergeTagsByTaxaFilesCmd: $?";
@@ -678,7 +702,7 @@ sub tags_to_snp_by_alignment{
 	}
 	
 	unless(($non_zero_hap_map_raw_files eq $hap_map_raw_file_counter) and ($hap_map_raw_file_counter ne 0)){
-		warn "Generating tags to SNP by alignment file using the TagsToSNPByAlignmentPlugin.....\n";
+		warn "Generating tags to SNP by alignment file using the TagsToSNPByAlignmentPlugin.....\n\n";
 		my $tagsToSNPByAlignmentCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -TagsToSNPByAlignmentPlugin -i $merged_tags_by_taxa_infile -y -m $topm_infile -mUpd $updated_topm_with_variants_outfile -o $hap_map_genotype_outfile -mxSites $max_num_sites -mnMAF $min_minor_allele_freq_tag_to_snp -mnMAC $min_minor_allele_count -ref $renumbered_reference_genome_fasta_infile -sC $start_chromosome -eC $end_chromosome -endPlugin -runfork1 1> $tags_to_snp_align_stdout_log_outfile 2> $tags_to_snp_align_stderr_log_outfile");
 		warn $tagsToSNPByAlignmentCmd . "\n\n";
 		system($tagsToSNPByAlignmentCmd) == 0 or die "Error calling $tagsToSNPByAlignmentCmd: $?";
@@ -730,7 +754,7 @@ sub merge_duplicate_snps{
 	}
 	
 	unless(($non_zero_hap_map_merged_snps_files eq $hap_map_merged_snps_file_counter) and ($hap_map_merged_snps_file_counter ne 0)){
-		warn "Generating merged duplicate SNPs file using the MergeDuplicateSNPsPlugin.....\n";
+		warn "Generating merged duplicate SNPs file using the MergeDuplicateSNPsPlugin.....\n\n";
 		my $mergeDuplicateSNPsCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -MergeDuplicateSNPsPlugin -hmp $hap_map_genotype_infile -o $merged_hap_map_genotype_outfile -misMat $genotypic_mismat_thres -callHets -sC $start_chromosome -eC $end_chromosome -endPlugin -runfork1 1> $merge_duplicate_snps_stdout_log_outfile 2> $merge_duplicate_snps_stderr_log_outfile");
 		warn $mergeDuplicateSNPsCmd . "\n\n";
 		system($mergeDuplicateSNPsCmd) == 0 or die "Error calling $mergeDuplicateSNPsCmd: $?";
@@ -787,7 +811,7 @@ sub gbs_hap_map_filters{
 	}
 	
 	unless(($non_zero_hap_map_filtered_snps_files eq $hap_map_filtered_snps_file_counter) and ($hap_map_filtered_snps_file_counter ne 0)){
-		warn "Generating filtered SNPs file using the GBSHapMapFiltersPlugin.....\n";
+		warn "Generating filtered SNPs file using the GBSHapMapFiltersPlugin.....\n\n";
 		my $GBSHapMapFiltersCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -GBSHapMapFiltersPlugin -hmp $merged_hap_map_genotype_infile -o $filtered_hap_map_snp_outfile -mnSCov $min_site_coverage -mnMAF $min_minor_allele_freq_gbs_hap_map -sC $start_chromosome -eC $end_chromosome -endPlugin -runfork1 1> $gbs_hap_map_filters_stdout_log_outfile 2> $gbs_hap_map_filters_stderr_log_outfile");
 		warn $GBSHapMapFiltersCmd . "\n\n";
 		system($GBSHapMapFiltersCmd) == 0 or die "Error calling $GBSHapMapFiltersCmd: $?";
@@ -830,6 +854,54 @@ sub gbs_hap_map_filters{
 	return $filtered_hap_map_snp_outfile;
 }
 
+sub binary_to_text{
+
+        my $gbs_output_dir = shift;
+        die "Error lost the GBS output directory" unless defined $gbs_output_dir;
+        
+        my $project_name = shift;
+        die "Error lost the project name" unless defined $project_name;
+
+        my $file_type = shift;
+        die "Error lost the project name" unless defined $file_type;
+        
+        my $tassel_num_ram = shift;
+        die "Error lost the amount of tassel memory" unless defined $tassel_num_ram;
+        
+        my $output_dir = shift;
+        die "Error lost the output directory to contain output .txt (text) files" unless defined $output_dir;
+
+        my ($tag_count_txt_files, $tag_count_txt_file_counter) = find_files($output_dir, "cnt.txt");
+        
+	my $non_zero_tag_count_txt_files = 0;
+	foreach my $file_name (sort keys %{$tag_count_txt_files}){
+# 		warn $file_name . "\n";
+		if(-s $tag_count_txt_files->{$file_name}){
+			$non_zero_tag_count_txt_files++;
+		}
+	}
+	
+	unless(($non_zero_tag_count_txt_files eq $tag_count_txt_file_counter) and ($tag_count_txt_file_counter ne 0)){
+
+		my ($tag_count_files, $tag_count_file_counter) = find_files($output_dir, "cnt");
+		foreach my $file_name (sort keys %{$tag_count_files}){
+# 			warn $file_name . "\n";
+			my $binary_infile = $tag_count_files->{$file_name};
+			
+			my $binary_filename = basename($binary_infile);
+			my $text_outfile = join('/', $output_dir, $binary_filename . ".txt");
+
+			my $binary_to_text_stdout_log_outfile = join('/', $gbs_output_dir, join("_", $project_name, $binary_filename, "BinaryToText.stdout.log"));
+			my $binary_to_text_stderr_log_outfile = join('/', $gbs_output_dir, join("_", $project_name, $binary_filename, "BinaryToText.stderr.log"));
+			
+			warn "Generating the $file_type text file using the BinaryToTextPlugin on $binary_filename.....\n";
+			my $binaryToTextCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -BinaryToTextPlugin -i $binary_infile -o $text_outfile -t $file_type -endPlugin -runfork1 1> $binary_to_text_stdout_log_outfile 2> $binary_to_text_stderr_log_outfile");
+			warn $binaryToTextCmd . "\n\n";
+			system($binaryToTextCmd) == 0 or die "Error calling $binaryToTextCmd: $?";
+		}
+	}
+}
+
 sub find_files{
     
 	my $infile_dir = shift;
@@ -843,9 +915,9 @@ sub find_files{
 	opendir(DIR, $infile_dir) || die "Error in opening dir $infile_dir\n";
 	while( my $file_name = readdir(DIR)){
 		my $infile_name = join('/', $infile_dir, $file_name) if ($file_name =~ m/\.$suffix$/);
-		warn "$infile_name\n" if ($file_name =~ m/\.$suffix/);
-		$files{$file_name} = $infile_name if ($file_name =~ m/\.$suffix/);
-		$file_counter++ if ($file_name =~ m/\.$suffix/);
+		warn "$infile_name\n" if ($file_name =~ m/\.$suffix$/);
+		$files{$file_name} = $infile_name if ($file_name =~ m/\.$suffix$/);
+		$file_counter++ if ($file_name =~ m/\.$suffix$/);
 	}
 	closedir(DIR);
 	return (\%files, $file_counter);
