@@ -5,6 +5,7 @@ use Getopt::Long;
 
 use File::Copy;
 use File::Basename;
+use Switch;
 
 # perl uneak_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/GQ03122013_5_fastq.txt.gz -n MPB_MALE_UNEAK_GBS -k ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/mpb_barcodes.txt -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/UNEAK_MPB_GBS_ANALYSIS
 
@@ -174,7 +175,10 @@ unless(-d $tags_by_taxa_output_dir){
 }
 
 my $tbt_outfile = utag_pair_to_tbt_counts($uneak_project_dir, $project_name, $tassel_num_ram, $tags_by_taxa_output_dir);
-        
+
+# run_pipeline.pl -Xmx4g -fork1 -BinaryToTextPlugin -i ./tagsByTaxa/tbt.bin -o ./tbt.bin.txt -t TBTByte -endPlugin -runfork1 >> ./bintotex.log
+binary_to_text($uneak_project_dir, $project_name, "TBTByte", $tassel_num_ram, $tags_by_taxa_output_dir);
+
 # ./mapInfo/ (for output from UTBTToMapInfoPlugin)
 # Create the map info output directory if it doesn't already exist.
 my $map_info_output_dir = join('/', $uneak_project_dir, "mapInfo");
@@ -182,8 +186,10 @@ unless(-d $map_info_output_dir){
       mkdir($map_info_output_dir, 0777) or die "Can't make directory: $!";
 } 
 
-# my $tbt_outfile = 
 utag_by_taxa_to_map_info($uneak_project_dir, $project_name, $tassel_num_ram, $map_info_output_dir);
+
+# run_pipeline.pl -Xmx4g -fork1 -BinaryToTextPlugin -i ./mapInfo/mapInfo.bin -o ./mapInfo/mapInfo.bin.txt -t TOPM -endPlugin -runfork1 >> ./bintotex.log
+binary_to_text($uneak_project_dir, $project_name, "TOPM", $tassel_num_ram, $map_info_output_dir);
 
 # ./hapMap/ (for output from TagsToSNPByAlignmentPlugin)
 # Create the hap map output directory if it doesn't already exist.
@@ -264,27 +270,66 @@ sub binary_to_text{
         my $output_dir = shift;
         die "Error lost the output directory to contain output .txt (text) files" unless defined $output_dir;
 
-        my ($tag_count_txt_files, $tag_count_txt_file_counter) = find_files($output_dir, "cnt.txt");
-        
-	my $non_zero_tag_count_txt_files = 0;
-	foreach my $file_name (sort keys %{$tag_count_txt_files}){
+        my ($txt_files, $txt_file_counter);
+	# Perform commands based on binary file type.
+	switch ($file_type) {
+		# $file_type evaluates as "TagCounts".
+		case("TagCounts"){
+			($txt_files, $txt_file_counter) = find_files($output_dir, "cnt.txt");
+		}
+		# $file_type evaluates as "TBTByte".
+		case("TBTByte"){
+			($txt_files, $txt_file_counter) = find_files($output_dir, "bin.txt");
+		}
+		# $file_type evaluates as "TOPM".
+		case("TOPM"){
+			($txt_files, $txt_file_counter) = find_files($output_dir, ".bin.txt");
+		}    
+		# Unsupported file type.
+		else{
+			die "Sorry $file_type is not a currently supported file type";
+		}
+        }
+	my $non_zero_txt_files = 0;
+	foreach my $file_name (sort keys %{$txt_files}){
 # 		warn $file_name . "\n";
-		if(-s $tag_count_txt_files->{$file_name}){
-			$non_zero_tag_count_txt_files++;
+		if(-s $txt_files->{$file_name}){
+			$non_zero_txt_files++;
 		}
 	}
 	
-	unless(($non_zero_tag_count_txt_files eq $tag_count_txt_file_counter) and ($tag_count_txt_file_counter ne 0)){
-		# Create the fastq barcodes key output directory if it doesn't already exist.
+	unless(($non_zero_txt_files eq $txt_file_counter) and ($txt_file_counter ne 0)){
+		# Create the binary to text output directory if it doesn't already exist.
 		my $binary_to_text_log_output_dir = join('/', $uneak_project_dir, "binaryToTextLogFiles");
 		unless(-d $binary_to_text_log_output_dir){
 			mkdir($binary_to_text_log_output_dir, 0777) or die "Can't make directory: $!";
 		}
 		
-		my ($tag_count_files, $tag_count_file_counter) = find_files($output_dir, "cnt");
-		foreach my $file_name (sort keys %{$tag_count_files}){
+		my ($binary_files, $binary_file_counter);
+		# Perform commands based on binary file type.
+		switch ($file_type) {
+			# $file_type evaluates as "TagCounts".
+			case("TagCounts"){
+				($binary_files, $binary_file_counter) = find_files($output_dir, "cnt");
+			}
+			# $file_type evaluates as "TBTByte".
+			case("TBTByte"){
+				($binary_files, $binary_file_counter) = find_files($output_dir, "bin");
+			}
+			# $file_type evaluates as "TOPM".
+			case("TOPM"){
+				($binary_files, $binary_file_counter) = find_files($output_dir, "bin");
+			}    
+			# Unsupported file type.
+			else{
+				die "Sorry $file_type is not a currently supported file type";
+			}
+        	}
+		
+		
+		foreach my $file_name (sort keys %{$binary_files}){
 # 			warn $file_name . "\n";
-			my $binary_infile = $tag_count_files->{$file_name};
+			my $binary_infile = $binary_files->{$file_name};
 			
 			my $binary_filename = basename($binary_infile);
 			my $text_outfile = join('/', $output_dir, $binary_filename . ".txt");

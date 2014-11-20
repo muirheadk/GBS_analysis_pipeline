@@ -6,7 +6,9 @@ use Getopt::Long;
 use Bio::SeqIO;
 use File::Basename;
 use File::Copy;
+use Switch;
 
+#notes **** NEED TO INCORPORATE BINARY TO TEXT FOR TOPM, TBT_Byte, and count files.
 # perl tassel_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/GQ03122013_5_fastq.txt.gz -n MPB_MALE_GBS -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/mountain_pine_beetle/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/unplaced.scaf.fa -k ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/mpb_barcodes.txt -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/TASSEL_MPB_GBS_ANALYSIS
 
 my ($fastq_infile, $project_name, $reference_genome_infile, $fastq_barcodes_infile, $restriction_enzymes, $max_num_barcode_reads, 

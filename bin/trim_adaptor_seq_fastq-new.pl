@@ -654,7 +654,7 @@ sub generate_adaptor_blastn{
 			$num_gaps, $query_start, $query_end, $target_start, $target_end, $e_value, $bit_score) = @split_adaptor_blastn_hit;
 			my $glyph_colour = "blue";
 			if(($align_length eq $adaptor_sequence_length) 
-				or ((($align_length >= $adaptor_length_min_threshold) and ($align_length < $adaptor_sequence_length)) and ($query_start eq 1) and ($target_end eq $gbs_sequence_length))){
+				or ((($align_length >= $min_adaptor_length) and ($align_length < $adaptor_sequence_length)) and ($query_start eq 1) and ($target_end eq $gbs_sequence_length))){
 				print OUTFILE join("\t", join("_", "GBS_adaptor_sequence", $fastq_adaptor_sequence), $target_name, $query_coverage, $percent_identity, $align_length, $num_mismatch, 
 					$num_gaps, $query_start, $query_end, $target_start, $target_end, $e_value, $bit_score, $glyph_colour) . "\n";
 			}

@@ -452,7 +452,7 @@ sub find_fastq_files{
 				push(@{$project_fastq_files{$dir_name}}, $fastq_file_name) if ($file_name =~ m/.fastq$/);
 				$file_count++ if ($file_name =~ m/.fastq$/);
 			}
-		closedir(DIR2);
+			closedir(DIR2);
 		}
 	}
 	closedir(DIR1);
