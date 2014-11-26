@@ -35,7 +35,7 @@ $adaptor_trim_offset = 5 unless defined $adaptor_trim_offset;
 $min_trimmed_fastq_sequence_length = 32  unless defined $min_trimmed_fastq_sequence_length;
 $blast_num_cpu = 2 unless defined $blast_num_cpu;
 
-my ($gzip, $makeblastdb, $blastn, $gbs_adaptor_align_graphics, $send_mail);
+my ($gzip, $makeblastdb, $blastn, $gbs_adaptor_align_graphics);
 $gzip 				= '/bin/gzip';
 $makeblastdb 			= '/usr/local/bin/makeblastdb';
 $blastn				= '/usr/local/bin/blastn';
@@ -148,6 +148,7 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
 	my ($fastq_header, $fastq_sequence, $fastq_plus, $fastq_quality_scores);
 	my $i = 1;
 	my $num_fastq_seqs = 0;
+	
 	# Parse the fastq files for the fastq header, sequence, plus, and quality scores and reformat to *.fasta format so that we can use adaptor blastn.
 	while(<INFILE>){
 		chomp $_;
