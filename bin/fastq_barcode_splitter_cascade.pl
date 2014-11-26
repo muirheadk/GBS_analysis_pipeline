@@ -2,26 +2,31 @@
 use warnings;
 use strict;
 use Getopt::Long;
+
 use File::Copy;
 use File::Basename;
 
-# perl fastq_barcode_splitter_cascade.pl -i ~/workspace/GBS_data-08-10-2013/HI.1405.008.GQ03122013-5_R1.fastq -b ~/workspace/GBS_data-08-10-2013/GBS_barcodes-2013-10-09.csv -o ~/workspace/GBS_data-08-10-2013
+# perl fastq_barcode_splitter_cascade.pl -i ~/workspace/GBS_data-08-10-2013/HI.1405.008.GQ03122013-5_R1.fastq -b ~/workspace/GBS_data-08-10-2013/GBS_barcodes-2013-10-09.csv -n 0 -o ~/workspace/GBS_data-08-10-2013
 my ($fastq_infile, $barcode_infile, $num_mismatches, $output_dir);
 GetOptions(
-      'i=s'    => \$fastq_infile,
-      'b=s'    => \$barcode_infile,
-      'n=s'    => \$num_mismatches,
-      'o=s'    => \$output_dir,
+      'i=s'    => \$fastq_infile, # The bulk fastq input file to split sequences based on barcode sequences. Can either be *.fastq or *.fastq.gz extension.
+      'b=s'    => \$barcode_infile, # The barcodes input file used to split sequences into individual fastq output files.
+      'n=s'    => \$num_mismatches, # The number of mismatches allowed within the barcode sequences.
+      'o=s'    => \$output_dir, # The output directory to contain the split *.fastq output files.
 );
 
+# Display usage message if the following parameters are not specified.
 usage() unless (
       defined $fastq_infile
       and defined $barcode_infile
       and defined $output_dir
 );
-$num_mismatches = 1 unless defined $num_mismatches;
 
-my ($gunzip, $fastx_barcode_splitter, $send_mail);
+# The number of mismatches allowed within the barcode sequences. Default: 0
+$num_mismatches = 0 unless defined $num_mismatches;
+
+# Program dependencies - The absolute paths to gunzip to uncompress bulk compressed fastq.gz input file if present and the fastx barcode splitter from the fastx toolkit.
+my ($gunzip, $fastx_barcode_splitter);
 $gunzip				= '/bin/gunzip';
 $fastx_barcode_splitter 	= '/usr/local/bin/fastx_barcode_splitter.pl';
 
@@ -29,19 +34,26 @@ sub usage {
     
 die <<"USAGE";
     
-Usage: $0 -i fastq_infile -b barcode_infile -m metadata_infile -n num_mismatches -o output_dir
+Usage: $0 -i fastq_infile -b barcode_infile -n num_mismatches -o output_dir
     
-Description - 
+DESCRIPTION - Split a bulk fastq input file into separate fastq files based on the longest to shortest barcode sequences for 
+each individual specified by the barcodes input file and output the results based on project leader specified in the barcodes 
+input file.
     
 OPTIONS:
-      -i fastq_infile - 
+
+-i fastq_infile - The bulk fastq input file to split sequences based on barcode sequences. Can either be *.fastq or *.fastq.gz extension.
+e.g. /path/to/HI.1405.008.GQ03122013-5_R1.fastq    <---- fastq file format
+     /path/to/HI.1405.008.GQ03122013-5_R1.fastq.gz <---- compressed fastq file format
     
-      -b barcode_infile -
+-b barcode_infile - The barcodes input file used to split sequences into individual fastq output files.
+e.g. /path/to/GBS_barcodes-2013-10-09.csv
+
+-n num_mismatches - The number of mismatches allowed within the barcode sequences. Default: 0
       
-      -n num_mismatches - 
-      
-      -o output_dir -
-    
+-o output_dir - The output directory to contain the split *.fastq output files.
+e.g. /path/to/output_dir
+
 USAGE
 }
 
@@ -50,6 +62,7 @@ unless(-d $output_dir){
       mkdir($output_dir, 0777) or die "Can't make directory: $!";
 }
 
+# If the bulk fastq file is compressed, uncompress the file and set the resulting fastq filename to be the fastq infile.
 if($fastq_infile =~ m/\.gz$/){
 	my $uncompressed_fastq_file = gunzip_fastq_file($fastq_infile);
 	$fastq_infile = $uncompressed_fastq_file;
@@ -61,6 +74,7 @@ unless(-d $split_fastq_output_dir){
       mkdir($split_fastq_output_dir, 0777) or die "Can't make directory: $!";
 }
 
+# Parse the barcodes input file based on barcode length so that we can split the bulk fastq file using the longest to shortest barcode.
 my %barcode_data = ();
 open(INFILE, "<$barcode_infile") or die "Couldn't open file $barcode_infile for reading, $!";
 my $i = 0;
@@ -80,6 +94,7 @@ while(<INFILE>){
 }
 close(INFILE) or die "Couldn't close file $barcode_infile";
 
+# Start from the longest to shortest barcode length and keep track of which fastq file belongs to which project leader.
 my %barcode_filenames = ();
 my $unmatched_file_counter = 0;
 my $unmatched_fastq_infile = "";
@@ -126,7 +141,7 @@ foreach my $barcode_seq_length (sort {$b <=> $a} keys %barcode_data){
 	$unmatched_file_counter++;
 }
 
-
+# Copy the fastq output files from the FASTQ_BARCODE_LENGTH_DIR/FASTQ_BARCODES_LENGTH_$barcode_seq_length directories based on project leader names.
 foreach my $fastq_project_leader (sort keys %barcode_filenames){
 	
 	foreach my $fastq_barcode_filenames (@{$barcode_filenames{$fastq_project_leader}}){
@@ -137,6 +152,7 @@ foreach my $fastq_project_leader (sort keys %barcode_filenames){
 	}
 }
 
+# execute the fastx_barcode_splitter.pl script from the fastx toolkit.
 sub fastx_barcode_splitter{
 	
 	my $fastq_infile = shift;
@@ -150,13 +166,13 @@ sub fastx_barcode_splitter{
 
 	
 # 	$fastx_barcode_splitter --bcfile mpb_barcodes_5nucls.txt --bol --mismatches 1 --prefix ~/MPB_GBS_Data-08-10-2013/gbs_ --suffix ".fastq" < HI.1405.008.GQ03122013-5_R1.fastq
-# 	warn "Generating blastp alignment file....\n";
 	my $fastx_barcode_splitterCmd  = "$fastx_barcode_splitter --bcfile $barcode_infile --bol --mismatches $num_mismatches --prefix $fastq_output_dir/ --suffix \".fastq\" < $fastq_infile";
 	warn $fastx_barcode_splitterCmd . "\n\n";
 
 	my $status = system($fastx_barcode_splitterCmd) == 0 or die "Error calling $fastx_barcode_splitter: $?";
 }
 
+# execute the gunzip program to uncompress the compressed fastq file.
 sub gunzip_fastq_file{
 	
 	my $fastq_file = shift;
