@@ -32,7 +32,7 @@ $fastq_adaptor_sequence = 'CCGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATCTCGTATGCCG
 $gbs_sequence_length = 100 unless defined $gbs_sequence_length;
 $adaptor_length_min_threshold = 16 unless defined $adaptor_length_min_threshold;
 $adaptor_trim_offset = 5 unless defined $adaptor_trim_offset;
-$min_trimmed_fastq_sequence_length = 15  unless defined $min_trimmed_fastq_sequence_length;
+$min_trimmed_fastq_sequence_length = 32  unless defined $min_trimmed_fastq_sequence_length;
 $blast_num_cpu = 2 unless defined $blast_num_cpu;
 
 my ($gzip, $makeblastdb, $blastn, $gbs_adaptor_align_graphics, $send_mail);
@@ -114,6 +114,10 @@ unless(-d $trimmed_output_dir){# Need this to make the bulk fastq sequence file.
 my $trimmed_fastq_bulk_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset) . ".fastq");
 push(@fastq_files2gzip, $trimmed_fastq_bulk_outfile);
 open(TRIMMED_BULK_OUTFILE, ">$trimmed_fastq_bulk_outfile") or die "Couldn't open file $trimmed_fastq_bulk_outfile for writting, $!";
+my $trimmed_seqs_layout_bulk_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset, "all_trimmed_seqs_layout") . ".txt");
+open(TRIMMED_BULK_LAYOUT_OUTFILE, ">$trimmed_seqs_layout_bulk_outfile") or die "Couldn't open file $trimmed_seqs_layout_bulk_outfile for writting, $!";
+print TRIMMED_BULK_LAYOUT_OUTFILE join("\t", "sequence_id", "trimmed_fastq_start", "trimmed_fastq_end", "trimmed_fastq_length", "trimmed_adaptor_start", "trimmed_adaptor_end",
+"trimmed_adaptor_length", "adaptor_seq_start", "adaptor_seq_end", "adaptor_seq_length") . "\n";
 my $trimmed_seqs_layout_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset, "trimmed_seqs_layout") . ".txt");
 open(TRIMMED_LAYOUT_OUTFILE, ">$trimmed_seqs_layout_outfile") or die "Couldn't open file $trimmed_seqs_layout_outfile for writting, $!";
 print TRIMMED_LAYOUT_OUTFILE join("\t", "sequence_id", "trimmed_fastq_start", "trimmed_fastq_end", "trimmed_fastq_length", "trimmed_adaptor_start", "trimmed_adaptor_end",
@@ -131,7 +135,14 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
 	
 	my %fastq_sequences = ();
 	open(INFILE, "<$fastq_infile") or die "Couldn't open file $fastq_infile for reading, $!";
+	
+	# Get the basename of the fastq filename without the .fastq extension.
 	my $fasta_filename = fileparse($fastq_infile, qr/\.fastq/);
+	
+	# Need to add the length of the barcode to the $min_trimmed_fastq_sequence_length so that we get the minimum trimmed fastq sequence length plus the length of the barcode sequence.
+	my ($individual_id, $barcode, $plate_num, $well_num) = split(/_/, $fasta_filename);
+	my $min_trimmed_fastq_sequence_length_plus_barcode = ($min_trimmed_fastq_sequence_length + length($barcode));
+	
 	my $fasta_target_outfile = join("/", $fasta_output_dir, $fasta_filename . ".fasta");
 	open(OUTFILE, ">$fasta_target_outfile") or die "Couldn't open file $fasta_target_outfile for writting, $!";
 	my ($fastq_header, $fastq_sequence, $fastq_plus, $fastq_quality_scores);
@@ -309,7 +320,7 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   			my $trimmed_adaptor_sequence_length = length($trimmed_adaptor_sequence);
   			my $trimmed_fastq_sequence_length = length($trimmed_fastq_sequence);
   			
-  			if($trimmed_fastq_sequence_length >= $min_trimmed_fastq_sequence_length){
+  			if($trimmed_fastq_sequence_length >= $min_trimmed_fastq_sequence_length_plus_barcode){
   			
   				$trimmed_fastq_sequences{$fastq_header}{'FASTQ_SEQUENCE'} = $trimmed_fastq_sequence;
   				$trimmed_fastq_sequences{$fastq_header}{'PLUS'} = $fastq_plus;
@@ -327,7 +338,7 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   				my $trimmed_fastq_header = $fastq_header;
   				my $trimmed_seqs_layout_header = join("_", $fasta_filename, $trimmed_fastq_header);
   				print TRIMMED_LAYOUT_OUTFILE join("\t", $trimmed_seqs_layout_header, 1, (($target_start - $adaptor_trim_offset) - 1), $trimmed_fastq_sequence_length, ($target_start - $adaptor_trim_offset), $fastq_sequence_length, $trimmed_adaptor_sequence_length, $target_start, $target_end, $align_length) . "\n";
-  				
+  				print TRIMMED_BULK_LAYOUT_OUTFILE  join("\t", $trimmed_seqs_layout_header, 1, (($target_start - $adaptor_trim_offset) - 1), $trimmed_fastq_sequence_length, ($target_start - $adaptor_trim_offset), $fastq_sequence_length, $trimmed_adaptor_sequence_length, $target_start, $target_end, $align_length) . "\n";
   				my $adaptor_concatenated_sequence;  
   				if($query_name =~ m/([\w_]+)_([ACGT]+)/){
   					my ($query_id, $adaptor_sequence) = ($1, $2);
@@ -350,7 +361,7 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   				$adaptor_length_counter{$align_length}{$adaptor_concatenated_sequence}++;
   				push(@trimmed_fastq_list, $fastq_header);
   				
-  			}elsif($trimmed_fastq_sequence_length < $min_trimmed_fastq_sequence_length){ #If this alignment doesn't meet our filtering criteria skip to the next alignment. Might need to trash some of these sequences if Bryan and Julian say so and keep track of untrimmed, trimmed, and removed counts.
+  			}elsif($trimmed_fastq_sequence_length < $min_trimmed_fastq_sequence_length_plus_barcode){ #If this alignment doesn't meet our filtering criteria skip to the next alignment.
   				$removed_fastq_sequences{$fastq_header}{'FASTQ_SEQUENCE'} = $fastq_sequences{$fastq_header}{'FASTQ_SEQUENCE'};
   				$removed_fastq_sequences{$fastq_header}{'PLUS'} = $fastq_sequences{$fastq_header}{'PLUS'};
   				$removed_fastq_sequences{$fastq_header}{'FASTQ_QUALITY_SCORES'} = $fastq_sequences{$fastq_header}{'FASTQ_QUALITY_SCORES'};
@@ -359,7 +370,7 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   				my $removed_seqs_layout_header = join("_", $fasta_filename, $removed_fastq_header);
   				
   				print REMOVED_LAYOUT_OUTFILE join("\t", $removed_seqs_layout_header, 1, (($target_start - $adaptor_trim_offset) - 1), $trimmed_fastq_sequence_length, ($target_start - $adaptor_trim_offset), $fastq_sequence_length, $trimmed_adaptor_sequence_length, $target_start, $target_end, $align_length) . "\n";
-  				
+  				print TRIMMED_BULK_LAYOUT_OUTFILE join("\t", $removed_seqs_layout_header, 1, (($target_start - $adaptor_trim_offset) - 1), $trimmed_fastq_sequence_length, ($target_start - $adaptor_trim_offset), $fastq_sequence_length, $trimmed_adaptor_sequence_length, $target_start, $target_end, $align_length) . "\n";
   				push(@removed_fastq_list, $fastq_header);
   			}
   		}
@@ -486,6 +497,7 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   	undef @fastq_list2remove;
 }
 close(TRIMMED_BULK_OUTFILE) or die "Couldn't close file $trimmed_fastq_bulk_outfile";
+close(TRIMMED_BULK_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_layout_bulk_outfile";
 close(TRIMMED_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_layout_outfile";
 close(REMOVED_LAYOUT_OUTFILE) or die "Couldn't close file $removed_seqs_layout_outfile";
 
@@ -551,11 +563,6 @@ rmdir($fasta_output_dir) or die "Could not remove directory $fasta_output_dir: $
 undef @fastq_files2gzip;
 undef %fastq_seq_counter;
 undef %adaptor_length_counter;
-
-
-# my $subject = "\"$0 Process Complete\"";
-# my $message = "\"$0 process finished successfully! You can find all the trimmed adaptor fastq output files for each project leader in the $output_dir directory.\"";
-# send_mail($subject, $message, 'both');
 
 sub find_fastq_files{
     
