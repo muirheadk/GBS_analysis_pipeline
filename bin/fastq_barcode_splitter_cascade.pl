@@ -6,13 +6,15 @@ use Getopt::Long;
 use File::Copy;
 use File::Basename;
 
-# perl fastq_barcode_splitter_cascade.pl -i ~/workspace/GBS_data-08-10-2013/HI.1405.008.GQ03122013-5_R1.fastq -b ~/workspace/GBS_data-08-10-2013/GBS_barcodes-2013-10-09.csv -n 0 -o ~/workspace/GBS_data-08-10-2013
+# NEED TO ADDED COPY COMMANDS AFTER EACH ITERITION IN ORDER TO SAVE SPACE BECAUSE THE FILES GENERATED ARE TECHNICALLY DUPLICATED.
+
+# perl fastq_barcode_splitter_cascade.pl -i ~/workspace/GBS_data-08-10-2013/HI.1405.008.GQ03122013-5_R1.fastq -b ~/workspace/GBS_data-08-10-2013/GBS_barcodes-2013-10-09.csv -n 1 -o ~/workspace/GBS_data-08-10-2013
 my ($fastq_infile, $barcode_infile, $num_mismatches, $output_dir);
 GetOptions(
-      'i=s'    => \$fastq_infile, # The bulk fastq input file to split sequences based on barcode sequences. Can either be *.fastq or *.fastq.gz extension.
-      'b=s'    => \$barcode_infile, # The barcodes input file used to split sequences into individual fastq output files.
+      'i=s'    => \$fastq_infile, # The absolute path to the bulk fastq input file to split sequences based on barcode sequences. Can either be *.fastq or *.fastq.gz extension.
+      'b=s'    => \$barcode_infile, # The absolute path to the barcodes input file used to split sequences into individual fastq output files.
       'n=s'    => \$num_mismatches, # The number of mismatches allowed within the barcode sequences.
-      'o=s'    => \$output_dir, # The output directory to contain the split *.fastq output files.
+      'o=s'    => \$output_dir, # The absolute path to the output directory to contain the split *.fastq output files.
 );
 
 # Display usage message if the following parameters are not specified.
@@ -42,17 +44,20 @@ input file.
     
 OPTIONS:
 
--i fastq_infile - The bulk fastq input file to split sequences based on barcode sequences. Can either be *.fastq or *.fastq.gz extension.
-e.g. /path/to/HI.1405.008.GQ03122013-5_R1.fastq    <---- fastq file format
-     /path/to/HI.1405.008.GQ03122013-5_R1.fastq.gz <---- compressed fastq file format
+-i fastq_infile - The absolute path to the bulk fastq input file to split sequences based on barcode sequences. Can either be *.fastq or *.fastq.gz extension.
+
+	e.g. /path/to/HI.1405.008.GQ03122013-5_R1.fastq    <---- fastq file format
+	     /path/to/HI.1405.008.GQ03122013-5_R1.fastq.gz <---- compressed fastq file format
     
--b barcode_infile - The barcodes input file used to split sequences into individual fastq output files.
-e.g. /path/to/GBS_barcodes-2013-10-09.csv
+-b barcode_infile - The absolute path to the barcodes input file used to split sequences into individual fastq output files.
+
+	e.g. /path/to/GBS_barcodes-2013-10-09.csv
 
 -n num_mismatches - The number of mismatches allowed within the barcode sequences. Default: 0
       
--o output_dir - The output directory to contain the split *.fastq output files.
-e.g. /path/to/output_dir
+-o output_dir - The absolute path to the output directory to contain the split *.fastq output files.
+
+	e.g. /path/to/output_dir
 
 USAGE
 }
