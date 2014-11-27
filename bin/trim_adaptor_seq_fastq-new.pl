@@ -549,16 +549,16 @@ foreach my $fastq_file (sort @fastq_files2gzip){
     gzip_fastq_file($fastq_file);
 }
   
-# Grab all the blastdb and fasta formatted files to remove to save space because we don't need them anymore.
-my $blastdb_files = find_blastdb_files($fasta_output_dir);
-
-# Iterate through all the blastdb and fasta formatted files and remove them.
-foreach my $blastdb_file (@{$blastdb_files}){
-    unlink($blastdb_file) or die "Could not unlink $blastdb_file: $!";
-}
-
-# Remove the fasta file directory because we don't need it anymore.
-rmdir($fasta_output_dir) or die "Could not remove directory $fasta_output_dir: $!";
+# # Grab all the blastdb and fasta formatted files to remove to save space because we don't need them anymore.
+# my $blastdb_files = find_blastdb_files($fasta_output_dir);
+# 
+# # Iterate through all the blastdb and fasta formatted files and remove them.
+# foreach my $blastdb_file (@{$blastdb_files}){
+#     unlink($blastdb_file) or die "Could not unlink $blastdb_file: $!";
+# }
+# 
+# # Remove the fasta file directory because we don't need it anymore.
+# rmdir($fasta_output_dir) or die "Could not remove directory $fasta_output_dir: $!";
 
 # Empty all hash and array containers for garbage collection purposes.
 undef @fastq_files2gzip;
