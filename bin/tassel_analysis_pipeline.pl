@@ -10,7 +10,6 @@ use Switch;
 
 #notes **** NEED TO INCORPORATE BINARY TO TEXT FOR TOPM, TBT_Byte, and count files.
 # perl tassel_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/GQ03122013_5_fastq.txt.gz -n MPB_MALE_GBS -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/mountain_pine_beetle/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/unplaced.scaf.fa -k ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/mpb_barcodes.txt -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/TASSEL_MPB_GBS_ANALYSIS
-
 my ($fastq_infile, $project_name, $reference_genome_infile, $fastq_barcodes_infile, $restriction_enzymes, $max_num_barcode_reads, 
 $min_num_present_fastq_to_tag, $min_num_present_merge_multiple_tag, $max_num_tags_tbt, $min_minor_allele_freq_tag_to_snp, $min_minor_allele_freq_gbs_hap_map, 
 $min_minor_allele_count, $max_num_sites, $start_chromosome, $genotypic_mismat_thres, $min_site_coverage, $tassel_num_ram, $bwa_num_cpu, $gbs_output_dir);
@@ -144,8 +143,13 @@ unless(-d $tag_count_output_dir){
       mkdir($tag_count_output_dir, 0777) or die "Can't make directory: $!";
 }
 
+# run_pipeline.pl -Xmx11g -fork1 -FastqToTagCountPlugin -i ./fastq -k mpb_barcodes.txt -e PstI-MspI -s 300000000 -c 1 -o ./tagCounts -endPlugin -runfork1 > ./tagCounts.stdout.log
 fastq_to_tag_counts($fastq_infile_dir, $project_name, $fastq_barcodes_infile, $restriction_enzymes, $max_num_barcode_reads, $min_num_present_fastq_to_tag, 
 	$tassel_num_ram, $tag_count_output_dir, $gbs_output_dir);
+
+#run binarytotext plugin to make the fastq_to_tag_counts result from above human readable
+# run_pipeline.pl -Xmx4g -fork1 -BinaryToTextPlugin -i ./tagCounts/GQ25032013_7.cnt -o ./tagCounts/GQ25032013_7_cnt.txt -t TagCounts -endPlugin -runfork1 > ./bintotex.log
+binary_to_text($gbs_output_dir, $project_name, "TagCounts", $tassel_num_ram, $tag_count_output_dir);
 
 # Create the merged tag counts output directory if it doesn't already exist.
 # my $merged_tag_count_output_dir = join('/', $gbs_output_dir, "mergedTagCounts");
@@ -154,12 +158,17 @@ unless(-d $merged_multiple_tag_count_output_dir){
       mkdir($merged_multiple_tag_count_output_dir, 0777) or die "Can't make directory: $!";
 }
 
-
+# run_pipeline.pl -Xmx11g -fork1 -MergeMultipleTagCountPlugin -i ./tagCounts -o ./mergedTagCounts/mpbGBSTags.cnt -c 5 -t -endPlugin -runfork1 > ./MTC.stdout.log
 my ($merged_multiple_tag_counts_outfile, $merged_multiple_tag_counts_fasta_outfile) = merge_multiple_tag_counts($tag_count_output_dir, $project_name, 
 	$min_num_present_merge_multiple_tag, $tassel_num_ram, $merged_multiple_tag_count_output_dir, $gbs_output_dir);
 
+# run_pipeline.pl -Xmx11g -fork1 -TagCountToFastqPlugin -i ./mergedTagCounts/mpbGBSTags.cnt -o ./mergedTagCounts/mpbGBSTags.fq -c 5 -endPlugin -runfork1 > ./MTCtoFQ.stdout.log
 my $merged_multiple_tag_counts_to_fastq_outfile = merge_multiple_tag_counts_to_fastq($merged_multiple_tag_counts_outfile, $project_name, $min_num_present_merge_multiple_tag, 
 	$tassel_num_ram, $merged_multiple_tag_count_output_dir, $gbs_output_dir);
+
+#run binarytotext plugin to make the merge_multiple_tag_counts result from above human readable
+# run_pipeline.pl -Xmx4g -fork1 -BinaryToTextPlugin -i ./mergedTagCounts/mergeAll.cnt -o ./mergedTagCounts/mergeAll_cnt.txt -t TagCounts -endPlugin -runfork1 >> ./bintotex.log
+binary_to_text($gbs_output_dir, $project_name, "TagCounts", $tassel_num_ram, $merged_multiple_tag_count_output_dir);
 
 # Create the reference genome output directory if it doesn't already exist.
 my $reference_genome_output_dir = join('/', $gbs_output_dir, "REFERENCE_GENOME");
@@ -167,13 +176,17 @@ unless(-d $reference_genome_output_dir){
       mkdir($reference_genome_output_dir, 0777) or die "Can't make directory: $!";
 }
 
+# Converts the reference genome to BWA-TASSEL format and generates a table of contents file referencing the sequence headers to the new BWA-TASSEL format sequence headers.
 my ($reference_genome_fasta_outfile, $end_chromosome) = convert_reference_genome_to_bwa_tassel($reference_genome_infile, $project_name, $reference_genome_output_dir);
 
+# Creates the BWA reference genome index file
 bwa_index($reference_genome_fasta_outfile, $project_name, $reference_genome_output_dir);
 
+# Creates the BWA alignment file using the merged multiple tag counts fastq file to align the fastq sequence reads to the reference genome.
 my $bwa_alignment_outfile = bwa_aln($reference_genome_fasta_outfile, $project_name, $bwa_num_cpu, $merged_multiple_tag_counts_to_fastq_outfile, 
 	$merged_multiple_tag_count_output_dir);
 
+# Creates the BWA single-ended alignment file in sam format using the merged multiple tag counts fastq file to align the fastq sequence reads to the reference genome and the BWA aln format file.
 my $bwa_aligned_master_outfile = bwa_samse($reference_genome_fasta_outfile, $project_name, $bwa_alignment_outfile, $merged_multiple_tag_counts_to_fastq_outfile, 
 	$merged_multiple_tag_count_output_dir);
 
@@ -183,23 +196,32 @@ unless(-d $topm_output_dir){
       mkdir($topm_output_dir, 0777) or die "Can't make directory: $!";
 }
 
+# run_pipeline.pl -Xmx12g -fork1 -SAMConverterPlugin -i ./mergedTagCounts/AlignedMasterTagsMPB.sam -o ./topm/MasterTagsMPB.topm -endPlugin -runfork1 > ./SAMconvert.stdout.log
 my $topm_outfile = sam_converter($bwa_aligned_master_outfile, $project_name, $tassel_num_ram, $topm_output_dir, $gbs_output_dir);
 
 # Create the tbt output directory if it doesn't already exist.
-my $tbt_output_dir = join('/', $gbs_output_dir, "TAGS_BY_TAXA_DIR");
-unless(-d $tbt_output_dir){
-      mkdir($tbt_output_dir, 0777) or die "Can't make directory: $!";
+my $tags_by_taxa_output_dir = join('/', $gbs_output_dir, "TAGS_BY_TAXA_DIR");
+unless(-d $tags_by_taxa_output_dir){
+      mkdir($tags_by_taxa_output_dir, 0777) or die "Can't make directory: $!";
 }
 
-fastq_to_tags_by_taxa($fastq_infile_dir, $project_name, $fastq_barcodes_infile, $restriction_enzymes, $topm_outfile, $tassel_num_ram, $tbt_output_dir, $gbs_output_dir);
+# run_pipeline.pl -Xmx12g -fork1 -FastqToTBTPlugin -i ./fastq -k mpb_barcodes.txt -e PstI-MspI -o ./tbt -y -m ./topm/MasterTagsMPB.topm -endPlugin -runfork1 > ./TBT.stdout.log
+fastq_to_tags_by_taxa($fastq_infile_dir, $project_name, $fastq_barcodes_infile, $restriction_enzymes, $topm_outfile, $tassel_num_ram, $tags_by_taxa_output_dir, $gbs_output_dir);
+
+# run_pipeline.pl -Xmx4g -fork1 -BinaryToTextPlugin -i ./tagsByTaxa/tbt.bin -o ./tbt.bin.txt -t TBTByte -endPlugin -runfork1 >> ./bintotex.log
+binary_to_text($gbs_output_dir, $project_name, "TBTByte", $tassel_num_ram, $tags_by_taxa_output_dir);
 
 # Create the mergedtbt output directory if it doesn't already exist.
-my $merged_tbt_output_dir = join('/', $gbs_output_dir, "MERGED_TAGS_BY_TAXA_DIR");
-unless(-d $merged_tbt_output_dir){
-      mkdir($merged_tbt_output_dir, 0777) or die "Can't make directory: $!";
+my $merged_tags_by_taxa_output_dir = join('/', $gbs_output_dir, "MERGED_TAGS_BY_TAXA_DIR");
+unless(-d $merged_tags_by_taxa_output_dir){
+      mkdir($merged_tags_by_taxa_output_dir, 0777) or die "Can't make directory: $!";
 }
 
-my $merged_tags_by_taxa_outfile = merge_tags_by_taxa_files($tbt_output_dir, $project_name, $max_num_tags_tbt, $tassel_num_ram, $merged_tbt_output_dir, $gbs_output_dir);
+# run_pipeline.pl -Xmx12g -fork1 -MergeTagsByTaxaFilesPlugin -i ./tbt -o ./mergedTBT/mpbGBSstudy.tbt.byte -s 200000000 -endPlugin -runfork1 > ./mergeTBT.stdout.log
+my $merged_tags_by_taxa_outfile = merge_tags_by_taxa_files($tags_by_taxa_output_dir, $project_name, $max_num_tags_tbt, $tassel_num_ram, $merged_tags_by_taxa_output_dir, $gbs_output_dir);
+
+# run_pipeline.pl -Xmx4g -fork1 -BinaryToTextPlugin -i ./tagsByTaxa/tbt.bin -o ./tbt.bin.txt -t TBTByte -endPlugin -runfork1 >> ./bintotex.log
+binary_to_text($gbs_output_dir, $project_name, "TBTByte", $tassel_num_ram, $merged_tags_by_taxa_output_dir);
 
 # Create the hap map output directory if it doesn't already exist.
 my $hap_map_output_dir = join('/', $gbs_output_dir, "HAP_MAP_DIR");
@@ -213,16 +235,21 @@ unless(-d $hap_map_raw_output_dir){
       mkdir($hap_map_raw_output_dir, 0777) or die "Can't make directory: $!";
 }
 
+# run_pipeline.pl -Xmx12g -fork1 -TagsToSNPByAlignmentPlugin -i ./mergedTBT/mpbGBSstudy.tbt.byte -y -m ./topm/MasterTagsMPB.topm -mUpd ./topm/MasterTagsMPBwVariants.topm -o ./hapmap/raw/mpbGBSGenos_chr+.hmp.txt -mxSites 500000 -mnMAF 0.02 -mnMAC 100000 -ref ./refgen/renumbered_Msequence.fasta -sC 1 -eC 8188 -endPlugin -runfork1 > ./TagstoSNPAlign.stdout.log
 my $hap_map_genotype_outfile = tags_to_snp_by_alignment($merged_tags_by_taxa_outfile, $topm_outfile, $project_name, $max_num_sites, 
 	$min_minor_allele_freq_tag_to_snp, $min_minor_allele_count, $reference_genome_fasta_outfile, $start_chromosome, $end_chromosome, 
 	$tassel_num_ram, $topm_output_dir, $hap_map_raw_output_dir, $gbs_output_dir);
-        
+	
+#run binarytotext plugin to make the topm result from above human readable
+binary_to_text($gbs_output_dir, $project_name, "TOPM", $tassel_num_ram, $topm_output_dir);
+
 # Create the hap map merged SNP output directory if it doesn't already exist.
 my $hap_map_merged_snps_output_dir = join('/', $hap_map_output_dir, "HAP_MAP_MERGED_SNPS_DIR");
 unless(-d $hap_map_merged_snps_output_dir){
       mkdir($hap_map_merged_snps_output_dir, 0777) or die "Can't make directory: $!";
 }
 
+# run_pipeline.pl -Xmx12g -fork1 -MergeDuplicateSNPsPlugin -hmp ./hapmap/raw/mpbGBSGenos_chr+.hmp.txt -o ./hapmap/mergedSNPs/mpbGBSGenos_mergedSNPs_chr+.hmp.txt -misMat 0.1 -callHets -sC 1 -eC 8188 -endPlugin -runfork1 > MergeDupSNP.stdout.log
 my $merged_hap_map_genotype_outfile = merge_duplicate_snps($hap_map_genotype_outfile, $project_name, $genotypic_mismat_thres, $start_chromosome, $end_chromosome, 
 	$tassel_num_ram, $hap_map_merged_snps_output_dir, $gbs_output_dir);
 
@@ -232,11 +259,12 @@ unless(-d $hap_map_filtered_snps_output_dir){
      mkdir($hap_map_filtered_snps_output_dir, 0777) or die "Can't make directory: $!";
 }
 
+# run_pipeline.pl -Xmx12g -fork1 -GBSHapMapFiltersPlugin -hmp ./hapmap/mergedSNPs/mpbGBSGenos_mergedSNPs_chr+.hmp.txt -o ./hapmap/filt/mpbGBSGenos_mergedSNPsFilt_chr+.hmp.txt -mnSCov 0.2 -MnMAF 0.01 -sC 1 -eC 8188 -endPlugin -runfork1 > ./hmpFilt.stdout.log
 my $filtered_hap_map_snp_outfile = gbs_hap_map_filters($merged_hap_map_genotype_outfile, $project_name, $min_minor_allele_freq_gbs_hap_map, $min_site_coverage, 
 	$start_chromosome, $end_chromosome, $tassel_num_ram, $hap_map_filtered_snps_output_dir, $hap_map_output_dir, $gbs_output_dir);
 
 
-#/home/cookeadmin/tassel-tassel3-standalone/run_pipeline.pl -Xmx11g -fork1 -FastqToTagCountPlugin -i ./fastq -k mpb_barcodes.txt -e PstI-MspI -s 300000000 -c 1 -o ./tagCounts -endPlugin -runfork1 > ./tagCounts.stdout.log
+# run_pipeline.pl -Xmx11g -fork1 -FastqToTagCountPlugin -i ./fastq -k mpb_barcodes.txt -e PstI-MspI -s 300000000 -c 1 -o ./tagCounts -endPlugin -runfork1 > ./tagCounts.stdout.log
 sub fastq_to_tag_counts{
 
         my $fastq_infile_dir = shift;
@@ -286,7 +314,7 @@ sub fastq_to_tag_counts{
 	}
 }
 
-#/home/cookeadmin/tassel-tassel3-standalone/run_pipeline.pl -Xmx11g -fork1 -MergeMultipleTagCountPlugin -i ./tagCounts -o ./mergedTagCounts/mpbGBSTags.cnt -c 5 -t -endPlugin -runfork1 > ./MTC.stdout.log
+# run_pipeline.pl -Xmx11g -fork1 -MergeMultipleTagCountPlugin -i ./tagCounts -o ./mergedTagCounts/mpbGBSTags.cnt -c 5 -t -endPlugin -runfork1 > ./MTC.stdout.log
 sub merge_multiple_tag_counts{
 
         my $tag_count_input_dir = shift;
@@ -334,7 +362,7 @@ sub merge_multiple_tag_counts{
 	return ($merged_multiple_tag_counts_outfile, $merged_multiple_tag_counts_fasta_outfile);
 }
 
-#/home/cookeadmin/tassel-tassel3-standalone/run_pipeline.pl -Xmx11g -fork1 -TagCountToFastqPlugin -i ./mergedTagCounts/mpbGBSTags.cnt -o ./mergedTagCounts/mpbGBSTags.fq -c 5 -endPlugin -runfork1 > ./MTCtoFQ.stdout.log
+# run_pipeline.pl -Xmx11g -fork1 -TagCountToFastqPlugin -i ./mergedTagCounts/mpbGBSTags.cnt -o ./mergedTagCounts/mpbGBSTags.fq -c 5 -endPlugin -runfork1 > ./MTCtoFQ.stdout.log
 sub merge_multiple_tag_counts_to_fastq{
 
         my $merged_multiple_tag_counts_infile = shift;
@@ -527,7 +555,7 @@ sub bwa_samse{
 	return $bwa_aligned_master_outfile;
 }
 
-#/home/cookeadmin/tassel-tassel3-standalone/run_pipeline.pl -Xmx12g -fork1 -SAMConverterPlugin -i ./mergedTagCounts/AlignedMasterTagsMPB.sam -o ./topm/MasterTagsMPB.topm -endPlugin -runfork1 > ./SAMconvert.stdout.log
+# run_pipeline.pl -Xmx12g -fork1 -SAMConverterPlugin -i ./mergedTagCounts/AlignedMasterTagsMPB.sam -o ./topm/MasterTagsMPB.topm -endPlugin -runfork1 > ./SAMconvert.stdout.log
 sub sam_converter{
 
         my $bwa_aligned_master_infile = shift;
@@ -560,7 +588,7 @@ sub sam_converter{
 	return $topm_outfile;
 }
 
-#/home/cookeadmin/tassel-tassel3-standalone/run_pipeline.pl -Xmx12g -fork1 -FastqToTBTPlugin -i ./fastq -k mpb_barcodes.txt -e PstI-MspI -o ./tbt -y -m ./topm/MasterTagsMPB.topm -endPlugin -runfork1 > ./TBT.stdout.log
+# run_pipeline.pl -Xmx12g -fork1 -FastqToTBTPlugin -i ./fastq -k mpb_barcodes.txt -e PstI-MspI -o ./tbt -y -m ./topm/MasterTagsMPB.topm -endPlugin -runfork1 > ./TBT.stdout.log
 sub fastq_to_tags_by_taxa{
 
         my $fastq_infile_dir = shift;
@@ -581,8 +609,8 @@ sub fastq_to_tags_by_taxa{
         my $tassel_num_ram = shift;
         die "Error lost amount of tassel memory" unless defined $tassel_num_ram;
         
-        my $tbt_output_dir = shift;
-        die "Error lost the output directory to contain output TagsByTaxa (TBT) file" unless defined $tbt_output_dir;
+        my $tags_by_taxa_output_dir = shift;
+        die "Error lost the output directory to contain output TagsByTaxa (TBT) file" unless defined $tags_by_taxa_output_dir;
         
         my $gbs_output_dir = shift;
         die "Error lost the GBS output directory" unless defined $gbs_output_dir;
@@ -590,7 +618,7 @@ sub fastq_to_tags_by_taxa{
         my $tags_by_taxa_stdout_log_outfile = join('/', $gbs_output_dir, join("_", $project_name, "TagsByTaxa.stdout.log"));
         my $tags_by_taxa_stderr_log_outfile = join('/', $gbs_output_dir, join("_", $project_name, "TagsByTaxa.stderr.log"));
         
-	my ($tbt_files, $tbt_file_counter) = find_files($tbt_output_dir, "tbt.byte");
+	my ($tbt_files, $tbt_file_counter) = find_files($tags_by_taxa_output_dir, "tbt.byte");
 	my $non_zero_tbt_files = 0;
 	foreach my $file_name (sort keys %{$tbt_files}){
 		warn $file_name . "\n";
@@ -601,13 +629,13 @@ sub fastq_to_tags_by_taxa{
 	
 	unless(($non_zero_tbt_files eq $tbt_file_counter) and ($tbt_file_counter ne 0)){
 		warn "Generating tags by taxa file using the FastqToTBTPlugin.....\n\n";
-		my $FastqToTBTCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -FastqToTBTPlugin -i $fastq_infile_dir -k $fastq_barcodes_infile -e $restriction_enzymes -o $tbt_output_dir -y -m $topm_infile -endPlugin -runfork1 1> $tags_by_taxa_stdout_log_outfile 2> $tags_by_taxa_stderr_log_outfile");
+		my $FastqToTBTCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -FastqToTBTPlugin -i $fastq_infile_dir -k $fastq_barcodes_infile -e $restriction_enzymes -o $tags_by_taxa_output_dir -y -m $topm_infile -endPlugin -runfork1 1> $tags_by_taxa_stdout_log_outfile 2> $tags_by_taxa_stderr_log_outfile");
 		warn $FastqToTBTCmd . "\n\n";
 		system($FastqToTBTCmd) == 0 or die "Error calling $FastqToTBTCmd: $?";
 	}
 }
 
-#/home/cookeadmin/tassel-tassel3-standalone/run_pipeline.pl -Xmx12g -fork1 -MergeTagsByTaxaFilesPlugin -i ./tbt -o ./mergedTBT/mpbGBSstudy.tbt.byte -s 200000000 -endPlugin -runfork1 > ./mergeTBT.stdout.log
+# run_pipeline.pl -Xmx12g -fork1 -MergeTagsByTaxaFilesPlugin -i ./tbt -o ./mergedTBT/mpbGBSstudy.tbt.byte -s 200000000 -endPlugin -runfork1 > ./mergeTBT.stdout.log
 sub merge_tags_by_taxa_files{
         my $tbt_input_dir = shift;
         die "Error lost the input directory containing the TagsByTaxa (TBT) file" unless defined $tbt_input_dir;
@@ -621,14 +649,14 @@ sub merge_tags_by_taxa_files{
         my $tassel_num_ram = shift;
         die "Error lost amount of tassel memory" unless defined $tassel_num_ram;
         
-        my $merged_tbt_output_dir = shift;
-        die "Error lost the output directory to contain output MergeTagsByTaxa (mergedTBT) file" unless defined $merged_tbt_output_dir;
+        my $merged_tags_by_taxa_output_dir = shift;
+        die "Error lost the output directory to contain output MergeTagsByTaxa (mergedTBT) file" unless defined $merged_tags_by_taxa_output_dir;
         
         my $gbs_output_dir = shift;
         die "Error lost the GBS output directory" unless defined $gbs_output_dir;
         
         # The merged tags by taxa output file name.
-        my $merged_tags_by_taxa_outfile = join('/', $merged_tbt_output_dir, join("_", $project_name, "Study.tbt.byte"));
+        my $merged_tags_by_taxa_outfile = join('/', $merged_tags_by_taxa_output_dir, join("_", $project_name, "Study.tbt.byte"));
         
         my $merged_tags_by_taxa_stdout_log_outfile = join('/', $gbs_output_dir, join("_", $project_name, "MergeTagsByTaxa.stdout.log"));
         my $merged_tags_by_taxa_stderr_log_outfile = join('/', $gbs_output_dir, join("_", $project_name, "MergeTagsByTaxa.stderr.log"));
@@ -643,7 +671,7 @@ sub merge_tags_by_taxa_files{
 	
 }
 
-#/home/cookeadmin/tassel-tassel3-standalone/run_pipeline.pl -Xmx12g -fork1 -TagsToSNPByAlignmentPlugin -i ./mergedTBT/mpbGBSstudy.tbt.byte -y -m ./topm/MasterTagsMPB.topm -mUpd ./topm/MasterTagsMPBwVariants.topm -o ./hapmap/raw/mpbGBSGenos_chr+.hmp.txt -mxSites 500000 -mnMAF 0.02 -mnMAC 100000 -ref ./refgen/renumbered_Msequence.fasta -sC 1 -eC 8188 -endPlugin -runfork1 > ./TagstoSNPAlign.stdout.log
+# run_pipeline.pl -Xmx12g -fork1 -TagsToSNPByAlignmentPlugin -i ./mergedTBT/mpbGBSstudy.tbt.byte -y -m ./topm/MasterTagsMPB.topm -mUpd ./topm/MasterTagsMPBwVariants.topm -o ./hapmap/raw/mpbGBSGenos_chr+.hmp.txt -mxSites 500000 -mnMAF 0.02 -mnMAC 100000 -ref ./refgen/renumbered_Msequence.fasta -sC 1 -eC 8188 -endPlugin -runfork1 > ./TagstoSNPAlign.stdout.log
 sub tags_to_snp_by_alignment{
 
         my $merged_tags_by_taxa_infile = shift;
@@ -713,7 +741,7 @@ sub tags_to_snp_by_alignment{
 	return $hap_map_genotype_outfile;
 }
 
-#/home/cookeadmin/tassel-tassel3-standalone/run_pipeline.pl -Xmx12g -fork1 -MergeDuplicateSNPsPlugin -hmp ./hapmap/raw/mpbGBSGenos_chr+.hmp.txt -o ./hapmap/mergedSNPs/mpbGBSGenos_mergedSNPs_chr+.hmp.txt -misMat 0.1 -callHets -sC 1 -eC 8188 -endPlugin -runfork1 > MergeDupSNP.stdout.log
+# run_pipeline.pl -Xmx12g -fork1 -MergeDuplicateSNPsPlugin -hmp ./hapmap/raw/mpbGBSGenos_chr+.hmp.txt -o ./hapmap/mergedSNPs/mpbGBSGenos_mergedSNPs_chr+.hmp.txt -misMat 0.1 -callHets -sC 1 -eC 8188 -endPlugin -runfork1 > MergeDupSNP.stdout.log
 sub merge_duplicate_snps{
 
         my $hap_map_genotype_infile = shift;
@@ -764,7 +792,7 @@ sub merge_duplicate_snps{
 	return $merged_hap_map_genotype_outfile;
 }
 
-# /home/cookeadmin/tassel-tassel3-standalone/run_pipeline.pl -Xmx12g -fork1 -GBSHapMapFiltersPlugin -hmp ./hapmap/mergedSNPs/mpbGBSGenos_mergedSNPs_chr+.hmp.txt -o ./hapmap/filt/mpbGBSGenos_mergedSNPsFilt_chr+.hmp.txt -mnSCov 0.2 -MnMAF 0.01 -sC 1 -eC 8188 -endPlugin -runfork1 > ./hmpFilt.stdout.log
+# run_pipeline.pl -Xmx12g -fork1 -GBSHapMapFiltersPlugin -hmp ./hapmap/mergedSNPs/mpbGBSGenos_mergedSNPs_chr+.hmp.txt -o ./hapmap/filt/mpbGBSGenos_mergedSNPsFilt_chr+.hmp.txt -mnSCov 0.2 -MnMAF 0.01 -sC 1 -eC 8188 -endPlugin -runfork1 > ./hmpFilt.stdout.log
 sub gbs_hap_map_filters{
 
         my $merged_hap_map_genotype_infile = shift;
@@ -856,10 +884,12 @@ sub gbs_hap_map_filters{
 	return $filtered_hap_map_snp_outfile;
 }
 
+# run binarytotext plugin to make the ufastqtotagcount result from above human readable
+# run_pipeline.pl -Xmx4g -fork1 -BinaryToTextPlugin -i ./tagCounts/GQ25032013_7.cnt -o ./tagCounts/GQ25032013_7_cnt.txt -t TagCounts -endPlugin -runfork1 > ./bintotex.log
 sub binary_to_text{
 
-        my $gbs_output_dir = shift;
-        die "Error lost the GBS output directory" unless defined $gbs_output_dir;
+	my $gbs_project_dir = shift;
+        die "Error lost the TASSEL GBS project directory" unless defined $gbs_project_dir;
         
         my $project_name = shift;
         die "Error lost the project name" unless defined $project_name;
@@ -873,30 +903,74 @@ sub binary_to_text{
         my $output_dir = shift;
         die "Error lost the output directory to contain output .txt (text) files" unless defined $output_dir;
 
-        my ($tag_count_txt_files, $tag_count_txt_file_counter) = find_files($output_dir, "cnt.txt");
-        
-	my $non_zero_tag_count_txt_files = 0;
-	foreach my $file_name (sort keys %{$tag_count_txt_files}){
+        my ($txt_files, $txt_file_counter);
+	# Perform commands based on binary file type.
+	switch ($file_type) {
+		# $file_type evaluates as "TagCounts".
+		case("TagCounts"){
+			($txt_files, $txt_file_counter) = find_files($output_dir, "cnt.txt");
+		}
+		# $file_type evaluates as "TBTByte".
+		case("TBTByte"){
+			($txt_files, $txt_file_counter) = find_files($output_dir, "byte.txt");
+		}
+		# $file_type evaluates as "TOPM".
+		case("TOPM"){
+			($txt_files, $txt_file_counter) = find_files($output_dir, ".topm.txt");
+		}    
+		# Unsupported file type.
+		else{
+			die "Sorry $file_type is not a currently supported file type";
+		}
+        }
+	my $non_zero_txt_files = 0;
+	foreach my $file_name (sort keys %{$txt_files}){
 # 		warn $file_name . "\n";
-		if(-s $tag_count_txt_files->{$file_name}){
-			$non_zero_tag_count_txt_files++;
+		if(-s $txt_files->{$file_name}){
+			$non_zero_txt_files++;
 		}
 	}
 	
-	unless(($non_zero_tag_count_txt_files eq $tag_count_txt_file_counter) and ($tag_count_txt_file_counter ne 0)){
-
-		my ($tag_count_files, $tag_count_file_counter) = find_files($output_dir, "cnt");
-		foreach my $file_name (sort keys %{$tag_count_files}){
+	unless(($non_zero_txt_files eq $txt_file_counter) and ($txt_file_counter ne 0)){
+		# Create the binary to text output directory if it doesn't already exist.
+		my $binary_to_text_log_output_dir = join('/', $gbs_project_dir, "binaryToTextLogFiles");
+		unless(-d $binary_to_text_log_output_dir){
+			mkdir($binary_to_text_log_output_dir, 0777) or die "Can't make directory: $!";
+		}
+		
+		my ($binary_files, $binary_file_counter);
+		# Perform commands based on binary file type.
+		switch ($file_type) {
+			# $file_type evaluates as "TagCounts".
+			case("TagCounts"){
+				($binary_files, $binary_file_counter) = find_files($output_dir, "cnt");
+			}
+			# $file_type evaluates as "TBTByte".
+			case("TBTByte"){
+				($binary_files, $binary_file_counter) = find_files($output_dir, "byte");
+			}
+			# $file_type evaluates as "TOPM".
+			case("TOPM"){
+				($binary_files, $binary_file_counter) = find_files($output_dir, "topm");
+			}    
+			# Unsupported file type.
+			else{
+				die "Sorry $file_type is not a currently supported file type";
+			}
+        	}
+		
+		
+		foreach my $file_name (sort keys %{$binary_files}){
 # 			warn $file_name . "\n";
-			my $binary_infile = $tag_count_files->{$file_name};
+			my $binary_infile = $binary_files->{$file_name};
 			
 			my $binary_filename = basename($binary_infile);
 			my $text_outfile = join('/', $output_dir, $binary_filename . ".txt");
 
-			my $binary_to_text_stdout_log_outfile = join('/', $gbs_output_dir, join("_", $project_name, $binary_filename, "BinaryToText.stdout.log"));
-			my $binary_to_text_stderr_log_outfile = join('/', $gbs_output_dir, join("_", $project_name, $binary_filename, "BinaryToText.stderr.log"));
+			my $binary_to_text_stdout_log_outfile = join('/', $binary_to_text_log_output_dir, join("_", $project_name, $binary_filename, "BinaryToText.stdout.log"));
+			my $binary_to_text_stderr_log_outfile = join('/', $binary_to_text_log_output_dir, join("_", $project_name, $binary_filename, "BinaryToText.stderr.log"));
 			
-			warn "Generating the $file_type text file using the BinaryToTextPlugin on $binary_filename.....\n";
+			warn "Generating the TASSEL GBS $file_type text file using the BinaryToTextPlugin on $binary_filename.....\n";
 			my $binaryToTextCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -BinaryToTextPlugin -i $binary_infile -o $text_outfile -t $file_type -endPlugin -runfork1 1> $binary_to_text_stdout_log_outfile 2> $binary_to_text_stderr_log_outfile");
 			warn $binaryToTextCmd . "\n\n";
 			system($binaryToTextCmd) == 0 or die "Error calling $binaryToTextCmd: $?";
