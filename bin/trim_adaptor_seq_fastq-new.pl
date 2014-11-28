@@ -5,36 +5,50 @@ use Getopt::Long;
 
 use File::Basename;
 use IPC::Open2;
-#use Math::Round;
 use List::Compare;
 
 # perl trim_adaptor_seq_fastq-new.pl -i ~/workspace/GBS_data-08-10-2013/PROJECT_LEADER_DIR/CHRISTIANNE_MCDONALD -p CHRISTIANNE_MCDONALD -c 7 -o ~/workspace/GBS_data-08-10-2013/TRIMMED_ADAPTOR_FASTQ_DIR-2014-10-29
 my ($fastq_file_dir, $project_name, $fastq_adaptor_sequence, $gbs_sequence_length, $adaptor_length_min_threshold, $adaptor_trim_offset, $min_trimmed_fastq_sequence_length, $blast_num_cpu, $output_dir);
 GetOptions(
-	'i=s'    => \$fastq_file_dir,
-	'p=s'    => \$project_name,
-	'a=s'    => \$fastq_adaptor_sequence,
-	'l=s'    => \$gbs_sequence_length,
-	'm=s'    => \$adaptor_length_min_threshold,
-	't=s'    => \$adaptor_trim_offset,
-	'q=s'    => \$min_trimmed_fastq_sequence_length,
-	'c=s'    => \$blast_num_cpu,
-	'o=s'    => \$output_dir,
+	'i=s'    => \$fastq_file_dir, # The *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+	'p=s'    => \$project_name, # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
+	'a=s'    => \$fastq_adaptor_sequence, # The GBS common adaptor sequence to trim from the GBS fastq sequences. Default: CCGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATCTCGTATGCCGTCTTCTGCTTG
+	'l=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 100
+	'm=s'    => \$adaptor_length_min_threshold, # The minimum GBS common adaptor sequence length cut-off in base pairs (bps) to retain for trimming if found in a given GBS fastq sequence hit found in the adaptor blastn searches. Default: 16
+	't=s'    => \$adaptor_trim_offset, # The trimming offset length in base pairs (bps) to trim upstream of the start of the GBS common adaptor sequence found in the adaptor blastn searches. Default: 5
+	'q=s'    => \$min_trimmed_fastq_sequence_length, # The minimum trimmed fastq sequence length in base pairs (bps) to retain after trimming. Default: 32
+	'c=s'    => \$blast_num_cpu, # The number of cpu cores to use for the adaptor blastn searches. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+	'o=s'    => \$output_dir, # The absolute path to the output directory to contain the trimmed adaptor sequence fastq output files.
 );
 
+# Display a usage message if the following parameters are not specified.
 usage() unless (
 	defined $fastq_file_dir
 	and $project_name
 	and defined $output_dir
 );
 
+# The GBS common adaptor sequence to trim from the GBS fastq sequences. Default: CCGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATCTCGTATGCCGTCTTCTGCTTG
 $fastq_adaptor_sequence = 'CCGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATCTCGTATGCCGTCTTCTGCTTG' unless defined $fastq_adaptor_sequence;
+
+# The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 100
 $gbs_sequence_length = 100 unless defined $gbs_sequence_length;
+
+# The minimum GBS common adaptor sequence length cut-off in base pairs (bps) to retain for trimming if found in a given GBS fastq sequence hit found in the adaptor blastn searches. Default: 16
 $adaptor_length_min_threshold = 16 unless defined $adaptor_length_min_threshold;
+
+# The trimming offset length in base pairs (bps) to trim upstream of the start of the GBS common adaptor sequence found in the adaptor blastn searches. Default: 5
 $adaptor_trim_offset = 5 unless defined $adaptor_trim_offset;
+
+# The minimum trimmed fastq sequence length in base pairs (bps) to retain after trimming. Keep in mind that this is the minimum trimmed fastq sequence length used before we add the length of the barcode 
+# used for splitting each individual fastq file. Tassel requires sequences at least 32 base pairs (bps) plus the length of a particular barcode that can be in the range of 4-8 base pairs (bps) in length. Default: 32
 $min_trimmed_fastq_sequence_length = 32  unless defined $min_trimmed_fastq_sequence_length;
+
+# The number of cpu cores to use for the adaptor blastn searches. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
 $blast_num_cpu = 2 unless defined $blast_num_cpu;
 
+# Program dependencies - The absolute paths to gzip to compress all project leader *.fastq input files, the makeblastdb program to create the blast databases for the adaptor blastn program, 
+# and the blastn program to generate the adaptor blastn tab-delimited files.
 my ($gzip, $makeblastdb, $blastn, $gbs_adaptor_align_graphics);
 $gzip 				= '/bin/gzip';
 $makeblastdb 			= '/usr/local/bin/makeblastdb';
@@ -48,28 +62,33 @@ die <<"USAGE";
 
 Usage: $0 -i fastq_file_dir -p project_name -a fastq_adaptor_sequence -l gbs_sequence_length -m adaptor_length_min_threshold -t adaptor_trim_offset -q min_trimmed_fastq_sequence_length -c blast_num_cpu -o output_dir
 
-DESCRIPTION - 
+DESCRIPTION - A program to trim the GBS common adaptor sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adaptor is sequenced along with the DNA of an individual
 
 OPTIONS:
 
--i fastq_file_dir - 
+-i fastq_file_dir - The *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+	e.g. /path/to/fastq_file_dir
+	
+-p project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
+	e.g. MPB_MALE_GBS
+	
+-a fastq_adaptor_sequence - The GBS common adaptor sequence to trim from the GBS fastq sequences. Default: CCGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATCTCGTATGCCGTCTTCTGCTTG
 
--p project_name -
+-l gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 100
 
--a fastq_adaptor_sequence -
+-m adaptor_length_min_threshold - The minimum GBS common adaptor sequence length cut-off in base pairs (bps) to retain for trimming if found in a given GBS fastq sequence hit found in the adaptor blastn searches. Default: 16
 
--l gbs_sequence_length - 
+-t adaptor_trim_offset - The trimming offset length in base pairs (bps) to trim upstream of the start of the GBS common adaptor sequence found in the adaptor blastn searches. Default: 5
 
--m adaptor_length_min_threshold -
+-q min_trimmed_fastq_sequence_length - The minimum trimmed fastq sequence length in base pairs (bps) to retain after trimming. Keep in mind that this is the minimum trimmed fastq sequence length used before we add the 
+length of the barcode used for splitting each individual fastq file. Tassel requires sequences at least 32 base pairs (bps) plus the length of a particular barcode that can be in the range of 4-8 base pairs (bps) in 
+length. Default: 32
 
--t adaptor_trim_offset - 
+-c blast_num_cpu - The number of cpu cores to use for the adaptor blastn searches. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
 
--q min_trimmed_fastq_sequence_length - 
+-o output_dir - The absolute path to the output directory to contain the trimmed adaptor sequence fastq output files.
 
--c blast_num_cpu -
-
--o output_dir -
-
+	e.g. /path/to/output_dir
 USAGE
 }
 
@@ -111,29 +130,41 @@ unless(-d $trimmed_output_dir){# Need this to make the bulk fastq sequence file.
 	mkdir($trimmed_output_dir, 0777) or die "Can't make directory: $!";
 }
 
+# Generate bulk trimmed fastq files for each Genotyping by Sequencing (GBS) project. 
+# $trimmed_fastq_bulk_outfile contains the trimmed GBS sequences in fastq format.
 my $trimmed_fastq_bulk_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset) . ".fastq");
 push(@fastq_files2gzip, $trimmed_fastq_bulk_outfile);
 open(TRIMMED_BULK_OUTFILE, ">$trimmed_fastq_bulk_outfile") or die "Couldn't open file $trimmed_fastq_bulk_outfile for writting, $!";
+
+
+# The $trimmed_seqs_layout_bulk_outfile contains alled the trimmed coordinates layout for each sequence trimmed of the GBS common adaptor sequence.
 my $trimmed_seqs_layout_bulk_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset, "all_trimmed_seqs_layout") . ".txt");
 open(TRIMMED_BULK_LAYOUT_OUTFILE, ">$trimmed_seqs_layout_bulk_outfile") or die "Couldn't open file $trimmed_seqs_layout_bulk_outfile for writting, $!";
 print TRIMMED_BULK_LAYOUT_OUTFILE join("\t", "sequence_id", "trimmed_fastq_start", "trimmed_fastq_end", "trimmed_fastq_length", "trimmed_adaptor_start", "trimmed_adaptor_end",
 "trimmed_adaptor_length", "adaptor_seq_start", "adaptor_seq_end", "adaptor_seq_length") . "\n";
+
+# The $trimmed_seqs_layout_outfile contains the trimmed coordinates layout for each sequence trimmed of the GBS common adaptor sequence that passed the retaining criteria.
 my $trimmed_seqs_layout_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset, "trimmed_seqs_layout") . ".txt");
 open(TRIMMED_LAYOUT_OUTFILE, ">$trimmed_seqs_layout_outfile") or die "Couldn't open file $trimmed_seqs_layout_outfile for writting, $!";
 print TRIMMED_LAYOUT_OUTFILE join("\t", "sequence_id", "trimmed_fastq_start", "trimmed_fastq_end", "trimmed_fastq_length", "trimmed_adaptor_start", "trimmed_adaptor_end",
 "trimmed_adaptor_length", "adaptor_seq_start", "adaptor_seq_end", "adaptor_seq_length") . "\n";
+
+# The $removed_seqs_layout_outfile contains the trimmed coordinates layout for each sequence trimmed of the GBS common adaptor sequence that failed the retaining criteria and was therefore removed.
 my $removed_seqs_layout_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset, "removed_seqs_layout") . ".txt");
 open(REMOVED_LAYOUT_OUTFILE, ">$removed_seqs_layout_outfile") or die "Couldn't open file $removed_seqs_layout_outfile for writting, $!";
 print REMOVED_LAYOUT_OUTFILE join("\t", "sequence_id", "trimmed_fastq_start", "trimmed_fastq_end", "trimmed_fastq_length", "trimmed_adaptor_start", "trimmed_adaptor_end",
 "trimmed_adaptor_length", "adaptor_seq_start", "adaptor_seq_end", "adaptor_seq_length") . "\n";
 my %fastq_seq_counter = ();
 my %adaptor_length_counter = ();
+
 # Iterate through the files with the extension *.fastq.
 foreach my $fastq_filename (sort keys %{$fastq_files}){
 	my $fastq_infile = $fastq_files->{$fastq_filename};
 	warn "Processing " . $fastq_infile . ".....\n";
 	
 	my %fastq_sequences = ();
+	
+	# open the fastq input file for parsing.
 	open(INFILE, "<$fastq_infile") or die "Couldn't open file $fastq_infile for reading, $!";
 	
 	# Get the basename of the fastq filename without the .fastq extension.
@@ -143,6 +174,7 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
 	my ($individual_id, $barcode, $plate_num, $well_num) = split(/_/, $fasta_filename);
 	my $min_trimmed_fastq_sequence_length_plus_barcode = ($min_trimmed_fastq_sequence_length + length($barcode));
 	
+	# Generate files in fasta format from each fastq file for use in the adaptor blastn searches
 	my $fasta_target_outfile = join("/", $fasta_output_dir, $fasta_filename . ".fasta");
 	open(OUTFILE, ">$fasta_target_outfile") or die "Couldn't open file $fasta_target_outfile for writting, $!";
 	my ($fastq_header, $fastq_sequence, $fastq_plus, $fastq_quality_scores);
@@ -153,22 +185,22 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
 	while(<INFILE>){
 		chomp $_;
 		#warn $_ . "\n";
-		if(($_ =~ m/^\@[A-Za-z0-9-_]+:\d+:[A-Za-z0-9]+:\d+:\d+:\d+:\d+ \d:[A-Z]:\d:[ACGTRYKMSWBDHVN]*$/)
-			and ($i eq 1)){ # @HWI-ST767:215:C30VBACXX:8:1101:1801:1484 1:N:0:
+		if(($_ =~ m/^\@[A-Za-z0-9-_]+:\d+:[A-Za-z0-9]+:\d+:\d+:\d+:\d+ \d:[A-Z]:\d:[ACGTRYKMSWBDHVN]*$/) 
+			and ($i eq 1)){ # The fastq sequence header is on the first line. i.e. @HWI-ST767:215:C30VBACXX:8:1101:1801:1484 1:N:0:
 			$fastq_header = $_;
 #  				die $fastq_header;
-		}elsif(($_ =~ m/^[ACGTRYKMSWBDHVN]+$/i) and ($i eq 2)){
+		}elsif(($_ =~ m/^[ACGTRYKMSWBDHVN]+$/i) and ($i eq 2)){ # The fastq sequence is on the second line.
 			$fastq_sequence = $_;
 #  				die $fastq_sequence;
-		}elsif(($_ =~ m/^\+$/) and ($i eq 3)){
+		}elsif(($_ =~ m/^\+$/) and ($i eq 3)){ # The fastq plus character is on the third line.
 			$fastq_plus = $_;
 #  				die $fastq_plus;
-		}elsif(($_ =~ m/^.+$/) and (($i % 4) eq 0)){
+		}elsif(($_ =~ m/^.+$/) and (($i % 4) eq 0)){ # the fastq quality scores are on the fourth line.
 			$fastq_quality_scores = $_;
 #   				die $fastq_quality_scores;
 		}
 		
-		if(($i % 4) eq 0){
+		if(($i % 4) eq 0){ # Once we are finished parsing a fastq sequence entry we check to make sure it was parsed correctly and that the lengths of the sequence and quality scores match. 
 			
 			die "Error: fastq_header is undefined" unless(defined($fastq_header));
 			die "Error: fastq_sequence is undefined" unless(defined($fastq_sequence));
@@ -178,12 +210,14 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
 			my $fastq_sequence_length = length($fastq_sequence);
 			my $fastq_quality_scores_length = length($fastq_quality_scores);
 			
+			# Store each fastq sequence entry in a hash variable indexed to the fastq header for identification and an attribute index for the fastq sequence, fastq plus character, and the fastq quality score.
 			$fastq_sequences{$fastq_header}{'FASTQ_SEQUENCE'} = $fastq_sequence;
 			$fastq_sequences{$fastq_header}{'PLUS'} = $fastq_plus;
 			$fastq_sequences{$fastq_header}{'FASTQ_QUALITY_SCORES'} = $fastq_quality_scores;
 			die "Error: $fastq_header: fastq_sequence_length=$fastq_sequence_length bp ne gbs_sequence_length=$gbs_sequence_length bp" if($fastq_sequence_length ne $gbs_sequence_length);
 			die "Error: $fastq_header: fastq_sequence_length=$fastq_sequence_length ne fastq_quality_scores_length=$fastq_quality_scores_length" if($fastq_sequence_length ne $fastq_quality_scores_length);
 			
+			# Print the fastq header and sequence to the fasta file for the adaptor blastn searches in fasta format.
 			print OUTFILE join("\n", join("", ">", $fastq_header), $fastq_sequence) . "\n";
 			
 			$i = 1;
@@ -196,6 +230,9 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
 	close(INFILE) or die "Couldn't close file $fastq_infile";
 	close(OUTFILE) or die "Couldn't close file $fasta_target_outfile";
 	
+	# Execute the adaptor blastn search using the GBS common adaptor sequence as the query and the fastq sequences in fasta format as the blast database.
+	# Keep a maximum of target sequences equal to the number of sequences in the fastq file. Retain adaptor blastn hits based on the minimum adaptor length threshold.
+	# Keep adaptor blastn hits that begin at position 1 of the full GBS common adaptor sequence up to the minimum adaptor length threshold.
 	my $adaptor_blastn_tsv_outfile = generate_adaptor_blastn($fastq_adaptor_sequence, $fasta_target_outfile, $num_fastq_seqs, $adaptor_length_min_threshold, $gbs_sequence_length, $blast_num_cpu, $blastn_output_dir);
 
   	# Create output directory if it doesn't already exist.
@@ -213,7 +250,8 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   	}
   	
   	# Parse the tab-delimited adaptor blast output so that we can trimm the fastq sequences that contain the GBS adaptor sequence.
-  	# Create new adaptor blastn files so that we can visualize where we trimmed the sequence.
+  	# Create new adaptor blastn files so that we can visualize where we trimmed the sequence. Store results in a hash array indexed to the target sequence so that 
+  	# we can use the longest length of the GBS common adaptor sequence as the optimal alignment in the trimming step.
   	warn "Parsing $fasta_filename.gbs_adaptor_blastn.tsv to get most optimal adaptor blastn hits.....\n";
   	open(INFILE, "<$adaptor_blastn_tsv_outfile") or die "Couldn't open file $adaptor_blastn_tsv_outfile for reading, $!";
   	my %adaptor_blastn_hits = ();
@@ -251,6 +289,7 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   	}
   	close(INFILE) or die "Couldn't close file $adaptor_blastn_tsv_outfile";
   	
+  	# Generate the trimmed adaptor blastn files filtered for further processing.
   	my $trimmed_adaptor_blastn_outfile = join('/', $trimmed_blastn_output_dir, $fasta_filename . ".gbs_adaptor_blastn.tsv");
   	open(OUTFILE, ">$trimmed_adaptor_blastn_outfile") or die "Couldn't open file $trimmed_adaptor_blastn_outfile for writting, $!";
   	print OUTFILE join("\t", "query_name", "target_name", "query_coverage", "percent_identity", "align_length", "num_mismatch", 
@@ -311,18 +350,25 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   		my $predicted_adaptor_start = ($fastq_sequence_length - $adaptor_sequence_length);
   		
   		my ($trimmed_fastq_sequence, $trimmed_fastq_quality_scores, $trimmed_adaptor_sequence);
+  		# If the adaptor alignment length is equal to the length of the full GBS common adaptor then trim where that GBS common adaptor sequence is found subtracting the trimmed offset from the target start.
+  		# If the adaptor alignment length is less than the length of the full GBS common adaptor then trim only if the target end of the aligned adaptor sequence is equal the the common GBS sequence length.
   		if(($align_length eq $adaptor_sequence_length) 
   			or ((($align_length >= $adaptor_length_min_threshold) and ($align_length < $adaptor_sequence_length)) and ($query_start eq 1) and ($target_end eq $gbs_sequence_length))){
   			
+  			# Get the trimmed fastq sequence trimmed of the GBS common adaptor sequence and trimmed offset.
   			$trimmed_fastq_sequence = get_subseq($fastq_sequence, 1, (($target_start - $adaptor_trim_offset) - 1));
+  			# Get the trimmed fastq quality scores trimmed of the GBS common adaptor sequence and trimmed offset.
   			$trimmed_fastq_quality_scores = get_subseq($fastq_quality_scores, 1, (($target_start - $adaptor_trim_offset) - 1));
+  			# Get the trimmed adaptor sequence and trimmed offset that was trimmed off the GBS fastq sequence.
   			$trimmed_adaptor_sequence = get_subseq($fastq_sequence, ($target_start - $adaptor_trim_offset), $fastq_sequence_length);
-  				
+  			
+  			# Get the length of the trimmed GBS common adaptor sequence and trimmed offset.
   			my $trimmed_adaptor_sequence_length = length($trimmed_adaptor_sequence);
   			my $trimmed_fastq_sequence_length = length($trimmed_fastq_sequence);
   			
+  			# If the trimmed sequence length is greater than or equal to the minimum trimmed fastq sequence length plus the length of the barcode then the trimmed and sequence count files.
   			if($trimmed_fastq_sequence_length >= $min_trimmed_fastq_sequence_length_plus_barcode){
-  			
+  				# Store the trimmed fastq sequence entry in a hash variable indexed by the fastq sequence header.
   				$trimmed_fastq_sequences{$fastq_header}{'FASTQ_SEQUENCE'} = $trimmed_fastq_sequence;
   				$trimmed_fastq_sequences{$fastq_header}{'PLUS'} = $fastq_plus;
   				$trimmed_fastq_sequences{$fastq_header}{'FASTQ_QUALITY_SCORES'} = $trimmed_fastq_quality_scores;
@@ -362,7 +408,7 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   				$adaptor_length_counter{$align_length}{$adaptor_concatenated_sequence}++;
   				push(@trimmed_fastq_list, $fastq_header);
   				
-  			}elsif($trimmed_fastq_sequence_length < $min_trimmed_fastq_sequence_length_plus_barcode){ #If this alignment doesn't meet our filtering criteria skip to the next alignment.
+  			}elsif($trimmed_fastq_sequence_length < $min_trimmed_fastq_sequence_length_plus_barcode){ #If this alignment doesn't meet our filtering criteria separate fastq sequence from trimmed fastq sequence data.
   				$removed_fastq_sequences{$fastq_header}{'FASTQ_SEQUENCE'} = $fastq_sequences{$fastq_header}{'FASTQ_SEQUENCE'};
   				$removed_fastq_sequences{$fastq_header}{'PLUS'} = $fastq_sequences{$fastq_header}{'PLUS'};
   				$removed_fastq_sequences{$fastq_header}{'FASTQ_QUALITY_SCORES'} = $fastq_sequences{$fastq_header}{'FASTQ_QUALITY_SCORES'};
@@ -413,9 +459,9 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   		mkdir($trimmed_fastq_output_dir, 0777) or die "Can't make directory: $!";
   	}
   
+  	# Print out trimmed fastq sequences first so that we can see what was trimmed.
   	my $trimmed_fastq_outfile = join("/", $trimmed_fastq_output_dir, join("_", $fasta_filename, "trimmed_offset", $adaptor_trim_offset) . ".fastq");
   	open(OUTFILE, ">$trimmed_fastq_outfile") or die "Couldn't open file $trimmed_fastq_outfile for writting, $!";
-  	# Print out trimmed fastq sequences first so that we can see what was trimmed.
   	foreach my $fastq_header (sort keys %trimmed_fastq_sequences){
   		
   		my $fastq_sequence = $trimmed_fastq_sequences{$fastq_header}{'FASTQ_SEQUENCE'};
@@ -451,7 +497,8 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   
   	}
   	close(OUTFILE) or die "Couldn't close file $trimmed_fastq_outfile";
-  
+  	
+  	# Parsed trimmed fastq file and concatenate to the bulk fastq output file for this project.
   	open(INFILE, "<$trimmed_fastq_outfile") or die "Couldn't open file $trimmed_fastq_outfile for reading, $!";
   	while(<INFILE>){
   		chomp $_;
@@ -460,12 +507,13 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
   	close(INFILE) or die "Couldn't close file $trimmed_fastq_outfile";
   	
   	
-  	# Create output directory if it doesn't already exist.
+  	# Create the removed fastq sequence output directory if it doesn't already exist.
   	my $removed_fastq_output_dir = join('/', $trimmed_output_dir, "REMOVED_FASTQ_SEQUENCES");
   	unless(-d $removed_fastq_output_dir){
   		mkdir($removed_fastq_output_dir, 0777) or die "Can't make directory: $!";
   	}
   	
+  	# Print out trimmed fastq sequences that did not pass the filtering critera so that we can see what was trimmed and removed.
   	my $removed_fastq_outfile = join("/", $removed_fastq_output_dir, join("_", $fasta_filename, "trimmed_offset", $adaptor_trim_offset, "removed_sequences") . ".fastq");
   	open(OUTFILE, ">$removed_fastq_outfile") or die "Couldn't open file $trimmed_fastq_outfile for writting, $!";
   	foreach my $fastq_header (sort keys %removed_fastq_sequences){
@@ -502,11 +550,13 @@ close(TRIMMED_BULK_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_lay
 close(TRIMMED_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_layout_outfile";
 close(REMOVED_LAYOUT_OUTFILE) or die "Couldn't close file $removed_seqs_layout_outfile";
 
+# Generate a fastq sequence counts file so that we can see the percentages of untrimmed, trimmed, and removed fastq sequences each fastq input file.
 my $fastq_seq_counts_outfile = join("/", $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset, "fastq_seq_counts") . ".txt");
 open(OUTFILE, ">$fastq_seq_counts_outfile") or die "Couldn't open file $fastq_seq_counts_outfile for writting, $!";
 print OUTFILE join("\t", "fastq_file_name", "total_num_seqs", "num_untrimmed_seqs", "percent_untrimmed_seqs", "num_trimmed_seqs", "percent_trimmed_seqs", "num_removed_seqs", "percent_removed_seqs") . "\n";
 foreach my $fasta_filename (sort keys %fastq_seq_counter){
 
+    # Get the fastq untrimmed, trimmed, and removed counts.
     my $num_untrimmed_seqs = $fastq_seq_counter{$fasta_filename}{'UNTRIMMED'};
     my $num_trimmed_seqs = $fastq_seq_counter{$fasta_filename}{'TRIMMED'};
     my $num_removed_seqs = $fastq_seq_counter{$fasta_filename}{'REMOVED'};
@@ -517,6 +567,7 @@ foreach my $fasta_filename (sort keys %fastq_seq_counter){
     $num_trimmed_seqs = 0 unless(defined($num_trimmed_seqs));
     $num_removed_seqs = 0 unless(defined($num_removed_seqs));
 
+    # Calculate the total number of sequences.
     my $total_num_seqs = ($num_untrimmed_seqs + $num_trimmed_seqs + $num_removed_seqs);
 
     my $percent_untrimmed_seqs = (($num_untrimmed_seqs/$total_num_seqs) * 100);
@@ -533,6 +584,7 @@ foreach my $fasta_filename (sort keys %fastq_seq_counter){
 }
 close(OUTFILE) or die "Couldn't close file $fastq_seq_counts_outfile";
 
+# Generate the number of GBS common adaptor sequence found within the adaptor blastn searches so that we can see the variation of the length of the adaptor sequences.
 my $adaptor_length_counts_outfile = join("/", $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adaptor_trim_offset, "adaptor_length_counts") . ".txt");
 open(OUTFILE, ">$adaptor_length_counts_outfile") or die "Couldn't open file $adaptor_length_counts_outfile for writting, $!";
 print OUTFILE join("\t", "adapter_sequence_id", "adapter_length", "adaptor_sequence_count") . "\n";
@@ -565,6 +617,8 @@ undef @fastq_files2gzip;
 undef %fastq_seq_counter;
 undef %adaptor_length_counter;
 
+# find the fastq files found in the given fastq input file directory and return a hash list of the files and the number of files found.
+# Will add a pod documentation for this sub routine.
 sub find_fastq_files{
     
 	my $fastq_file_dir = shift;
@@ -583,6 +637,8 @@ sub find_fastq_files{
 	return (\%fastq_files, $file_count);
 }
 
+# find all the blast database related *.fasta, *.nin, *.nsq, and *.nhr files found in the given blastdb input file directory and return a hash list of the files
+# Will add a pod documentation for this sub routine.
 sub find_blastdb_files{
     
 	my $blastdb_dir = shift;
@@ -599,6 +655,8 @@ sub find_blastdb_files{
 	return \@blastdb_files;
 }
 
+# Make blast database *.nin, *.nsq, and *.nhr files based on the fasta file given. If the blast database is already created then don't execute makeblastdb.
+# Will add a pod documentation for this sub routine.
 # makeblastdb -in ncbi_nr_db_2014-05-30_organisms.fasta -dbtype 'nucl' -out ncbi_nr_db_2014-05-30_organisms.fasta
 sub makeblastdb_nuc{
 	my $fastadb = shift;
@@ -621,6 +679,10 @@ sub makeblastdb_nuc{
 
 }
 
+# Execute the adaptor blastn files in tab-delimited format for use in trimming the fastq sequences using the GBS common adaptor sequence as the query and the fastq sequences in fasta format as the blast database.
+# Keep a maximum of target sequences equal to the number of sequences in the fastq file. Retain adaptor blastn hits based on the minimum adaptor length threshold.
+# Keep adaptor blastn hits that begin at position 1 of the full GBS common adaptor sequence up to the minimum adaptor length threshold.
+# Will add a pod documentation for this sub routine.
 sub generate_adaptor_blastn{
 	my $fastq_adaptor_sequence = shift;
 	die "Error lost fastq adaptor sequence" unless defined $fastq_adaptor_sequence;
@@ -637,11 +699,13 @@ sub generate_adaptor_blastn{
 	my $blastn_output_dir = shift;
 	die "Error lost adaptor blastn output directory" unless defined $blastn_output_dir;
 	
+	# Get the base name of the fasta target file.
 	my $fasta_target_name = fileparse($fasta_target);
 	
 	# Get the length of the adaptor so that we can verify adaptor blast results.
 	my $adaptor_sequence_length = length($fastq_adaptor_sequence);
 	
+	# Create the adaptor blastn database
 	makeblastdb_nuc($fasta_target);
 	
 	my $adaptor_blastn_tsv_outfile = join('/', $blastn_output_dir, $fasta_target_name . ".gbs_adaptor_blastn.tsv");
@@ -674,6 +738,8 @@ sub generate_adaptor_blastn{
 	return $adaptor_blastn_tsv_outfile;
 }
 
+# Not in use at the moment because the amount of sequences trimmed exceed the capacity of rendered bio graphics images.
+# Will add a pod documentation for this sub routine.
 sub generate_adaptor_blast_graphics{
 	
 	my $adaptor_blastn_tsv_outfile = shift;
@@ -691,6 +757,8 @@ sub generate_adaptor_blast_graphics{
 	) == 0 or die "Error calling $gbsAdaptorAlignGraphicsCmd: $?";
 }
 
+# Compress a fastq file using gzip to save space.
+# Will add a pod documentation for this sub routine.
 sub gzip_fastq_file{
 	
 	my $fastq_file = shift;
@@ -704,6 +772,8 @@ sub gzip_fastq_file{
 	) == 0 or die "Error calling $gzipCmd: $?";
 }
 
+# Get the subsequence based on the input sequence, sequence start, and sequence end.
+# Will add a pod documentation for this sub routine.
 # my $seq = get_subseq("AGCTTGCGTT", 3, 8);
 # warn $seq . "\n";
 sub get_subseq{
