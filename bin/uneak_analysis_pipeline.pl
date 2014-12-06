@@ -8,7 +8,6 @@ use File::Basename;
 use Switch;
 
 # perl uneak_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/GQ03122013_5_fastq.txt.gz -n MPB_MALE_UNEAK_GBS -k ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/mpb_barcodes.txt -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/UNEAK_MPB_GBS_ANALYSIS
-
 my ($fastq_infile, $project_name, $fastq_barcodes_infile, $restriction_enzymes, $max_num_barcode_reads, $min_num_present_ufastq_to_tag, $min_num_present_merge_multiple_tag, 
 $error_rate, $min_minor_allele_freq_hap_map, $max_minor_allele_freq_hap_map, $min_call_rate, $max_call_rate, $tassel_num_ram, $uneak_project_dir);
 
@@ -250,101 +249,6 @@ sub ufastq_to_tag_counts{
 	}
 }
 
-#run binarytotext plugin to make the ufastqtotagcount result from above human readable
-#change GQ25032013_5 in the following line to the actual name of your files (should be GQ25032013_yourlanenumber 
-# run_pipeline.pl -Xmx4g -fork1 -BinaryToTextPlugin -i ./tagCounts/GQ25032013_7.cnt -o ./tagCounts/GQ25032013_7_cnt.txt -t TagCounts -endPlugin -runfork1 > ./bintotex.log
-sub binary_to_text{
-
-	my $uneak_project_dir = shift;
-        die "Error lost the UNEAK project directory" unless defined $uneak_project_dir;
-        
-        my $project_name = shift;
-        die "Error lost the project name" unless defined $project_name;
-
-        my $file_type = shift;
-        die "Error lost the project name" unless defined $file_type;
-        
-        my $tassel_num_ram = shift;
-        die "Error lost the amount of tassel memory" unless defined $tassel_num_ram;
-        
-        my $output_dir = shift;
-        die "Error lost the output directory to contain output .txt (text) files" unless defined $output_dir;
-
-        my ($txt_files, $txt_file_counter);
-	# Perform commands based on binary file type.
-	switch ($file_type) {
-		# $file_type evaluates as "TagCounts".
-		case("TagCounts"){
-			($txt_files, $txt_file_counter) = find_files($output_dir, "cnt.txt");
-		}
-		# $file_type evaluates as "TBTByte".
-		case("TBTByte"){
-			($txt_files, $txt_file_counter) = find_files($output_dir, "bin.txt");
-		}
-		# $file_type evaluates as "TOPM".
-		case("TOPM"){
-			($txt_files, $txt_file_counter) = find_files($output_dir, ".bin.txt");
-		}    
-		# Unsupported file type.
-		else{
-			die "Sorry $file_type is not a currently supported file type";
-		}
-        }
-	my $non_zero_txt_files = 0;
-	foreach my $file_name (sort keys %{$txt_files}){
-# 		warn $file_name . "\n";
-		if(-s $txt_files->{$file_name}){
-			$non_zero_txt_files++;
-		}
-	}
-	
-	unless(($non_zero_txt_files eq $txt_file_counter) and ($txt_file_counter ne 0)){
-		# Create the binary to text output directory if it doesn't already exist.
-		my $binary_to_text_log_output_dir = join('/', $uneak_project_dir, "binaryToTextLogFiles");
-		unless(-d $binary_to_text_log_output_dir){
-			mkdir($binary_to_text_log_output_dir, 0777) or die "Can't make directory: $!";
-		}
-		
-		my ($binary_files, $binary_file_counter);
-		# Perform commands based on binary file type.
-		switch ($file_type) {
-			# $file_type evaluates as "TagCounts".
-			case("TagCounts"){
-				($binary_files, $binary_file_counter) = find_files($output_dir, "cnt");
-			}
-			# $file_type evaluates as "TBTByte".
-			case("TBTByte"){
-				($binary_files, $binary_file_counter) = find_files($output_dir, "bin");
-			}
-			# $file_type evaluates as "TOPM".
-			case("TOPM"){
-				($binary_files, $binary_file_counter) = find_files($output_dir, "bin");
-			}    
-			# Unsupported file type.
-			else{
-				die "Sorry $file_type is not a currently supported file type";
-			}
-        	}
-		
-		
-		foreach my $file_name (sort keys %{$binary_files}){
-# 			warn $file_name . "\n";
-			my $binary_infile = $binary_files->{$file_name};
-			
-			my $binary_filename = basename($binary_infile);
-			my $text_outfile = join('/', $output_dir, $binary_filename . ".txt");
-
-			my $binary_to_text_stdout_log_outfile = join('/', $binary_to_text_log_output_dir, join("_", $project_name, $binary_filename, "BinaryToText.stdout.log"));
-			my $binary_to_text_stderr_log_outfile = join('/', $binary_to_text_log_output_dir, join("_", $project_name, $binary_filename, "BinaryToText.stderr.log"));
-			
-			warn "Generating the UNEAK $file_type text file using the BinaryToTextPlugin on $binary_filename.....\n";
-			my $binaryToTextCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -BinaryToTextPlugin -i $binary_infile -o $text_outfile -t $file_type -endPlugin -runfork1 1> $binary_to_text_stdout_log_outfile 2> $binary_to_text_stderr_log_outfile");
-			warn $binaryToTextCmd . "\n\n";
-			system($binaryToTextCmd) == 0 or die "Error calling $binaryToTextCmd: $?";
-		}
-	}
-}
-
 #run umergetaxatagcounts plugin from the current directory (-w), using a read depth cutoff of 5 (-c). You can change the cutoff to whatever you like.
 # run_pipeline.pl -Xmx4g -fork1 -UMergeTaxaTagCountPlugin -w ./ -c 5 -endPlugin -runfork1 > UmergeTagCount.log
 sub umerge_taxa_tag_counts{
@@ -517,6 +421,101 @@ sub umap_info_to_hap_map{
 		system($umapInfoToHapMapCmd) == 0 or die "Error calling $umapInfoToHapMapCmd: $?";
 	}
 	return ($hap_map_fas_txt_outfile, $hap_map_hmc_txt_outfile, $hap_map_hmp_txt_outfile);
+}
+
+#run binarytotext plugin to make the ufastqtotagcount result from above human readable
+#change GQ25032013_5 in the following line to the actual name of your files (should be GQ25032013_yourlanenumber 
+# run_pipeline.pl -Xmx4g -fork1 -BinaryToTextPlugin -i ./tagCounts/GQ25032013_7.cnt -o ./tagCounts/GQ25032013_7_cnt.txt -t TagCounts -endPlugin -runfork1 > ./bintotex.log
+sub binary_to_text{
+
+	my $uneak_project_dir = shift;
+        die "Error lost the UNEAK project directory" unless defined $uneak_project_dir;
+        
+        my $project_name = shift;
+        die "Error lost the project name" unless defined $project_name;
+
+        my $file_type = shift;
+        die "Error lost the project name" unless defined $file_type;
+        
+        my $tassel_num_ram = shift;
+        die "Error lost the amount of tassel memory" unless defined $tassel_num_ram;
+        
+        my $output_dir = shift;
+        die "Error lost the output directory to contain output .txt (text) files" unless defined $output_dir;
+
+        my ($txt_files, $txt_file_counter);
+	# Perform commands based on binary file type.
+	switch ($file_type) {
+		# $file_type evaluates as "TagCounts".
+		case("TagCounts"){
+			($txt_files, $txt_file_counter) = find_files($output_dir, "cnt.txt");
+		}
+		# $file_type evaluates as "TBTByte".
+		case("TBTByte"){
+			($txt_files, $txt_file_counter) = find_files($output_dir, "bin.txt");
+		}
+		# $file_type evaluates as "TOPM".
+		case("TOPM"){
+			($txt_files, $txt_file_counter) = find_files($output_dir, ".bin.txt");
+		}    
+		# Unsupported file type.
+		else{
+			die "Sorry $file_type is not a currently supported file type";
+		}
+        }
+	my $non_zero_txt_files = 0;
+	foreach my $file_name (sort keys %{$txt_files}){
+# 		warn $file_name . "\n";
+		if(-s $txt_files->{$file_name}){
+			$non_zero_txt_files++;
+		}
+	}
+	
+	unless(($non_zero_txt_files eq $txt_file_counter) and ($txt_file_counter ne 0)){
+		# Create the binary to text output directory if it doesn't already exist.
+		my $binary_to_text_log_output_dir = join('/', $uneak_project_dir, "binaryToTextLogFiles");
+		unless(-d $binary_to_text_log_output_dir){
+			mkdir($binary_to_text_log_output_dir, 0777) or die "Can't make directory: $!";
+		}
+		
+		my ($binary_files, $binary_file_counter);
+		# Perform commands based on binary file type.
+		switch ($file_type) {
+			# $file_type evaluates as "TagCounts".
+			case("TagCounts"){
+				($binary_files, $binary_file_counter) = find_files($output_dir, "cnt");
+			}
+			# $file_type evaluates as "TBTByte".
+			case("TBTByte"){
+				($binary_files, $binary_file_counter) = find_files($output_dir, "bin");
+			}
+			# $file_type evaluates as "TOPM".
+			case("TOPM"){
+				($binary_files, $binary_file_counter) = find_files($output_dir, "bin");
+			}    
+			# Unsupported file type.
+			else{
+				die "Sorry $file_type is not a currently supported file type";
+			}
+        	}
+		
+		
+		foreach my $file_name (sort keys %{$binary_files}){
+# 			warn $file_name . "\n";
+			my $binary_infile = $binary_files->{$file_name};
+			
+			my $binary_filename = basename($binary_infile);
+			my $text_outfile = join('/', $output_dir, $binary_filename . ".txt");
+
+			my $binary_to_text_stdout_log_outfile = join('/', $binary_to_text_log_output_dir, join("_", $project_name, $binary_filename, "BinaryToText.stdout.log"));
+			my $binary_to_text_stderr_log_outfile = join('/', $binary_to_text_log_output_dir, join("_", $project_name, $binary_filename, "BinaryToText.stderr.log"));
+			
+			warn "Generating the UNEAK $file_type text file using the BinaryToTextPlugin on $binary_filename.....\n";
+			my $binaryToTextCmd  = join("", "$run_pipeline -Xmx", $tassel_num_ram, "g -fork1 -BinaryToTextPlugin -i $binary_infile -o $text_outfile -t $file_type -endPlugin -runfork1 1> $binary_to_text_stdout_log_outfile 2> $binary_to_text_stderr_log_outfile");
+			warn $binaryToTextCmd . "\n\n";
+			system($binaryToTextCmd) == 0 or die "Error calling $binaryToTextCmd: $?";
+		}
+	}
 }
 
 sub find_files{

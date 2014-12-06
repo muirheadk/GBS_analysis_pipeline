@@ -31,9 +31,12 @@ $gbs_sequence_length = 100 unless defined $gbs_sequence_length;
 $uneak_sequence_length = 64 unless defined $uneak_sequence_length;
 $blast_num_cpu = 2 unless defined $blast_num_cpu;
 
-my ($makeblastdb, $blastn);
+my ($makeblastdb, $blastn, $cdhit_est, $cdbfasta, $cdbyank);
 $makeblastdb 			= '/usr/local/bin/makeblastdb';
 $blastn				= '/usr/local/bin/blastn';
+$cdhit_est				= '/usr/bin/cdhit-est';
+$cdbfasta				= '/usr/bin/cdbfasta';
+$cdbyank				= '/usr/bin/cdbyank';
 
 sub usage {
 
@@ -118,7 +121,12 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
 	my $fastq_infile = $fastq_files->{$fastq_filename};
 	my $fasta_filename = fileparse($fastq_infile, qr/\.fastq/);
 	my ($individual_id, $barcode, $plate_num, $well_num) = split(/_/, $fasta_filename);
-	my $fasta_target_outfile = join("/", $fasta_target_output_dir, join("_", $individual_id, "target") . ".fasta");
+	# Create output directory if it doesn't already exist.
+	my $individual_target_output_dir = join('/', $fasta_target_output_dir, $individual_id);
+	unless(-d $individual_target_output_dir){
+		mkdir($individual_target_output_dir, 0777) or die "Can't make directory: $!";
+	}
+	my $fasta_target_outfile = join("/", $individual_target_output_dir, join("_", $individual_id, "target") . ".fasta");
 	$fasta_filenames{$individual_id} = $fasta_target_outfile;
 	unless(-s $fasta_target_outfile){
 		warn "Processing " . $fastq_infile . ".....\n";
@@ -187,6 +195,7 @@ my $hap_map_fasta_infile = join('/', $uneak_project_dir, "hapMap", "HapMap.fas.t
 my $seqio = Bio::SeqIO->new(-file => $hap_map_fasta_infile, '-format' => 'Fasta');
 my %snp_fasta_seqs = ();
 my %hap_map_fasta_seqs = ();
+
 while(my $seq_entry = $seqio->next_seq) {
 
 	my $seq_id = $seq_entry->id;
@@ -194,11 +203,12 @@ while(my $seq_entry = $seqio->next_seq) {
 	my $sequence_desc = $seq_entry->desc;
 
 	my ($hap_map_reference_id, $type, $length) = split(/_/, $seq_id);
-	my $sequence_type_length = join("_", $type, $length);
-	
-	# sequence for blastn runs.
-	my $hap_map_fasta_id = join("_", $hap_map_reference_id, $type);
-	$hap_map_fasta_seqs{$hap_map_fasta_id} = get_subseq($sequence, 1, $length);
+	my $snp_id = "";
+	if($hap_map_reference_id =~ /^[A-Z]+([0-9]+)$/){
+		$snp_id = $1;
+	}
+
+	$hap_map_fasta_seqs{$snp_id}{$type} = join("\t", join("_", $hap_map_reference_id, $type, $length), get_subseq($sequence, 1, $length));
 	
 	# sequence for snp position search.
 	push(@{$snp_fasta_seqs{$hap_map_reference_id}}, $sequence);
@@ -208,6 +218,7 @@ while(my $seq_entry = $seqio->next_seq) {
 # Clean out the sequence I/O object.
 $seqio = ();
 
+# Get the SNP position
 my %uneak_snp_positions = ();
 foreach my $hap_map_reference_id (sort keys %snp_fasta_seqs){
 	my @sequence1 = split('', @{$snp_fasta_seqs{$hap_map_reference_id}}[0]);
@@ -278,10 +289,12 @@ while(<INFILE>){
 			push(@hap_map_hmc_entries, $split_hmc_entries[$j]);
 			my $query_count = $split_sequence_counts[0];
 			my $hit_count = $split_sequence_counts[1];
-			my $query_id = join("_", $hap_map_reference_id, "query");
-			my $hit_id = join("_", $hap_map_reference_id, "hit");
-			$hap_map_hmc_counts{$individual_id}{$query_id} = $query_count;
-			$hap_map_hmc_counts{$individual_id}{$hit_id} = $hit_count;
+			my $snp_id = "";
+			if($hap_map_reference_id =~ /^[A-Z]+([0-9]+)$/){
+				$snp_id = $1;
+			}
+			$hap_map_hmc_counts{$individual_id}{$snp_id}{"query"} = $query_count;
+			$hap_map_hmc_counts{$individual_id}{$snp_id}{"hit"} = $hit_count;
 		}
 		@hap_map_hmc_entries = ();
 	}
@@ -302,115 +315,139 @@ unless(-d $query_fasta_output_dir){
 }
 
 
-
 my @individual_ids = ();
 foreach my $individual_id (sort {$a cmp $b} keys %hap_map_hmc_counts){
-	my $max_target_seqs = 0;
-	my $num_query_seqs = 0;
-	my %query_fasta_sequences = ();
-	foreach my $sequence_id (sort keys %{$hap_map_hmc_counts{$individual_id}}){
-		# number of sequences present with this allele added together to use for the max_target_seqs parameter for blastn.
-		$max_target_seqs += $hap_map_hmc_counts{$individual_id}{$sequence_id};
-		
-		# number of sequences present with this allele.
-		my $num_snp_seqs = $hap_map_hmc_counts{$individual_id}{$sequence_id};
-		if($num_snp_seqs ne 0){
-			
-			my ($hap_map_reference_id, $hap_map_reference_type) = split(/_/, $sequence_id);
-			
-			# Get the length of the sequence
-			my $hap_map_fasta_sequence_length = length($hap_map_fasta_seqs{$sequence_id});
-			
-			my $snp_id = "";
-			if($hap_map_reference_id =~ /^[A-Z]+([0-9]+)$/){
-				$snp_id = $1;
-			}
-			
-			$query_fasta_sequences{$snp_id}{$hap_map_reference_type} = join("\n", join("", ">", join("_", $individual_id, $sequence_id, $hap_map_fasta_sequence_length)), $hap_map_fasta_seqs{$sequence_id});
-			
-		}
-		$num_query_seqs++;
-	}
-	
-	
 	my $fasta_query_outfile = join("/", $query_fasta_output_dir, join("_", $individual_id, "query") . ".fasta");
+	warn join(" ", "Generating", join("_", $individual_id, "query") . ".fasta", "query output file.....\n");
 	open(OUTFILE, ">$fasta_query_outfile") or die "Couldn't open file $fasta_query_outfile for writting, $!";
-	foreach my $snp_id (sort {$a <=> $b} keys %query_fasta_sequences){
-		foreach my $hap_map_reference_type (sort {$a cmp $b} keys %{$query_fasta_sequences{$snp_id}}){
-			print OUTFILE $query_fasta_sequences{$snp_id}{$hap_map_reference_type} . "\n";
+	my %cdhit_est_seq_lengths = ();
+	foreach my $snp_id (sort {$a <=> $b} keys %{$hap_map_hmc_counts{$individual_id}}){
+	
+		if(defined($hap_map_hmc_counts{$individual_id}{$snp_id}{"query"})){
+			# number of snp query sequences present with this allele.
+			my $num_snp_query_seqs = $hap_map_hmc_counts{$individual_id}{$snp_id}{"query"};
+			if($num_snp_query_seqs ne 0){
+				my ($sequence_query_id, $query_sequence) = split(/\t/, $hap_map_fasta_seqs{$snp_id}{"query"});
+				my ($hap_map_reference_id, $type, $length) = split(/_/, $sequence_query_id);
+				$cdhit_est_seq_lengths{$length}++;
+				print OUTFILE join("\n", join("", ">", join("_", $individual_id, $sequence_query_id)), $query_sequence) . "\n";
+				
+			}
+		}
+		
+		if(defined($hap_map_hmc_counts{$individual_id}{$snp_id}{"hit"})){
+			# number of snp hit sequences present with this allele.
+			my $num_snp_hit_seqs = $hap_map_hmc_counts{$individual_id}{$snp_id}{"hit"};
+			if($num_snp_hit_seqs ne 0){
+				my ($sequence_hit_id, $hit_sequence) = split(/\t/, $hap_map_fasta_seqs{$snp_id}{"hit"});
+				my ($hap_map_reference_id, $type, $length) = split(/_/, $sequence_hit_id);
+				$cdhit_est_seq_lengths{$length}++;
+				print OUTFILE join("\n", join("", ">", join("_", $individual_id, $sequence_hit_id)), $hit_sequence) . "\n";
+				
+			}
 		}
 	}
 	close(OUTFILE) or die "Couldn't close file $fasta_query_outfile";
 	
-	$max_target_seqs += $num_query_seqs;
- 	generate_uneak_blastn($individual_id, $fasta_query_outfile, $fasta_filenames{$individual_id}, $max_target_seqs, $uneak_sequence_length, $blast_num_cpu, $blastn_output_dir);
-	push(@individual_ids, $individual_id);
-}
-
-# Parsing uneak_blastn.tsv files to get sequence counts for each SNP and extracting the GBS fastq sequence headers to grab the trimming data
-warn "Parsing uneak_blastn.tsv files to get sequence counts for each SNP and extracting the GBS fastq sequence headers to grab the trimming data.....\n";
-my ($blastn_files, $blastn_file_counter) = find_files($blastn_output_dir, "uneak_blastn.tsv");
-my $blastn_outfile = join('/', $project_dir, join("_", $project_name, "uneak_blastn.tsv"));
-open(OUTFILE, ">$blastn_outfile") or die "Couldn't open file $blastn_outfile for writting, $!";
-print OUTFILE join("\t", "query_name", "target_name", "query_coverage", "percent_identity", "align_length", "num_mismatch",
-	"num_gaps", "query_start", "query_end", "target_start", "target_end", "e_value", "bit_score") . "\n";
-my %blastn_snps_counter = ();
-my %blastn_snps_gbs_references = ();
-foreach my $blastn_filename (sort keys %{$blastn_files}){
-	my $blastn_infile = $blastn_files->{$blastn_filename};
-	open(INFILE, "<$blastn_infile") or die "Couldn't open file $blastn_infile for reading, $!";
-	my $i = 0;
-	while(<INFILE>){
-		chomp $_;
-		warn $_ . "\n";
-		if($i ne 0){
-			my @split_blastn_hit =  split(/\t/, $_);
-			my ($query_name, $target_name, $query_coverage, $percent_identity, $align_length, $num_mismatch,
-			$num_gaps, $query_start, $query_end, $target_start, $target_end, $e_value, $bit_score) = @split_blastn_hit;
-			#JRD229_TP1731_hit
-			my ($individual_id, $hap_map_reference_id, $query_type) = split(/_/, $query_name);
+	my $fasta_target_infile = $fasta_filenames{$individual_id};
+	my $num_iterations = 0;
+	
+ 	my (@cdhit_est_clstr_fasta_outfile_list, @full_clustered_list);
+ 	my ($cdhit_est_clustered_fasta_outfile, $cdhit_outfile, $clustered_list, $recluster_list);
+	foreach my $query_seq_length (sort {$b <=> $a} keys %cdhit_est_seq_lengths){
+		print $query_seq_length . "\n";
+		if($num_iterations >= 1){
 			
-			# Getting the SNP id from the hap map reference id so that we can sort in ascending order easier.
-			my $snp_id = "";
-			if($hap_map_reference_id =~ /^[A-Z]+([0-9]+)$/){
-				$snp_id = $1;
-			}
-			$blastn_snps_counter{$snp_id}{$individual_id}{$query_type}++;
-			push(@{$blastn_snps_gbs_references{$snp_id}{$individual_id}{$query_type}}, $target_name);
-			print OUTFILE $_ . "\n";
+			my $cdhit_est_reclustered_fasta_outfile = cdbfasta_yank($cdhit_outfile, $query_seq_length, $recluster_list);
+			($cdhit_est_clustered_fasta_outfile, $cdhit_outfile, $clustered_list, $recluster_list) = cluster_cdhit_est($cdhit_est_reclustered_fasta_outfile, $query_seq_length);
+			push(@cdhit_est_clstr_fasta_outfile_list, $cdhit_est_clustered_fasta_outfile);
+			push(@full_clustered_list, @{$clustered_list});
+		}else{
+			
+			($cdhit_est_clustered_fasta_outfile, $cdhit_outfile, $clustered_list, $recluster_list) = cluster_cdhit_est($fasta_target_infile, $query_seq_length);
+			push(@cdhit_est_clstr_fasta_outfile_list, $cdhit_est_clustered_fasta_outfile);
+			push(@full_clustered_list, @{$clustered_list});
 		}
-		$i++;
+		$num_iterations++;
 	}
-	close(INFILE) or die "Couldn't close file $blastn_infile";
+	my ($fasta_filename, $fasta_dir) = fileparse($fasta_target_infile, qr/\.fasta/);
+	my $cdhit_est_cluster_report_outfile = join("/", $fasta_dir, join("", $fasta_filename . ".fasta.cd-hit.all.report"));
+	open(OUTFILE, ">$cdhit_est_cluster_report_outfile") or die "Couldn't open file $cdhit_est_cluster_report_outfile for writting, $!";
+	my $num_clusters = 1;
+	foreach my $cluster (@full_clustered_list){
+		print OUTFILE join("\t", "Cluster$num_clusters", $cluster) . "\n"
+	}
+	close(OUTFILE) or die "Couldn't close file $cdhit_est_cluster_report_outfile";
+# 	generate_uneak_blastn($individual_id, $fasta_query_outfile, $fasta_filenames{$individual_id}, $max_target_seqs, $uneak_sequence_length, $blast_num_cpu, $blastn_output_dir);
+ 	push(@individual_ids, $individual_id);
+ 	%cdhit_est_seq_lengths = ();
 }
-close(OUTFILE) or die "Couldn't close file $blastn_outfile";
 
-# Generating the pretrim hap map counts file so that we can use it for generating the trimmed hap map counts file.
-my $pretrim_hap_map_hmc_outfile = join('/', $project_dir, join("_", $project_name, "pretrim_hap_map_hmc.txt"));
-open(OUTFILE, ">$pretrim_hap_map_hmc_outfile") or die "Couldn't open file $pretrim_hap_map_hmc_outfile for writting, $!";
-print OUTFILE join("\t", "SNP_ID", @individual_ids) . "\n";
-foreach my $snp_id (sort {$a <=> $b} keys %uneak_snp_positions){
-	my @pretrim_hap_map_hmc_counts = ();
-	foreach my $individual_id (sort {$a cmp $b} @individual_ids){
-		my $snp_query_count;
-		if(defined($blastn_snps_counter{$snp_id}{$individual_id}{"query"})){
-			$snp_query_count = $blastn_snps_counter{$snp_id}{$individual_id}{"query"};
-		}
-		$snp_query_count = 0 unless(defined($snp_query_count));
-		
-		my $snp_hit_count;
-		if(defined($blastn_snps_counter{$snp_id}{$individual_id}{"hit"})){
-			$snp_hit_count = $blastn_snps_counter{$snp_id}{$individual_id}{"hit"};
-		}
-		$snp_hit_count = 0 unless(defined($snp_hit_count));
-		
-		my $snp_individual_counts = join("|", $snp_query_count, $snp_hit_count);
-		push(@pretrim_hap_map_hmc_counts, $snp_individual_counts);
-	}
-	print OUTFILE join("\t", join("", "TP", $snp_id), @pretrim_hap_map_hmc_counts) . "\n";
-	@pretrim_hap_map_hmc_counts = ();
-}
-close(OUTFILE) or die "Couldn't close file $pretrim_hap_map_hmc_outfile";
+
+# # Parsing uneak_blastn.tsv files to get sequence counts for each SNP and extracting the GBS fastq sequence headers to grab the trimming data
+# warn "Parsing uneak_blastn.tsv files to get sequence counts for each SNP and extracting the GBS fastq sequence headers to grab the trimming data.....\n";
+# my ($blastn_files, $blastn_file_counter) = find_files($blastn_output_dir, "uneak_blastn.tsv");
+# my $blastn_outfile = join('/', $project_dir, join("_", $project_name, "uneak_blastn.tsv"));
+# open(OUTFILE, ">$blastn_outfile") or die "Couldn't open file $blastn_outfile for writting, $!";
+# print OUTFILE join("\t", "query_name", "target_name", "query_coverage", "percent_identity", "align_length", "num_mismatch",
+# 	"num_gaps", "query_start", "query_end", "target_start", "target_end", "e_value", "bit_score") . "\n";
+# my %blastn_snps_counter = ();
+# my %blastn_snps_gbs_references = ();
+# foreach my $blastn_filename (sort keys %{$blastn_files}){
+# 	my $blastn_infile = $blastn_files->{$blastn_filename};
+# 	open(INFILE, "<$blastn_infile") or die "Couldn't open file $blastn_infile for reading, $!";
+# 	my $i = 0;
+# 	while(<INFILE>){
+# 		chomp $_;
+# 		warn $_ . "\n";
+# 		if($i ne 0){
+# 			my @split_blastn_hit =  split(/\t/, $_);
+# 			my ($query_name, $target_name, $query_coverage, $percent_identity, $align_length, $num_mismatch,
+# 			$num_gaps, $query_start, $query_end, $target_start, $target_end, $e_value, $bit_score) = @split_blastn_hit;
+# 			#JRD229_TP1731_hit
+# 			my ($individual_id, $hap_map_reference_id, $query_type) = split(/_/, $query_name);
+# 			
+# 			# Getting the SNP id from the hap map reference id so that we can sort in ascending order easier.
+# 			my $snp_id = "";
+# 			if($hap_map_reference_id =~ /^[A-Z]+([0-9]+)$/){
+# 				$snp_id = $1;
+# 			}
+# 			$blastn_snps_counter{$snp_id}{$individual_id}{$query_type}++;
+# 			push(@{$blastn_snps_gbs_references{$snp_id}{$individual_id}{$query_type}}, $target_name);
+# 			print OUTFILE $_ . "\n";
+# 		}
+# 		$i++;
+# 	}
+# 	close(INFILE) or die "Couldn't close file $blastn_infile";
+# }
+# close(OUTFILE) or die "Couldn't close file $blastn_outfile";
+# 
+# # Generating the pretrim hap map counts file so that we can use it for generating the trimmed hap map counts file.
+# my $pretrim_hap_map_hmc_outfile = join('/', $project_dir, join("_", $project_name, "pretrim_hap_map_hmc.txt"));
+# open(OUTFILE, ">$pretrim_hap_map_hmc_outfile") or die "Couldn't open file $pretrim_hap_map_hmc_outfile for writting, $!";
+# print OUTFILE join("\t", "SNP_ID", @individual_ids) . "\n";
+# foreach my $snp_id (sort {$a <=> $b} keys %uneak_snp_positions){
+# 	my @pretrim_hap_map_hmc_counts = ();
+# 	foreach my $individual_id (sort {$a cmp $b} @individual_ids){
+# 		my $snp_query_count;
+# 		if(defined($blastn_snps_counter{$snp_id}{$individual_id}{"query"})){
+# 			$snp_query_count = $blastn_snps_counter{$snp_id}{$individual_id}{"query"};
+# 		}
+# 		$snp_query_count = 0 unless(defined($snp_query_count));
+# 		
+# 		my $snp_hit_count;
+# 		if(defined($blastn_snps_counter{$snp_id}{$individual_id}{"hit"})){
+# 			$snp_hit_count = $blastn_snps_counter{$snp_id}{$individual_id}{"hit"};
+# 		}
+# 		$snp_hit_count = 0 unless(defined($snp_hit_count));
+# 		
+# 		my $snp_individual_counts = join("|", $snp_query_count, $snp_hit_count);
+# 		push(@pretrim_hap_map_hmc_counts, $snp_individual_counts);
+# 	}
+# 	print OUTFILE join("\t", join("", "TP", $snp_id), @pretrim_hap_map_hmc_counts) . "\n";
+# 	@pretrim_hap_map_hmc_counts = ();
+# }
+# close(OUTFILE) or die "Couldn't close file $pretrim_hap_map_hmc_outfile";
 
 
 sub find_fastq_files{
@@ -521,10 +558,8 @@ sub generate_uneak_blastn{
 	my $uneak_blastn_tsv_outfile = join('/', $blastn_output_dir, $individual_id . ".uneak_blastn.tsv");
 	unless(-s $uneak_blastn_tsv_outfile){
 		warn join(" ", "Generating blast tab-delimited file", join("", $individual_id, ".uneak_blastn", ".tsv"), "using uneak sequence blastn.....") . "\n";
- 		#my $uneakSequenceBlastnCmd  = "$blastn -query $fasta_query_infile -db $fasta_target_infile -task blastn -strand plus -word_size 11 -dust yes -evalue 1e-6 -max_target_seqs $max_target_seqs -perc_identity 100 -outfmt '6 qseqid salltitles qcovhsp pident length mismatch gapopen qstart qend sstart send evalue bitscore' -num_threads $blast_num_cpu";
-	my $uneakSequenceBlastnCmd  = "$blastn -query $fasta_query_infile -db $fasta_target_infile -task blastn -strand plus -word_size 11 -dust yes -evalue 1e-6 -max_target_seqs 20000 -perc_identity 100 -outfmt '6 qseqid salltitles qcovhsp pident length mismatch gapopen qstart qend sstart send evalue bitscore' -num_threads $blast_num_cpu";
- 		warn $uneakSequenceBlastnCmd . "\n\n";
-
+		my $uneakSequenceBlastnCmd  = "$blastn -query $fasta_query_infile -db $fasta_target_infile -task blastn -strand plus -word_size 11 -dust yes -evalue 1e-6 -max_target_seqs 10000 -perc_identity 100 -outfmt '6 qseqid salltitles qcovhsp pident length mismatch gapopen qstart qend sstart send evalue bitscore' -num_threads $blast_num_cpu";
+		warn $uneakSequenceBlastnCmd . "\n\n";
 		open(OUTFILE, ">$uneak_blastn_tsv_outfile") or die "Couldn't open file $uneak_blastn_tsv_outfile for writting, $!";
                 print OUTFILE join("\t", "query_name", "target_name", "query_coverage", "percent_identity", "align_length", "num_mismatch",
                 "num_gaps", "query_start", "query_end", "target_start", "target_end", "e_value", "bit_score") . "\n";
@@ -550,6 +585,123 @@ sub generate_uneak_blastn{
 	return $uneak_blastn_tsv_outfile;
 }
 
+sub cluster_cdhit_est {
+	my $fasta_infile = shift;
+	die "Error lost fasta input file" unless defined $fasta_infile;
+
+	my $cluster_sequence_length = shift;
+	die "Error lost cluster sequence length" unless defined $cluster_sequence_length;
+	
+	my ($fasta_filename, $fasta_dir) = fileparse($fasta_infile, qr/\.fasta/);
+	# Clustering via cdhit-est
+	
+	my $cdhit_outfile = join("/", $fasta_dir, join("_", $fasta_filename, $cluster_sequence_length . ".fasta.cd-hit"));
+ 	unless(-s $cdhit_outfile){
+		my $cdhitESTCmd = "$cdhit_est -c 1 -G 1 -n 10 -d 0 -M 0 -T 7 -i $fasta_infile -o $cdhit_outfile";
+		warn "$cdhitESTCmd\n\n";
+		system($cdhit_est, 
+			'-c',	1,
+			'-G',	1,
+			'-n',	10,
+			'-d',	0,
+			'-M',	0,
+			'-T',	7,
+			'-i',	$fasta_infile, 
+			'-o',	$cdhit_outfile
+		) == 0 or die "Error calling $cdhitESTCmd: $?";
+ 	}
+
+	# Create a summary report from the CD-hit step
+	my $cdhit_est_clstr_infile = join("", $cdhit_outfile, ".clstr");
+	open(INFILE, "<$cdhit_est_clstr_infile") or die "Couldn't open file $cdhit_est_clstr_infile for reading, $!";
+	my %cdhit_clusters = ();
+	my %cdhit_clustered_seq = ();
+	my $cluster_id;
+	while(<INFILE>){
+		chomp $_;
+		warn $_ . "\n";
+		if($_ =~ m/>Cluster\s(\d+)/){
+			$cluster_id = $1;
+		}elsif($_ =~ m/\d+\t(\d+)nt,\s>(.+)\.\.\. \*/){
+			my ($cluster_seq_length, $sequence_id) = ($1, $2);
+			$cdhit_clustered_seq{$cluster_id}{"sequence_id"} = join(" ", $sequence_id, "1:N:0:");
+			$cdhit_clustered_seq{$cluster_id}{"length"} = $cluster_seq_length;
+			$cdhit_clustered_seq{$cluster_id}{"counts"}++;
+			push(@{$cdhit_clusters{$cluster_id}}, join(" ", $sequence_id, "1:N:0:"));
+		}elsif($_ =~ m/\d+\t(\d+)nt,\s>(.+)\.\.\.\sat\s\+\/100\.00\%/){
+			my ($cluster_seq_length, $sequence_id) = ($1, $2);
+			push(@{$cdhit_clusters{$cluster_id}}, join(" ", $sequence_id, "1:N:0:"));
+			$cdhit_clustered_seq{$cluster_id}{"counts"}++;
+		}
+		
+	}
+	close(INFILE) or die "Couldn't close file $cdhit_est_clstr_infile";
+	
+
+	my @recluster_list = ();
+	my @clustered_list = ();
+	my @cdbyank_clustered_list = ();
+	foreach my $cluster_id (sort {$a <=> $b} keys %cdhit_clusters){
+		if($cdhit_clustered_seq{$cluster_id}{"counts"} > 1){
+			push(@clustered_list, join("\t", $cdhit_clustered_seq{$cluster_id}{"length"}, $cdhit_clustered_seq{$cluster_id}{"counts"}, $cdhit_clustered_seq{$cluster_id}{"sequence_id"}, join(",", @{$cdhit_clusters{$cluster_id}})));
+			push(@cdbyank_clustered_list, $cdhit_clustered_seq{$cluster_id}{"sequence_id"});
+		}else{
+			push(@recluster_list, $cdhit_clustered_seq{$cluster_id}{"sequence_id"});
+		}
+	}
+	
+	my $cdhit_est_clustered_fasta_outfile = cdbfasta_yank($cdhit_outfile, $cdhit_clustered_seq{$cluster_id}{"length"}, \@cdbyank_clustered_list);
+	return ($cdhit_est_clustered_fasta_outfile, $cdhit_outfile, \@clustered_list, \@recluster_list);
+}
+
+sub cdbfasta_yank{
+
+	
+	my $cdhit_infile = shift;
+	die "Error lost cdhit input file" unless defined $cdhit_infile;
+
+	my $cluster_sequence_length = shift;
+	die "Error lost cluster sequence length" unless defined $cluster_sequence_length;
+	
+	my $cdbyank_clustered_list = shift;
+	die "Error lost cdbyank clustered sequence id list" unless defined $cdbyank_clustered_list;
+	# Make sure that the clustered results are indexed with CDBFASTA
+	my $cdbfasta_infile = $cdhit_infile . '.cidx';
+	unless(-s $cdbfasta_infile){
+		# Create a CDBFasta index of the GBS sequences.
+		my $cdbfastaCmd = "$cdbfasta $cdhit_infile";
+		warn "$cdbfastaCmd\n\n";
+		system($cdbfastaCmd) == 0 or die "Error calling $cdbfastaCmd: $?";
+	}
+
+	# Create a fasta file of GBS sequences which were clustered down into a non-redundant set.
+	my $cdhit_est_clstr_fasta_outfile = $cdhit_infile . '.fna';
+# 	unless (-s $cdhit_est_clstr_fasta_outfile){
+		open(OUTFILE, ">$cdhit_est_clstr_fasta_outfile") or die "Couldn't open file $cdhit_est_clstr_fasta_outfile for writting, $!";
+		foreach my $sequence_id (@{$cdbyank_clustered_list}){
+			my $cdbyankCmd = "$cdbyank $cdbfasta_infile -a '" . $sequence_id . "'";
+			warn "$cdbyankCmd\n";
+		
+			local (*CDBYANK_OUT, *CDBYANK_IN);
+			my $pid = open2(\*CDBYANK_OUT,\*CDBYANK_IN, $cdbyankCmd) or die "Error calling open2: $!";
+			close CDBYANK_IN or die "Error closing STDIN to cdbyank process: $!";	
+			
+			while (<CDBYANK_OUT>){
+				chomp $_;
+				if($_ =~ m/^>/){
+					print OUTFILE $_ . "\n";
+				}elsif($_ =~ m/^[ACGTRYKMSWBDHVN]+$/i){
+					print OUTFILE get_subseq($_, 1, $cluster_sequence_length) . "\n";
+				}
+			}
+			
+			close CDBYANK_OUT or die "Error closing STDOUT from cdbyank process: $!";
+			wait;
+		}
+		close(OUTFILE) or die "Couldn't close file $cdhit_est_clstr_fasta_outfile";
+# 	}
+	return $cdhit_est_clstr_fasta_outfile;
+}
 # my $seq = get_subseq("AGCTTGCGTT", 3, 8);
 # warn $seq . "\n";
 sub get_subseq{

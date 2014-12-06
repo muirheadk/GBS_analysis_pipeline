@@ -343,7 +343,7 @@ foreach my $individual_id (sort {$a cmp $b} keys %hap_map_hmc_counts){
 	close(OUTFILE) or die "Couldn't close file $fasta_query_outfile";
 	
 	$max_target_seqs += $num_query_seqs;
- 	generate_uneak_blastn($individual_id, $fasta_query_outfile, $fasta_filenames{$individual_id}, $max_target_seqs, $uneak_sequence_length, $blast_num_cpu, $blastn_output_dir);
+#  	generate_uneak_blastn($individual_id, $fasta_query_outfile, $fasta_filenames{$individual_id}, $max_target_seqs, $uneak_sequence_length, $blast_num_cpu, $blastn_output_dir);
 	push(@individual_ids, $individual_id);
 }
 
@@ -352,8 +352,7 @@ warn "Parsing uneak_blastn.tsv files to get sequence counts for each SNP and ext
 my ($blastn_files, $blastn_file_counter) = find_files($blastn_output_dir, "uneak_blastn.tsv");
 my $blastn_outfile = join('/', $project_dir, join("_", $project_name, "uneak_blastn.tsv"));
 open(OUTFILE, ">$blastn_outfile") or die "Couldn't open file $blastn_outfile for writting, $!";
-print OUTFILE join("\t", "query_name", "target_name", "query_coverage", "percent_identity", "align_length", "num_mismatch",
-	"num_gaps", "query_start", "query_end", "target_start", "target_end", "e_value", "bit_score") . "\n";
+print OUTFILE join("\t", "query_name", "target_name", "align_length", "num_mismatch", "query_start", "query_end", "target_start", "target_end") . "\n";
 my %blastn_snps_counter = ();
 my %blastn_snps_gbs_references = ();
 foreach my $blastn_filename (sort keys %{$blastn_files}){
@@ -365,8 +364,7 @@ foreach my $blastn_filename (sort keys %{$blastn_files}){
 		warn $_ . "\n";
 		if($i ne 0){
 			my @split_blastn_hit =  split(/\t/, $_);
-			my ($query_name, $target_name, $query_coverage, $percent_identity, $align_length, $num_mismatch,
-			$num_gaps, $query_start, $query_end, $target_start, $target_end, $e_value, $bit_score) = @split_blastn_hit;
+			my ($query_name, $target_name, $align_length, $query_start, $query_end, $target_start, $target_end) = @split_blastn_hit;
 			#JRD229_TP1731_hit
 			my ($individual_id, $hap_map_reference_id, $query_type) = split(/_/, $query_name);
 			

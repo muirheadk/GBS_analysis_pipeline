@@ -302,116 +302,98 @@ unless(-d $query_fasta_output_dir){
 }
 
 
-
-my @individual_ids = ();
-foreach my $individual_id (sort {$a cmp $b} keys %hap_map_hmc_counts){
-	my $max_target_seqs = 0;
-	my $num_query_seqs = 0;
-	my %query_fasta_sequences = ();
-	foreach my $sequence_id (sort keys %{$hap_map_hmc_counts{$individual_id}}){
-		# number of sequences present with this allele added together to use for the max_target_seqs parameter for blastn.
-		$max_target_seqs += $hap_map_hmc_counts{$individual_id}{$sequence_id};
-		
-		# number of sequences present with this allele.
-		my $num_snp_seqs = $hap_map_hmc_counts{$individual_id}{$sequence_id};
-		if($num_snp_seqs ne 0){
-			
-			my ($hap_map_reference_id, $hap_map_reference_type) = split(/_/, $sequence_id);
-			
-			# Get the length of the sequence
-			my $hap_map_fasta_sequence_length = length($hap_map_fasta_seqs{$sequence_id});
-			
-			my $snp_id = "";
-			if($hap_map_reference_id =~ /^[A-Z]+([0-9]+)$/){
-				$snp_id = $1;
-			}
-			
-			$query_fasta_sequences{$snp_id}{$hap_map_reference_type} = join("\n", join("", ">", join("_", $individual_id, $sequence_id, $hap_map_fasta_sequence_length)), $hap_map_fasta_seqs{$sequence_id});
-			
-		}
-		$num_query_seqs++;
-	}
-	
-	
-	my $fasta_query_outfile = join("/", $query_fasta_output_dir, join("_", $individual_id, "query") . ".fasta");
-	open(OUTFILE, ">$fasta_query_outfile") or die "Couldn't open file $fasta_query_outfile for writting, $!";
-	foreach my $snp_id (sort {$a <=> $b} keys %query_fasta_sequences){
-		foreach my $hap_map_reference_type (sort {$a cmp $b} keys %{$query_fasta_sequences{$snp_id}}){
-			print OUTFILE $query_fasta_sequences{$snp_id}{$hap_map_reference_type} . "\n";
-		}
-	}
-	close(OUTFILE) or die "Couldn't close file $fasta_query_outfile";
-	
-	$max_target_seqs += $num_query_seqs;
- 	generate_uneak_blastn($individual_id, $fasta_query_outfile, $fasta_filenames{$individual_id}, $max_target_seqs, $uneak_sequence_length, $blast_num_cpu, $blastn_output_dir);
-	push(@individual_ids, $individual_id);
-}
-
-# Parsing uneak_blastn.tsv files to get sequence counts for each SNP and extracting the GBS fastq sequence headers to grab the trimming data
-warn "Parsing uneak_blastn.tsv files to get sequence counts for each SNP and extracting the GBS fastq sequence headers to grab the trimming data.....\n";
-my ($blastn_files, $blastn_file_counter) = find_files($blastn_output_dir, "uneak_blastn.tsv");
-my $blastn_outfile = join('/', $project_dir, join("_", $project_name, "uneak_blastn.tsv"));
-open(OUTFILE, ">$blastn_outfile") or die "Couldn't open file $blastn_outfile for writting, $!";
-print OUTFILE join("\t", "query_name", "target_name", "query_coverage", "percent_identity", "align_length", "num_mismatch",
-	"num_gaps", "query_start", "query_end", "target_start", "target_end", "e_value", "bit_score") . "\n";
-my %blastn_snps_counter = ();
-my %blastn_snps_gbs_references = ();
-foreach my $blastn_filename (sort keys %{$blastn_files}){
-	my $blastn_infile = $blastn_files->{$blastn_filename};
-	open(INFILE, "<$blastn_infile") or die "Couldn't open file $blastn_infile for reading, $!";
-	my $i = 0;
-	while(<INFILE>){
-		chomp $_;
-		warn $_ . "\n";
-		if($i ne 0){
-			my @split_blastn_hit =  split(/\t/, $_);
-			my ($query_name, $target_name, $query_coverage, $percent_identity, $align_length, $num_mismatch,
-			$num_gaps, $query_start, $query_end, $target_start, $target_end, $e_value, $bit_score) = @split_blastn_hit;
-			#JRD229_TP1731_hit
-			my ($individual_id, $hap_map_reference_id, $query_type) = split(/_/, $query_name);
-			
-			# Getting the SNP id from the hap map reference id so that we can sort in ascending order easier.
-			my $snp_id = "";
-			if($hap_map_reference_id =~ /^[A-Z]+([0-9]+)$/){
-				$snp_id = $1;
-			}
-			$blastn_snps_counter{$snp_id}{$individual_id}{$query_type}++;
-			push(@{$blastn_snps_gbs_references{$snp_id}{$individual_id}{$query_type}}, $target_name);
-			print OUTFILE $_ . "\n";
-		}
-		$i++;
-	}
-	close(INFILE) or die "Couldn't close file $blastn_infile";
-}
-close(OUTFILE) or die "Couldn't close file $blastn_outfile";
-
-# Generating the pretrim hap map counts file so that we can use it for generating the trimmed hap map counts file.
 my $pretrim_hap_map_hmc_outfile = join('/', $project_dir, join("_", $project_name, "pretrim_hap_map_hmc.txt"));
-open(OUTFILE, ">$pretrim_hap_map_hmc_outfile") or die "Couldn't open file $pretrim_hap_map_hmc_outfile for writting, $!";
-print OUTFILE join("\t", "SNP_ID", @individual_ids) . "\n";
-foreach my $snp_id (sort {$a <=> $b} keys %uneak_snp_positions){
-	my @pretrim_hap_map_hmc_counts = ();
-	foreach my $individual_id (sort {$a cmp $b} @individual_ids){
-		my $snp_query_count;
-		if(defined($blastn_snps_counter{$snp_id}{$individual_id}{"query"})){
-			$snp_query_count = $blastn_snps_counter{$snp_id}{$individual_id}{"query"};
+unless(-s $pretrim_hap_map_hmc_outfile){
+	my @individual_ids = ();
+	foreach my $individual_id (sort {$a cmp $b} keys %hap_map_hmc_counts){
+		my $fasta_query_outfile = join("/", $query_fasta_output_dir, join("_", $individual_id, "query") . ".fasta");
+		open(OUTFILE, ">$fasta_query_outfile") or die "Couldn't open file $fasta_query_outfile for writting, $!";
+		my $max_target_seqs = 0;
+		my $num_query_seqs = 0;
+		foreach my $sequence_id (sort keys %{$hap_map_hmc_counts{$individual_id}}){
+			# number of sequences present with this allele added together to use for the max_target_seqs parameter for blastn.
+ 			$max_target_seqs += $hap_map_hmc_counts{$individual_id}{$sequence_id};
+ 			
+			# number of sequences present with this allele.
+			my $num_snp_seqs = $hap_map_hmc_counts{$individual_id}{$sequence_id};
+			if($num_snp_seqs ne 0){
+				# Get the length of the sequence
+				my $hap_map_fasta_sequence_length = length($hap_map_fasta_seqs{$sequence_id});
+				print OUTFILE join("\n", join("", ">", join("_", $individual_id, $sequence_id, $hap_map_fasta_sequence_length)), $hap_map_fasta_seqs{$sequence_id}) . "\n";
+				
+			}
+			$num_query_seqs++;
 		}
-		$snp_query_count = 0 unless(defined($snp_query_count));
-		
-		my $snp_hit_count;
-		if(defined($blastn_snps_counter{$snp_id}{$individual_id}{"hit"})){
-			$snp_hit_count = $blastn_snps_counter{$snp_id}{$individual_id}{"hit"};
-		}
-		$snp_hit_count = 0 unless(defined($snp_hit_count));
-		
-		my $snp_individual_counts = join("|", $snp_query_count, $snp_hit_count);
-		push(@pretrim_hap_map_hmc_counts, $snp_individual_counts);
+		close(OUTFILE) or die "Couldn't close file $fasta_query_outfile";
+		$max_target_seqs += $num_query_seqs;
+		generate_uneak_blastn($individual_id, $fasta_query_outfile, $fasta_filenames{$individual_id}, $max_target_seqs, $uneak_sequence_length, $blast_num_cpu, $blastn_output_dir);
+		push(@individual_ids, $individual_id);
 	}
-	print OUTFILE join("\t", join("", "TP", $snp_id), @pretrim_hap_map_hmc_counts) . "\n";
-	@pretrim_hap_map_hmc_counts = ();
-}
-close(OUTFILE) or die "Couldn't close file $pretrim_hap_map_hmc_outfile";
 
+	# Parsing uneak_blastn.tsv files to get sequence counts for each SNP and extracting the GBS fastq sequence headers to grab the trimming data
+	warn "Parsing uneak_blastn.tsv files to get sequence counts for each SNP and extracting the GBS fastq sequence headers to grab the trimming data.....\n";
+	my ($blastn_files, $blastn_file_counter) = find_files($blastn_output_dir, "uneak_blastn.tsv");
+	my $blastn_outfile = join('/', $project_dir, join("_", $project_name, "uneak_blastn.tsv"));
+	open(OUTFILE, ">$blastn_outfile") or die "Couldn't open file $blastn_outfile for writting, $!";
+	print OUTFILE join("\t", "query_name", "target_name", "query_coverage", "percent_identity", "align_length", "num_mismatch",
+		"num_gaps", "query_start", "query_end", "target_start", "target_end", "e_value", "bit_score") . "\n";
+	my %blastn_snps_counter = ();
+	my %blastn_snps_gbs_references = ();
+	foreach my $blastn_filename (sort keys %{$blastn_files}){
+		my $blastn_infile = $blastn_files->{$blastn_filename};
+		open(INFILE, "<$blastn_infile") or die "Couldn't open file $blastn_infile for reading, $!";
+		my $i = 0;
+		while(<INFILE>){
+			chomp $_;
+			warn $_ . "\n";
+			if($i ne 0){
+				my @split_blastn_hit =  split(/\t/, $_);
+				my ($query_name, $target_name, $query_coverage, $percent_identity, $align_length, $num_mismatch,
+				$num_gaps, $query_start, $query_end, $target_start, $target_end, $e_value, $bit_score) = @split_blastn_hit;
+				#JRD229_TP1731_hit
+				my ($individual_id, $hap_map_reference_id, $query_type) = split(/_/, $query_name);
+				
+				# Getting the SNP id from the hap map reference id so that we can sort in ascending order easier.
+				my $snp_id = "";
+				if($hap_map_reference_id =~ /^[A-Z]+([0-9]+)$/){
+					$snp_id = $1;
+				}
+				$blastn_snps_counter{$snp_id}{$individual_id}{$query_type}++;
+				push(@{$blastn_snps_gbs_references{$snp_id}{$individual_id}{$query_type}}, $target_name);
+				print OUTFILE $_ . "\n";
+			}
+			$i++;
+		}
+		close(INFILE) or die "Couldn't close file $blastn_infile";
+	}
+	close(OUTFILE) or die "Couldn't close file $blastn_outfile";
+
+	# Generating the pretrim hap map counts file so that we can use it for generating the trimmed hap map counts file.
+	open(OUTFILE, ">$pretrim_hap_map_hmc_outfile") or die "Couldn't open file $pretrim_hap_map_hmc_outfile for writting, $!";
+	print OUTFILE join("\t", "SNP_ID", @individual_ids) . "\n";
+	foreach my $snp_id (sort {$a <=> $b} keys %uneak_snp_positions){
+		my @pretrim_hap_map_hmc_counts = ();
+		foreach my $individual_id (sort {$a cmp $b} @individual_ids){
+			my $snp_query_count;
+			if(defined($blastn_snps_counter{$snp_id}{$individual_id}{"query"})){
+				$snp_query_count = $blastn_snps_counter{$snp_id}{$individual_id}{"query"};
+			}
+			$snp_query_count = 0 unless(defined($snp_query_count));
+			
+			my $snp_hit_count;
+			if(defined($blastn_snps_counter{$snp_id}{$individual_id}{"hit"})){
+				$snp_hit_count = $blastn_snps_counter{$snp_id}{$individual_id}{"hit"};
+			}
+			$snp_hit_count = 0 unless(defined($snp_hit_count));
+			
+			my $snp_individual_counts = join("|", $snp_query_count, $snp_hit_count);
+			push(@pretrim_hap_map_hmc_counts, $snp_individual_counts);
+		}
+		print OUTFILE join("\t", join("", "TP", $snp_id), @pretrim_hap_map_hmc_counts) . "\n";
+		@pretrim_hap_map_hmc_counts = ();
+	}
+	close(OUTFILE) or die "Couldn't close file $pretrim_hap_map_hmc_outfile";
+}
 
 sub find_fastq_files{
     
@@ -524,6 +506,7 @@ sub generate_uneak_blastn{
  		#my $uneakSequenceBlastnCmd  = "$blastn -query $fasta_query_infile -db $fasta_target_infile -task blastn -strand plus -word_size 11 -dust yes -evalue 1e-6 -max_target_seqs $max_target_seqs -perc_identity 100 -outfmt '6 qseqid salltitles qcovhsp pident length mismatch gapopen qstart qend sstart send evalue bitscore' -num_threads $blast_num_cpu";
 	my $uneakSequenceBlastnCmd  = "$blastn -query $fasta_query_infile -db $fasta_target_infile -task blastn -strand plus -word_size 11 -dust yes -evalue 1e-6 -max_target_seqs 20000 -perc_identity 100 -outfmt '6 qseqid salltitles qcovhsp pident length mismatch gapopen qstart qend sstart send evalue bitscore' -num_threads $blast_num_cpu";
  		warn $uneakSequenceBlastnCmd . "\n\n";
+v
 
 		open(OUTFILE, ">$uneak_blastn_tsv_outfile") or die "Couldn't open file $uneak_blastn_tsv_outfile for writting, $!";
                 print OUTFILE join("\t", "query_name", "target_name", "query_coverage", "percent_identity", "align_length", "num_mismatch",

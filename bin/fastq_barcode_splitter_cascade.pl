@@ -17,7 +17,7 @@ GetOptions(
       'o=s'    => \$output_dir, # The absolute path to the output directory to contain the split *.fastq output files.
 );
 
-# Display usage message if the following parameters are not specified.
+# Display a usage message if the following parameters are not specified.
 usage() unless (
       defined $fastq_infile
       and defined $barcode_infile
