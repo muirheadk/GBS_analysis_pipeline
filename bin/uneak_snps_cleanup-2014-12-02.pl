@@ -646,7 +646,21 @@ sub cluster_cdhit_est {
 			push(@clustered_list, join("\t", $cdhit_clustered_seq{$cluster_id}{"length"}, $cdhit_clustered_seq{$cluster_id}{"counts"}, $cdhit_clustered_seq{$cluster_id}{"sequence_id"}, join(",", @{$cdhit_clusters{$cluster_id}})));
 			push(@cdbyank_clustered_list, $cdhit_clustered_seq{$cluster_id}{"sequence_id"});
 		}else{
-			push(@recluster_list, $cdhit_clustered_seq{$cluster_id}{"sequence_id"});
+			push(@recluster_lsub find_blastdb_files{
+    
+	my $blastdb_dir = shift;
+	die "Error lost blastdb file directory" unless defined $blastdb_dir;
+    
+	my @blastdb_files = ();
+	opendir(DIR, $blastdb_dir) || die "Error in opening dir $blastdb_dir\n";
+	while( my $file_name = readdir(DIR)){
+		my $blastdb_file_name = join('/', $blastdb_dir, $file_name) if ($file_name =~ m/\.fasta$/ or $file_name =~ m/\.nin$/ or $file_name =~ m/\.nsq$/ or $file_name =~ m/\.nhr$/);
+		warn "$blastdb_file_name\n" if ($file_name =~ m/\.fasta$/ or $file_name =~ m/\.nin$/ or $file_name =~ m/\.nsq$/ or $file_name =~ m/\.nhr$/);
+		push(@blastdb_files, $blastdb_file_name) if ($file_name =~ m/\.fasta$/ or $file_name =~ m/\.nin$/ or $file_name =~ m/\.nsq$/ or $file_name =~ m/\.nhr$/);
+	}
+	closedir(DIR);
+	return \@blastdb_files;
+}ist, $cdhit_clustered_seq{$cluster_id}{"sequence_id"});
 		}
 	}
 	
