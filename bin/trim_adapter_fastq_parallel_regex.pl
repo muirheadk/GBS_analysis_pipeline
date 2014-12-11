@@ -127,6 +127,12 @@ unless(-d $trimmed_regex_output_dir){
 }
 
 # Create output directory if it doesn't already exist.
+my $trimmed_adapter_counts_output_dir = join('/', $trimmed_output_dir, "TRIMMED_ADAPTER_COUNTS_FILES");
+unless(-d $trimmed_adapter_counts_output_dir){
+	mkdir($trimmed_adapter_counts_output_dir, 0777) or die "Can't make directory: $!";
+}
+
+# Create output directory if it doesn't already exist.
 my $trimmed_fastq_output_dir = join('/', $trimmed_output_dir, "TRIMMED_FASTQ_FILES");
 unless(-d $trimmed_fastq_output_dir){
 	mkdir($trimmed_fastq_output_dir, 0777) or die "Can't make directory: $!";
@@ -176,15 +182,15 @@ for(my $align_length = $adapter_sequence_length; $align_length >= $adapter_lengt
 	$adapter_concatenated_sequences{$align_length} = $adapter_concatenated_sequence;
 }
 
-my (%original_fastq_sequence_counter, %fastq_sequence_counter, %adapter_regex_length_counter) = ();
+my (%original_fastq_sequence_counter, %trimmed_fastq_sequence_counter) = ();
 if ((require Parallel::Loops) and ($regex_num_cpu)){
 
         # Perform the adapter regex searches in parallel.
         my $parallel = Parallel::Loops->new($regex_num_cpu);
 	my %original_fastq_seq_counter = ();
-        my %fastq_seq_counter = ();
+        my %trimmed_fastq_seq_counter = ();
 	my %adapter_length_counter = ();
-        $parallel->share(\%original_fastq_seq_counter, \%fastq_seq_counter, \%adapter_length_counter); # make sure that these are visible in the children.
+        $parallel->share(\%original_fastq_seq_counter, \%trimmed_fastq_seq_counter); # make sure that these are visible in the children.
 
         # Find all files in the specified directory with the extension *.fastq.
 	my ($fastq_files, $fastq_file_count) = find_files($fastq_file_dir, "fastq");
@@ -406,7 +412,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 						my $trimmed_seqs_layout_header = join("_", $fasta_filename, $trimmed_fastq_header);
 						print TRIMMED_LAYOUT_OUTFILE join("\t", $trimmed_seqs_layout_header, 1, (($target_start - $adapter_trim_offset) - 1), $trimmed_fastq_sequence_length, ($target_start - $adapter_trim_offset), $fastq_sequence_length, $trimmed_adapter_sequence_length, $target_start, $target_end, $align_length) . "\n";
 						
-						$adapter_length_counter{$align_length}{$fasta_filename}++;
+						$adapter_length_counter{$align_length}++;
 						push(@trimmed_fastq_list, $fastq_header);
 						
 					}elsif($trimmed_fastq_sequence_length < $min_trimmed_fastq_sequence_length_plus_barcode){ #If this alignment doesn't meet our filtering criteria separate fastq sequence from trimmed fastq sequence data.
@@ -467,7 +473,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 			print OUTFILE  $fastq_plus . "\n";
 			print OUTFILE  $fastq_quality_scores . "\n";
 	
-			$fastq_seq_counter{$fasta_filename}{'TRIMMED'}++;
+			$trimmed_fastq_seq_counter{$fasta_filename}{'TRIMMED'}++;
 			
 		}
 		
@@ -484,7 +490,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 			print OUTFILE  $fastq_plus . "\n";
 			print OUTFILE  $fastq_quality_scores . "\n";
 			
-			$fastq_seq_counter{$fasta_filename}{'UNTRIMMED'}++;
+			$trimmed_fastq_seq_counter{$fasta_filename}{'UNTRIMMED'}++;
 	
 		}
 		close(OUTFILE) or die "Couldn't close file $trimmed_fastq_outfile";
@@ -504,10 +510,21 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 			print OUTFILE  $fastq_plus . "\n";
 			print OUTFILE  $fastq_quality_scores . "\n";
 			
-			$fastq_seq_counter{$fasta_filename}{'REMOVED'}++;
+			$trimmed_fastq_seq_counter{$fasta_filename}{'REMOVED'}++;
 	
 		}
 		close(OUTFILE) or die "Couldn't close file $removed_fastq_outfile";
+		
+		# Print the GBS common adapter length counts.
+		my $trimmed_adapter_counts_outfile = join("/", $trimmed_adapter_counts_output_dir, join("_", $fasta_filename, "trimmed_offset", $adapter_trim_offset, "adapter_length_counts") . ".txt");
+		open(OUTFILE, ">$trimmed_adapter_counts_outfile") or die "Couldn't open file $trimmed_adapter_counts_outfile for writting, $!";
+		print OUTFILE join("\t", "adapter_sequence_id", "adapter_length", "adapter_sequence_count") . "\n";
+		foreach my $adapter_length (sort {$b <=> $a} keys %adapter_length_counter){
+			my $adapter_sequence_count = $adapter_length_counter{$adapter_length};
+			my $adapter_concatenated_sequence = $adapter_concatenated_sequences{$adapter_length};
+			print OUTFILE join("\t", $adapter_concatenated_sequence, $adapter_length, $adapter_sequence_count) . "\n";
+		}
+		close(OUTFILE) or die "Couldn't close file $trimmed_adapter_counts_outfile";
 		
 		# Empty all hash and array containers so that we don't use fastq sequences or fastq headers from different files.
 		undef %trimmed_fastq_sequences;
@@ -522,18 +539,10 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 	});
 
 	# Get the fastq untrimmed, trimmed, and removed counts.
-	foreach my $fasta_filename (sort keys %fastq_seq_counter){
-		$fastq_sequence_counter{$fasta_filename}{'UNTRIMMED'} = $fastq_seq_counter{$fasta_filename}{'UNTRIMMED'};
-		$fastq_sequence_counter{$fasta_filename}{'TRIMMED'} = $fastq_seq_counter{$fasta_filename}{'TRIMMED'};
-		$fastq_sequence_counter{$fasta_filename}{'REMOVED'} = $fastq_seq_counter{$fasta_filename}{'REMOVED'};
-	}
-
-	# Get the GBS common adapter length counts for each fastq file.
-	foreach my $adapter_length (sort {$b <=> $a} keys %adapter_length_counter){
-		$adapter_regex_length_counter{$adapter_length} = 0;
-		foreach my $fasta_filename (sort keys %{$adapter_length_counter{$adapter_length}}){
-			$adapter_regex_length_counter{$adapter_length} += $adapter_length_counter{$adapter_length}{$fasta_filename};
-		}
+	foreach my $fasta_filename (sort keys %trimmed_fastq_seq_counter){
+		$trimmed_fastq_sequence_counter{$fasta_filename}{'UNTRIMMED'} = $trimmed_fastq_seq_counter{$fasta_filename}{'UNTRIMMED'};
+		$trimmed_fastq_sequence_counter{$fasta_filename}{'TRIMMED'} = $trimmed_fastq_seq_counter{$fasta_filename}{'TRIMMED'};
+		$trimmed_fastq_sequence_counter{$fasta_filename}{'REMOVED'} = $trimmed_fastq_seq_counter{$fasta_filename}{'REMOVED'};
 	}
 	
 	# Get the original fastq sequence counts for each fastq file so that we can use them to make sure we have the correct proportions of untrimmed, trimmed, and removed counts.
@@ -653,12 +662,12 @@ gzip_file($trimmed_seqs_layout_bulk_outfile);
 my $fastq_seq_counts_outfile = join("/", $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adapter_trim_offset, "fastq_seq_counts") . ".txt");
 open(OUTFILE, ">$fastq_seq_counts_outfile") or die "Couldn't open file $fastq_seq_counts_outfile for writting, $!";
 print OUTFILE join("\t", "fastq_file_name", "total_num_seqs", "num_untrimmed_seqs", "percent_untrimmed_seqs", "num_trimmed_seqs", "percent_trimmed_seqs", "num_removed_seqs", "percent_removed_seqs") . "\n";
-foreach my $fasta_filename (sort keys %fastq_sequence_counter){
+foreach my $fasta_filename (sort keys %trimmed_fastq_sequence_counter){
 
     # Get the fastq untrimmed, trimmed, and removed counts.
-    my $num_untrimmed_seqs = $fastq_sequence_counter{$fasta_filename}{'UNTRIMMED'};
-    my $num_trimmed_seqs = $fastq_sequence_counter{$fasta_filename}{'TRIMMED'};
-    my $num_removed_seqs = $fastq_sequence_counter{$fasta_filename}{'REMOVED'};
+    my $num_untrimmed_seqs = $trimmed_fastq_sequence_counter{$fasta_filename}{'UNTRIMMED'};
+    my $num_trimmed_seqs = $trimmed_fastq_sequence_counter{$fasta_filename}{'TRIMMED'};
+    my $num_removed_seqs = $trimmed_fastq_sequence_counter{$fasta_filename}{'REMOVED'};
 
 
     # If trimmed or removed sequence counters how zero count reflect in number of sequence variables.
@@ -683,6 +692,40 @@ foreach my $fasta_filename (sort keys %fastq_sequence_counter){
 }
 close(OUTFILE) or die "Couldn't close file $fastq_seq_counts_outfile";
 
+# Get the GBS common adapter length counts for each fastq file.
+my ($trimmed_adapter_counts_files, $trimmed_adapter_counts_file_count) = find_files($trimmed_adapter_counts_output_dir, "txt");
+my %adapter_length_counts = ();
+foreach my $trimmed_adapter_counts_filename (sort keys %{$trimmed_adapter_counts_files}){
+
+	# Get the full path to the GBS common adapter length counts file.
+	my $trimmed_adapter_counts_infile = $trimmed_adapter_counts_files->{$trimmed_adapter_counts_filename};
+	
+	# Parse the GBS common adapter length counts file.
+	open(INFILE, "<$trimmed_adapter_counts_infile") or die "Couldn't open file $trimmed_adapter_counts_infile for reading, $!";
+	my $i = 0;
+	while(<INFILE>){
+		chomp $_;
+		if($i ne 0){
+			my @split_adapter_count_entries = split(/\t/, $_);
+			
+			my ($adapter_concatenated_sequence, $adapter_length, $adapter_sequence_count) = @split_adapter_count_entries;
+			push(@{$adapter_length_counts{$adapter_length}}, $adapter_sequence_count);
+		}
+		$i++;
+	}
+	close(INFILE) or die "Couldn't close file $trimmed_adapter_counts_infile";
+}
+
+# Get the sum of adapter length counts obtained from each file.
+my %adapter_regex_length_counter = ();
+foreach my $adapter_length (sort {$b <=> $a} keys %adapter_length_counts){
+	my $adaptor_length_counter = 0;
+	foreach my $adapter_length_count (@{$adapter_length_counts{$adapter_length}}){
+		$adaptor_length_counter += $adapter_length_count;
+	}
+	$adapter_regex_length_counter{$adapter_length} = $adaptor_length_counter;
+}
+
 # Generate the number of GBS common adapter sequence found within the adapter regex searches so that we can see the variation of the length of the adapter sequences.
 my $adapter_length_counts_outfile = join("/", $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adapter_trim_offset, "adapter_length_counts") . ".txt");
 open(OUTFILE, ">$adapter_length_counts_outfile") or die "Couldn't open file $adapter_length_counts_outfile for writting, $!";
@@ -695,7 +738,7 @@ foreach my $adapter_length (sort {$b <=> $a} keys %adapter_regex_length_counter)
 close(OUTFILE) or die "Couldn't close file $adapter_length_counts_outfile";
 
 # Empty all hash and array containers for garbage collection purposes.
-undef %fastq_sequence_counter;
+undef %trimmed_fastq_sequence_counter;
 undef %adapter_regex_length_counter;
 
 # find the fastq files found in the given fastq input file directory and return a hash list of the files and the number of files found.
