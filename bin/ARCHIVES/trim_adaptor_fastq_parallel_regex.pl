@@ -109,7 +109,7 @@ unless(-d $project_dir){
 }
 
 # Create output directory if it doesn't already exist.
-my $regex_output_dir = join('/', $project_dir, "ADAPTER_REGEX_FILES");
+my $regex_output_dir = join('/', $project_dir, "adapter_REGEX_FILES");
 unless(-d $regex_output_dir){
 	mkdir($regex_output_dir, 0777) or die "Can't make directory: $!";
 }
@@ -121,7 +121,7 @@ unless(-d $trimmed_output_dir){# Need this to make the bulk fastq sequence file.
 }
 
 # Create output directory if it doesn't already exist.
-my $trimmed_regex_output_dir = join('/', $trimmed_output_dir, "TRIMMED_ADAPTER_REGEX_FILES");
+my $trimmed_regex_output_dir = join('/', $trimmed_output_dir, "TRIMMED_adapter_REGEX_FILES");
 unless(-d $trimmed_regex_output_dir){
 	mkdir($trimmed_regex_output_dir, 0777) or die "Can't make directory: $!";
 }
@@ -263,35 +263,29 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 			my ($align_length, $query_start, $query_end, $target_start, $target_end);
 			my $adapter_length_count = 1;
 			my $common_adapter_sequence = $fastq_adapter_sequence;
-			for(my $i = $adapter_sequence_length; $i >= $adapter_length_min_threshold; $i--){
-
-# 				warn "$i eq $adapter_sequence_length\n";
-				if($i eq $adapter_sequence_length){
-					my $common_adapter_regex = qr($common_adapter_sequence);
-					if($fastq_sequence =~ /$common_adapter_regex/g){
+			my $align_found = "false";
+			for(my $i = $adapter_sequence_length; $i > $adapter_length_min_threshold; $i--){
+				my $common_adapter_regex = qr($common_adapter_sequence);
+				if($fastq_sequence =~ /$common_adapter_regex/g){
+# 					print "$i eq $adapter_sequence_length\n";
+					if($i eq $adapter_sequence_length){
 						$target_start = ($-[0] + 1);
 						$target_end = $+[0];
 						$align_length = ($+[0] - $-[0]);
-						warn join("\t", $align_length, $query_start, $query_end, $target_start, $target_end) . "\n";
-						
+# 						print join("\t", $align_length, $target_start, $target_end) . "\n";
+						$align_found = "true";
 						$query_start = 1;
 						$query_end = $adapter_sequence_length;
-						warn join("\t", $adapter_sequence_length, $common_adapter_sequence) . "\n";
-						my $regex_alignment = join("\t", join("_", "GBS_adapter_sequence", $fastq_adapter_sequence), $fastq_header, $align_length, $query_start, $query_end, $target_start, $target_end);
-						print OUTFILE $regex_alignment . "\n";
+# 						warn join("\t", $adapter_sequence_length, $common_adapter_sequence) . "\n";
 						last;
-					}
-				}elsif($i < $adapter_sequence_length){
-					my $common_adapter_regex = qr($common_adapter_sequence);
-					while($fastq_sequence =~ /$common_adapter_regex/g){
+					}elsif($i < $adapter_sequence_length){
+					
 						if($+[0] eq $gbs_sequence_length){
 							$target_start = ($-[0] + 1);
 							$target_end = $+[0];
 							$align_length = ($+[0] - $-[0]);
-							warn join("\t", $align_length, $query_start, $query_end, $target_start, $target_end) . "\n";
-							
-							my $regex_alignment = join("\t", join("_", "GBS_adapter_sequence", $fastq_adapter_sequence), $fastq_header, $align_length, $query_start, $query_end, $target_start, $target_end);
-							print OUTFILE $regex_alignment . "\n";
+# 							print join("\t", $align_length, $target_start, $target_end) . "\n";
+							$align_found = "true";
 							last;
 						}
 					}
@@ -301,16 +295,20 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 				$query_end = ($adapter_sequence_length - $adapter_length_count);
 				
 				$common_adapter_sequence = get_subseq($common_adapter_sequence, $query_start, $query_end);
- 				warn join("\t", ($adapter_sequence_length - $adapter_length_count), $common_adapter_sequence) . "\n";
+# 				warn join("\t", ($adapter_sequence_length - $adapter_length_count), $common_adapter_sequence) . "\n";
 				$adapter_length_count++;
+			}
+			if($align_found eq "true"){
+				my $regex_alignment = join("\t", join("_", "GBS_adapter_sequence", $fastq_adapter_sequence), $fastq_header, $align_length, $query_start, $query_end, $target_start, $target_end);
+				print OUTFILE $regex_alignment . "\n";
 			}
 		}
 		close(OUTFILE) or die "Couldn't close file $adapter_regex_outfile";
 		
 		# Generate the trimmed adapter regex files filtered for further processing.
 		my $trimmed_adapter_regex_outfile = join('/', $trimmed_regex_output_dir, join("_", $fasta_filename, "gbs_adapter_regex.tsv"));
-		open(ADAPTER_REGEX_OUTFILE, ">$trimmed_adapter_regex_outfile") or die "Couldn't open file $trimmed_adapter_regex_outfile for writting, $!";
-		print ADAPTER_REGEX_OUTFILE join("\t", "query_name", "target_name", "align_length", "query_start", "query_end", "target_start", "target_end") . "\n";
+		open(adapter_REGEX_OUTFILE, ">$trimmed_adapter_regex_outfile") or die "Couldn't open file $trimmed_adapter_regex_outfile for writting, $!";
+		print adapter_REGEX_OUTFILE join("\t", "query_name", "target_name", "align_length", "query_start", "query_end", "target_start", "target_end") . "\n";
 		
 		# The $trimmed_seqs_layout_outfile contains the trimmed coordinates layout for each sequence trimmed of the GBS common adapter sequence that passed the retaining criteria.
 		my $trimmed_seqs_layout_outfile = join('/', $trimmed_layout_output_dir, join("_", $fasta_filename, "trimmed_offset", $adapter_trim_offset, "trimmed_seqs_layout") . ".txt");
@@ -362,6 +360,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 				die "Error: fastq_quality_scores is undefined" unless(defined($fastq_quality_scores));
 				
 				my $fastq_sequence_length = length($fastq_sequence);
+				my $predicted_adapter_start = ($fastq_sequence_length - $adapter_sequence_length);
 				
 				my ($trimmed_fastq_sequence, $trimmed_fastq_quality_scores, $trimmed_adapter_sequence);
 				# If the adapter alignment length is equal to the length of the full GBS common adapter then trim where that GBS common adapter sequence is found subtracting the trimmed offset from the target start.
@@ -391,9 +390,9 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 						my $trimmed_adapter_regex = join("\t", join("_", "trimmed_adapter_sequence_offset", $adapter_trim_offset), $target_name, $trimmed_adapter_sequence_length, ($target_start - $adapter_trim_offset), $fastq_sequence_length, ($target_start - $adapter_trim_offset), $fastq_sequence_length);
 						my $original_adapter_regex = join("\t", $query_name, $target_name, $align_length, $query_start, $query_end, $target_start, $target_end);
 							
-						print ADAPTER_REGEX_OUTFILE $trimmed_fastq_regex . "\n";
-						print ADAPTER_REGEX_OUTFILE $original_adapter_regex . "\n";
-						print ADAPTER_REGEX_OUTFILE $trimmed_adapter_regex . "\n";
+						print adapter_REGEX_OUTFILE $trimmed_fastq_regex . "\n";
+						print adapter_REGEX_OUTFILE $original_adapter_regex . "\n";
+						print adapter_REGEX_OUTFILE $trimmed_adapter_regex . "\n";
 						
 						my $trimmed_fastq_header = $fastq_header;
 						my $trimmed_seqs_layout_header = join("_", $fasta_filename, $trimmed_fastq_header);
@@ -403,9 +402,9 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 						push(@trimmed_fastq_list, $fastq_header);
 						
 					}elsif($trimmed_fastq_sequence_length < $min_trimmed_fastq_sequence_length_plus_barcode){ #If this alignment doesn't meet our filtering criteria separate fastq sequence from trimmed fastq sequence data.
-						$removed_fastq_sequences{$fastq_header}{'FASTQ_SEQUENCE'} = $trimmed_fastq_sequence;
-						$removed_fastq_sequences{$fastq_header}{'PLUS'} = $fastq_plus;
-						$removed_fastq_sequences{$fastq_header}{'FASTQ_QUALITY_SCORES'} = $trimmed_fastq_quality_scores;
+						$removed_fastq_sequences{$fastq_header}{'FASTQ_SEQUENCE'} = $fastq_sequences{$fastq_header}{'FASTQ_SEQUENCE'};
+						$removed_fastq_sequences{$fastq_header}{'PLUS'} = $fastq_sequences{$fastq_header}{'PLUS'};
+						$removed_fastq_sequences{$fastq_header}{'FASTQ_QUALITY_SCORES'} = $fastq_sequences{$fastq_header}{'FASTQ_QUALITY_SCORES'};
 						
 						my $removed_fastq_header = $fastq_header;
 						my $removed_seqs_layout_header = join("_", $fasta_filename, $removed_fastq_header);
@@ -418,7 +417,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 			}
 			$i++;
 		}
-		close(ADAPTER_REGEX_OUTFILE) or die "Couldn't close file $trimmed_adapter_regex_outfile";
+		close(adapter_REGEX_OUTFILE) or die "Couldn't close file $trimmed_adapter_regex_outfile";
 		close(TRIMMED_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_layout_outfile";
 		close(REMOVED_LAYOUT_OUTFILE) or die "Couldn't close file $removed_seqs_layout_outfile";
 		close(INFILE) or die "Couldn't close file $adapter_regex_outfile";
@@ -427,10 +426,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 		my @fastq_sequence_list = keys %fastq_sequences;
 		
 		# Grab the sub list of untrimmed fastq sequences and put them into the trimmed_fastq_sequences hash.
-		my @fastq_list2remove = ();
-		push(@fastq_list2remove, @trimmed_fastq_list);
-		push(@fastq_list2remove, @removed_fastq_list);
-		
+		my @fastq_list2remove = (@trimmed_fastq_list, @removed_fastq_list);
 		my $fastq_list_comparision = List::Compare->new(\@fastq_sequence_list, \@fastq_list2remove);
 		my @untrimmed_fastq_sequence_list = $fastq_list_comparision->get_unique;
 
