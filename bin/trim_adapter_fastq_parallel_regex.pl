@@ -94,7 +94,7 @@ my $fastq_adapter_sequence = '';
 switch($restriction_enzymes){
    case 'ApeKI'       { $fastq_adapter_sequence = 'CWGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAG' } # Not operational yet
    case 'Pstl/MspI'   { $fastq_adapter_sequence = 'CCGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATCTCGTATGCCGTCTTCTGCTTG' }
-   else               { die "Input $restriction_enzymes is not a recognized restriction enzyme(s) used in our genome sequence digestion! Please specify either ApeKI or Pstl/MspI on the command line" }
+   else               { die "Input $restriction_enzymes is not one of the recognized restriction enzyme(s)! Please specify either ApeKI or Pstl/MspI on the command line" }
 }
 
 # Create output directory if it doesn't already exist.
@@ -153,6 +153,7 @@ unless(-d $removed_layout_output_dir){
 # Get the length of the adapter so that we can verify adapter blast results.
 my $adapter_sequence_length = length($fastq_adapter_sequence);
 
+# Generate the adapter concatenated sequence positions string for annotation of the adapter counts file 
 my %adapter_concatenated_sequences = ();
 my $query_start = 1;
 for(my $align_length = $adapter_sequence_length; $align_length >= $adapter_length_min_threshold; $align_length--){
@@ -175,14 +176,15 @@ for(my $align_length = $adapter_sequence_length; $align_length >= $adapter_lengt
 	$adapter_concatenated_sequences{$align_length} = $adapter_concatenated_sequence;
 }
 
-my (%fastq_sequence_counter, %adapter_regex_length_counter) = ();
+my (%original_fastq_sequence_counter, %fastq_sequence_counter, %adapter_regex_length_counter) = ();
 if ((require Parallel::Loops) and ($regex_num_cpu)){
 
         # Perform the adapter regex searches in parallel.
         my $parallel = Parallel::Loops->new($regex_num_cpu);
+	my %original_fastq_seq_counter = ();
         my %fastq_seq_counter = ();
 	my %adapter_length_counter = ();
-        $parallel->share(\%fastq_seq_counter, \%adapter_length_counter); # make sure that these are visible in the children.
+        $parallel->share(\%original_fastq_seq_counter, \%fastq_seq_counter, \%adapter_length_counter); # make sure that these are visible in the children.
 
         # Find all files in the specified directory with the extension *.fastq.
 	my ($fastq_files, $fastq_file_count) = find_files($fastq_file_dir, "fastq");
@@ -250,7 +252,9 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 			}
 		}
 		close(INFILE) or die "Couldn't close file $fastq_infile";
-		
+		# Get original fastq sequences counts for each file.
+		$original_fastq_seq_counter{$fasta_filename} = $num_fastq_seqs;	
+
 		# Execute the adapter regex search using the GBS common adapter sequence as the query and the fastq sequences in fasta format as the blast database.
 		# Keep a maximum of target sequences equal to the number of sequences in the fastq file. Retain adapter regex hits based on the minimum adapter length threshold.
 		# Keep adapter regex hits that begin at position 1 of the full GBS common adapter sequence up to the minimum adapter length threshold.
@@ -524,12 +528,20 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 		$fastq_sequence_counter{$fasta_filename}{'REMOVED'} = $fastq_seq_counter{$fasta_filename}{'REMOVED'};
 	}
 
+	# Get the GBS common adapter length counts for each fastq file.
 	foreach my $adapter_length (sort {$b <=> $a} keys %adapter_length_counter){
 		$adapter_regex_length_counter{$adapter_length} = 0;
 		foreach my $fasta_filename (sort keys %{$adapter_length_counter{$adapter_length}}){
 			$adapter_regex_length_counter{$adapter_length} += $adapter_length_counter{$adapter_length}{$fasta_filename};
 		}
 	}
+	
+	# Get the original fastq sequence counts for each fastq file so that we can use them to make sure we have the correct proportions of untrimmed, trimmed, and removed counts.
+	foreach my $fasta_filename (sort keys %original_fastq_seq_counter){
+		$original_fastq_sequence_counter{$fasta_filename} = $original_fastq_seq_counter{$fasta_filename};
+	}
+	
+	# close parallel loops to free the memory contained in the shared hash variables.
 	undef $parallel;
 }
 
@@ -655,8 +667,8 @@ foreach my $fasta_filename (sort keys %fastq_sequence_counter){
     $num_removed_seqs = 0 unless(defined($num_removed_seqs));
 
     # Calculate the total number of sequences.
-    my $total_num_seqs = ($num_untrimmed_seqs + $num_trimmed_seqs + $num_removed_seqs);
-
+#    my $total_num_seqs = ($num_untrimmed_seqs + $num_trimmed_seqs + $num_removed_seqs);
+    my $total_num_seqs = $original_fastq_sequence_counter{$fasta_filename};
     my $percent_untrimmed_seqs = (($num_untrimmed_seqs/$total_num_seqs) * 100);
     my $percent_trimmed_seqs = (($num_trimmed_seqs/$total_num_seqs) * 100);
     my $percent_removed_seqs = (($num_removed_seqs/$total_num_seqs) * 100);
