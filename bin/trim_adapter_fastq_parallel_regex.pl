@@ -283,6 +283,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 					}
 				}elsif($i < $adapter_sequence_length){
 					my $common_adapter_regex = qr($common_adapter_sequence);
+					my $alignment_found = "false";
 					while($fastq_sequence =~ /$common_adapter_regex/g){
 						if($+[0] eq $gbs_sequence_length){
 							$target_start = ($-[0] + 1);
@@ -292,9 +293,11 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 							
 							my $regex_alignment = join("\t", join("_", "GBS_adapter_sequence", $fastq_adapter_sequence), $fastq_header, $align_length, $query_start, $query_end, $target_start, $target_end);
 							print OUTFILE $regex_alignment . "\n";
+							$alignment_found = "true";
 							last;
 						}
 					}
+					last if($alignment_found eq "true");
 				}
 				
 				$query_start = 1;
