@@ -76,7 +76,7 @@ foreach my $filename (sort keys %{$fasta_target_files}){
 			my ($query_name, $align_length, $query_start, $query_end, $target_start, $target_end);
 			my $fasta_target_length_count = 1;
 			my $align_found = "false";
-			for(my $i = $fasta_query_max; $i > $fasta_query_min; $i--){
+			for(my $i = $fasta_query_max; $i >= $fasta_query_min; $i--){
 				if(defined($fasta_query_regex{$individual_name}{$fasta_target_sequence})){
 					$query_name = $fasta_query_regex{$individual_name}{$fasta_target_sequence};
 					print "$i eq $fasta_query_max\n";

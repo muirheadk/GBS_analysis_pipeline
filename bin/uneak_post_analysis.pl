@@ -7,7 +7,7 @@ use File::Basename;
 use IPC::Open2;
 use Bio::SeqIO;
 
-# perl uneak_snps_cleanup.pl -i ~/workspace/GBS_data-08-10-2013/PROJECT_LEADER_DIR/JULIAN_DUPUIS -p Papilio_UNEAK_GBS -w ~/workspace/GBS_data-08-10-2013/Papilio_GBS_Data/Papilio_notrim-2014-11-18 -o ~/workspace/GBS_data-08-10-2013/Papilio_GBS_Data/uneak_snps_cleanup
+# perl uneak_post_analysis.pl -i ~/workspace/GBS_data-08-10-2013/PROJECT_LEADER_DIR/JULIAN_DUPUIS -p Papilio_UNEAK_GBS -w ~/workspace/GBS_data-08-10-2013/Papilio_GBS_Data/Papilio_notrim-2014-11-18 -o ~/workspace/GBS_data-08-10-2013/Papilio_GBS_Data/uneak_snps_cleanup
 my ($fastq_file_dir, $project_name, $uneak_project_dir, $gbs_sequence_length, $uneak_sequence_length, $blast_num_cpu, $output_dir);
 GetOptions(
 	'i=s'    => \$fastq_file_dir,
@@ -30,6 +30,7 @@ usage() unless (
 $gbs_sequence_length = 100 unless defined $gbs_sequence_length;
 $uneak_sequence_length = 64 unless defined $uneak_sequence_length;
 $blast_num_cpu = 2 unless defined $blast_num_cpu;
+
 
 
 sub usage {
@@ -60,6 +61,14 @@ OPTIONS:
 USAGE
 }
 
+# The cut-site for MspI.
+# 5' ---C   CGG--- 3'
+# 3' ---GGC   C--- 5'
+my $restriction_enzyme_cut_site = qr(CCGG);
+
+# The first seven bases of the GBS common adapter sequencefor MspI.
+my $common_adapter_prefix = qr(CCGAGAT);
+					
 # Create output directory if it doesn't already exist.
 unless(-d $output_dir){
       mkdir($output_dir, 0777) or die "Can't make directory: $!";
@@ -133,10 +142,41 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
 				
 				# need to see if there are Ns within the barcode + trimmed sequence.
 				my $barcode_sequence = get_subseq($fastq_sequence, 1, $barcode_length);
+# 				die join("\t", $barcode, $barcode_sequence);
 				my $barcode_tassel_trimmed_sequence = join("", $barcode_sequence, $tassel_trimmed_sequence);
 				
 				if(($barcode_tassel_trimmed_sequence !~ m/N/) and ($barcode_sequence =~ m/$barcode/)){
-					print OUTFILE join("\n", join("", ">", join("_", $fasta_filename, $fastq_header)), $tassel_trimmed_sequence) . "\n";
+					my $new_tassel_trimmed_sequence = $tassel_trimmed_sequence;
+					# The cut-site for MspI.
+					# 5' ---C   CGG--- 3'
+					# 3' ---GGC   C--- 5'
+					if($tassel_trimmed_sequence =~ m/$restriction_enzyme_cut_site/g){
+						my $target_start = ($-[0] + 1);
+						my $target_end = $+[0];
+						my $tassel_trimmed_subsequence = get_subseq($tassel_trimmed_sequence, 1, $target_start);
+						my $tassel_trimmed_subseq_length = length($tassel_trimmed_subsequence);
+						my $padded_poly_A_length =  ($uneak_sequence_length - $tassel_trimmed_subseq_length);
+ 						my $padded_poly_A_seq = 'A' x $padded_poly_A_length;
+						$new_tassel_trimmed_sequence = join("", $tassel_trimmed_subsequence, $padded_poly_A_seq);
+						
+						my $new_fastq_header = join("\001", $fastq_header, $fasta_filename, join("=", "length", $tassel_trimmed_subseq_length));
+						warn join("\t", join("\n", join("\t", $new_fastq_header, "MspI cut-site"), $new_tassel_trimmed_sequence, $tassel_trimmed_sequence), $target_start, $target_end) . "\n";
+						print OUTFILE join("\n", join("", ">", $new_fastq_header, $new_tassel_trimmed_sequence)) . "\n" if($tassel_trimmed_subseq_length > 32);
+					}
+					elsif($tassel_trimmed_sequence =~ m/$common_adapter_prefix/g){
+						# CCGAGAT
+						my $target_start = ($-[0] + 1);
+						my $target_end = $+[0];
+						my $tassel_trimmed_subsequence = get_subseq($tassel_trimmed_sequence, 1, ($target_start + 3));
+						my $tassel_trimmed_subseq_length = length($tassel_trimmed_subsequence);
+						my $padded_poly_A_length =  ($uneak_sequence_length - $tassel_trimmed_subseq_length);
+ 						my $padded_poly_A_seq = 'A' x $padded_poly_A_length;
+						$new_tassel_trimmed_sequence = join("", $tassel_trimmed_subsequence, $padded_poly_A_seq);
+						
+						my $new_fastq_header = join("\001", $fastq_header, $fasta_filename, join("=", "length", $tassel_trimmed_subseq_length));
+						warn join("\t", join("\n", join("\t", $new_fastq_header, "MspI common adapter"), $new_tassel_trimmed_sequence, $tassel_trimmed_sequence), $target_start, $target_end) . "\n";
+						print OUTFILE join("\n", join("", ">", $new_fastq_header, $new_tassel_trimmed_sequence)) . "\n" if($tassel_trimmed_subseq_length > 32);
+					}
 				}
 				$i = 1;
 				
@@ -294,7 +334,10 @@ foreach my $individual_id (sort {$a cmp $b} keys %hap_map_hmc_counts){
 				$snp_id = $1;
 			}
 			
-			$query_fasta_sequences{$snp_id}{$hap_map_reference_type} = join("\n", join("", ">", join("_", $individual_id, $sequence_id, $hap_map_fasta_sequence_length)), $hap_map_fasta_seqs{$sequence_id});
+			my $padded_poly_A_length =  ($uneak_sequence_length - $hap_map_fasta_sequence_length);
+ 			my $padded_poly_A_seq = 'A' x $padded_poly_A_length;
+			my $hap_map_padded_sequence = join("", $hap_map_fasta_seqs{$sequence_id}, $padded_poly_A_seq);
+			$query_fasta_sequences{$snp_id}{$hap_map_reference_type} = join("\n", join("", ">", join("_", $individual_id, $sequence_id, $hap_map_fasta_sequence_length)), $hap_map_padded_sequence);
 			
 		}
 		$num_query_seqs++;
