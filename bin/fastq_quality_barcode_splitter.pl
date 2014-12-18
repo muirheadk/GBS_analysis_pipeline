@@ -7,6 +7,12 @@ use File::Copy;
 use File::Basename;
 use Switch;
 
+# Added fastq_quality_barcode_splitter.pl on 2014-12-17. This script works very similar to the fastq_barcode_cascade_splitter.pl in same respects, but is a lot faster. 
+# It also performs a quality assessment and quality control filtering step to filter out fastq reads that don't meet the quality threshold. It also demultiplexes the 
+# original raw bulk fastq file based on barcode. The quality filtering and quality threshold steps are performed using the process_radtags program in the STACKS software suite. 
+# Once the raw fastq file is demultiplexed by barcode the resulting files are renamed corresponding to the individual name, plate/well number, and barcode sequence in its 
+# corresponding project leader directory.
+
 # perl fastq_quality_barcode_splitter.pl -i ~/workspace/GBS_data-08-10-2013/HI.1405.008.GQ03122013-5_R1.fastq.gz -b ~/workspace/GBS_data-08-10-2013/GBS_barcodes-2013-10-09.csv -n 0 -o ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS
 my ($fastq_infile, $restriction_enzymes, $barcode_infile, $num_mismatches, $output_dir);
 GetOptions(

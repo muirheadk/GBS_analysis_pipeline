@@ -146,7 +146,6 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
 				my $barcode_tassel_trimmed_sequence = join("", $barcode_sequence, $tassel_trimmed_sequence);
 				
 				if(($barcode_tassel_trimmed_sequence !~ m/N/) and ($barcode_sequence =~ m/$barcode/)){
-					my $new_tassel_trimmed_sequence = $tassel_trimmed_sequence;
 					# The cut-site for MspI.
 					# 5' ---C   CGG--- 3'
 					# 3' ---GGC   C--- 5'
@@ -157,13 +156,12 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
 						my $tassel_trimmed_subseq_length = length($tassel_trimmed_subsequence);
 						my $padded_poly_A_length =  ($uneak_sequence_length - $tassel_trimmed_subseq_length);
  						my $padded_poly_A_seq = 'A' x $padded_poly_A_length;
-						$new_tassel_trimmed_sequence = join("", $tassel_trimmed_subsequence, $padded_poly_A_seq);
+						my $new_tassel_trimmed_sequence = join("", $tassel_trimmed_subsequence, $padded_poly_A_seq);
 						
-						my $new_fastq_header = join("\001", $fastq_header, $fasta_filename, join("=", "length", $tassel_trimmed_subseq_length));
-						warn join("\t", join("\n", join("\t", $new_fastq_header, "MspI cut-site"), $new_tassel_trimmed_sequence, $tassel_trimmed_sequence), $target_start, $target_end) . "\n";
-						print OUTFILE join("\n", join("", ">", $new_fastq_header, $new_tassel_trimmed_sequence)) . "\n" if($tassel_trimmed_subseq_length > 32);
-					}
-					elsif($tassel_trimmed_sequence =~ m/$common_adapter_prefix/g){
+						my $new_fastq_header = join("\001", $fastq_header, $fasta_filename, join("=", "trimmed_length", $tassel_trimmed_subseq_length), join("=", "polly_A_length", $padded_poly_A_length));
+						warn join("\t", join("\n", join("\t", $new_fastq_header, "MspI cut-site"), $new_tassel_trimmed_sequence, $tassel_trimmed_subsequence, $tassel_trimmed_sequence), $target_start, $target_end) . "\n";
+						print OUTFILE join("\n", join("", ">", $new_fastq_header), $new_tassel_trimmed_sequence) . "\n"
+					}elsif($tassel_trimmed_sequence =~ m/$common_adapter_prefix/g){
 						# CCGAGAT
 						my $target_start = ($-[0] + 1);
 						my $target_end = $+[0];
@@ -171,11 +169,15 @@ foreach my $fastq_filename (sort keys %{$fastq_files}){
 						my $tassel_trimmed_subseq_length = length($tassel_trimmed_subsequence);
 						my $padded_poly_A_length =  ($uneak_sequence_length - $tassel_trimmed_subseq_length);
  						my $padded_poly_A_seq = 'A' x $padded_poly_A_length;
-						$new_tassel_trimmed_sequence = join("", $tassel_trimmed_subsequence, $padded_poly_A_seq);
+						my $new_tassel_trimmed_sequence = join("", $tassel_trimmed_subsequence, $padded_poly_A_seq);
 						
-						my $new_fastq_header = join("\001", $fastq_header, $fasta_filename, join("=", "length", $tassel_trimmed_subseq_length));
-						warn join("\t", join("\n", join("\t", $new_fastq_header, "MspI common adapter"), $new_tassel_trimmed_sequence, $tassel_trimmed_sequence), $target_start, $target_end) . "\n";
-						print OUTFILE join("\n", join("", ">", $new_fastq_header, $new_tassel_trimmed_sequence)) . "\n" if($tassel_trimmed_subseq_length > 32);
+						my $new_fastq_header = join("\001", $fastq_header, $fasta_filename, join("=", "trimmed_length", $tassel_trimmed_subseq_length), join("=", "polly_A_length", $padded_poly_A_length));
+						warn join("\t", join("\n", join("\t", $new_fastq_header, "MspI common adapter"), $new_tassel_trimmed_sequence, $tassel_trimmed_subsequence, $tassel_trimmed_sequence), $target_start, $target_end) . "\n";
+						print OUTFILE join("\n", join("", ">", $new_fastq_header), $new_tassel_trimmed_sequence) . "\n"
+					}elsif(($tassel_trimmed_sequence !~ m/$restriction_enzyme_cut_site/g) and ($tassel_trimmed_sequence !~ m/$common_adapter_prefix/g)){
+						my $new_fastq_header = join("\001", $fastq_header, $fasta_filename, join("=", "trimmed_length", $uneak_sequence_length), join("=", "polly_A_length", 0));
+						print OUTFILE join("\n", join("", ">", $new_fastq_header), $tassel_trimmed_sequence) . "\n"
+					
 					}
 				}
 				$i = 1;

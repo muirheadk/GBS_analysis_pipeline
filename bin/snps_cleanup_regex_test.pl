@@ -3,10 +3,9 @@ use warnings;
 use strict;
 
 use Bio::SeqIO;
-use List::Util qw(min max);
 use File::Basename;
 
-my $query_fasta_output_dir = "/home/cookeadmin/workspace/GBS_data-08-10-2013/Papilio_GBS_Data/Papilio_UNEAK_GBS-2014-12-04/UNEAK_FASTA_QUERY_FILES";
+my $query_fasta_output_dir = "/home/cookeadmin/workspace/GBS_data-08-10-2013/Papilio_GBS_Data/Papilio_UNEAK_GBS-2014-12-11/UNEAK_FASTA_QUERY_FILES";
 my ($fasta_query_files, $fasta_query_file_counter) = find_files($query_fasta_output_dir, "fasta");
 my %fasta_query_regex = ();
 my %fasta_query_range_lengths = ();
@@ -28,14 +27,8 @@ foreach my $filename (sort keys %{$fasta_query_files}){
 		my ($individual_id, $snp_id, $fasta_query_type, $fasta_query_length) = split(/_/, $fasta_query_seq_id);
 # 		$fasta_query_regex{$fasta_query_sequence}{$fasta_query_length} = $fasta_query_seq_id;
 		$fasta_query_regex{$individual_id}{$fasta_query_sequence} = $fasta_query_seq_id;
-		push(@fasta_query_lengths, $fasta_query_length);
 	}
 	
-	my $fasta_query_min = min(@fasta_query_lengths);
-	$fasta_query_range_lengths{$individual_name}{"min"} = $fasta_query_min;
-	
-	my $fasta_query_max = max(@fasta_query_lengths);
-	$fasta_query_range_lengths{$individual_name}{"max"} = $fasta_query_max;
 	
 	# Clean out the sequence I/O object.
 	$seqio = ();
@@ -49,8 +42,8 @@ foreach my $filename (sort keys %{$fasta_query_files}){
 # 	}
 # }
 
-my $blastn_output_dir = "/home/cookeadmin/workspace/GBS_data-08-10-2013/Papilio_GBS_Data/Papilio_UNEAK_GBS-2014-12-04/UNEAK_BLASTN_FILES";
-my $target_fasta_output_dir = "/home/cookeadmin/workspace/GBS_data-08-10-2013/Papilio_GBS_Data/Papilio_UNEAK_GBS-2014-12-04/UNEAK_FASTA_TARGET_FILES";
+my $blastn_output_dir = "/home/cookeadmin/workspace/GBS_data-08-10-2013/Papilio_GBS_Data/Papilio_UNEAK_GBS-2014-12-11/UNEAK_BLASTN_FILES";
+my $target_fasta_output_dir = "/home/cookeadmin/workspace/GBS_data-08-10-2013/Papilio_GBS_Data/Papilio_UNEAK_GBS-2014-12-11/UNEAK_FASTA_TARGET_FILES";
 my ($fasta_target_files, $fasta_target_file_counter) = find_files($target_fasta_output_dir, "fasta");
 foreach my $filename (sort keys %{$fasta_target_files}){
 	warn $filename . "\n";
@@ -62,51 +55,36 @@ foreach my $filename (sort keys %{$fasta_target_files}){
 	my $regex_alignment_outfile = join('/', $blastn_output_dir, $individual_name . ".uneak_blastn.tsv");
 	open(OUTFILE, ">$regex_alignment_outfile") or die "Couldn't open file $regex_alignment_outfile for writting, $!";
 	print OUTFILE join("\t", "query_name", "target_name", "align_length", "query_start", "query_end", "target_start", "target_end") . "\n";
-	my %regex_align_hits = ();
-	
-	if(defined($fasta_query_range_lengths{$individual_name}{"min"}) and defined($fasta_query_range_lengths{$individual_name}{"max"})){
-		
-		my ($fasta_query_min, $fasta_query_max) = ($fasta_query_range_lengths{$individual_name}{"min"}, $fasta_query_range_lengths{$individual_name}{"max"});
-		my $seqio = Bio::SeqIO->new(-file => $fasta_target_infile, '-format' => 'Fasta');
-		while(my $seq_entry = $seqio->next_seq) {
+	my $seqio = Bio::SeqIO->new(-file => $fasta_target_infile, '-format' => 'Fasta');
+	while(my $seq_entry = $seqio->next_seq) {
 
-			my $fasta_target_seq_id = $seq_entry->id;
-			my $fasta_target_sequence = $seq_entry->seq;
-
-			my ($query_name, $align_length, $query_start, $query_end, $target_start, $target_end);
-			my $fasta_target_length_count = 1;
-			my $align_found = "false";
-			for(my $i = $fasta_query_max; $i >= $fasta_query_min; $i--){
-				if(defined($fasta_query_regex{$individual_name}{$fasta_target_sequence})){
-					$query_name = $fasta_query_regex{$individual_name}{$fasta_target_sequence};
-					print "$i eq $fasta_query_max\n";
-					$target_start = 1;
-					$target_end = $i;
-					$align_length = $i;
-					print join("\t", $align_length, $target_start, $target_end) . "\n";
-					$align_found = "true";
-					$query_start = 1;
-					$query_end = $i;
-					warn join("\t", $query_name, $i, $fasta_target_sequence) . "\n";
-					last;
-				}
-				
-				$query_start = 1;
-				$query_end = ($fasta_query_max - $fasta_target_length_count);
-				
-				$fasta_target_sequence = get_subseq($fasta_target_sequence, $query_start, $query_end);
-				warn join("\t", ($fasta_query_max - $fasta_target_length_count), $fasta_target_sequence) . "\n";
-				$fasta_target_length_count++;
-			}
-			if($align_found eq "true"){
-				
-				my $regex_alignment = join("\t", $query_name, $fasta_target_seq_id, $align_length, $query_start, $query_end, $target_start, $target_end);
-				print OUTFILE $regex_alignment . "\n";
-			}
+		my $fasta_target_seq_id = $seq_entry->id;
+		my $fasta_target_sequence = $seq_entry->seq;
+		die $fasta_target_sequence;
+		my ($query_name, $align_length, $query_start, $query_end, $target_start, $target_end);
+		my $fasta_target_length_count = 1;
+		my $align_found = "false";
+		if(defined($fasta_query_regex{$individual_name}{$fasta_target_sequence})){
+			$query_name = $fasta_query_regex{$individual_name}{$fasta_target_sequence};
+			my ($individual_id, $snp_id, $fasta_query_type, $fasta_query_length) = split(/_/, $query_name);
+			$target_start = 1;
+			$target_end = $fasta_query_length;
+			$align_length = $fasta_query_length;
+			print join("\t", $align_length, $target_start, $target_end) . "\n";
+			$align_found = "true";
+			$query_start = 1;
+			$query_end = $fasta_query_length;
+			warn join("\t", $query_name, $fasta_query_length, $fasta_target_sequence) . "\n";
 		}
-		# Clean out the sequence I/O object.
-		$seqio = ();
+		if($align_found eq "true"){
+			
+			my $regex_alignment = join("\t", $query_name, $fasta_target_seq_id, $align_length, $query_start, $query_end, $target_start, $target_end);
+			print OUTFILE $regex_alignment . "\n";
+		}
 	}
+	# Clean out the sequence I/O object.
+	$seqio = ();
+	
 	close(OUTFILE) or die "Couldn't close file $regex_alignment_outfile";
 	
 
