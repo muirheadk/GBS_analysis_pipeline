@@ -9,7 +9,7 @@ use File::Copy;
 use Switch;
 
 # perl unique_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/CHRISTIANNE_MCDONALD/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p CHRISTIANNE_MCDONALD -o ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/STACKS_DENOVO_ASSEMBLY
-my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $alpha_value_ustacks, $max_locus_stacks, $stacks_num_cpu, $output_dir);
+my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $alpha_value_ustacks, $max_locus_stacks, $num_cpu_cores, $output_dir);
 
 GetOptions(
 	'i=s'    => \$gbs_fastq_dir,
@@ -20,7 +20,7 @@ GetOptions(
 	'n=s'    => \$max_align_distance_ustacks,
 	'a=s'    => \$alpha_value_ustacks,
 	'l=s'    => \$max_locus_stacks,
-	's=s'    => \$stacks_num_cpu,
+	'c=s'    => \$num_cpu_cores,
 	'o=s'    => \$output_dir,
 );
 
@@ -42,7 +42,7 @@ $alpha_value_ustacks = 0.05 unless defined $alpha_value_ustacks;
 
 $max_locus_stacks = 3 unless defined $max_locus_stacks;
 
-$stacks_num_cpu = 2 unless defined $stacks_num_cpu;
+$num_cpu_cores = 2 unless defined $num_cpu_cores;
 
 # Program dependencies - The absolute paths to gunzip to uncompress bulk compressed fastq.gz input file if present and stacks related programs.
 my ($gunzip, $ustacks, $cstacks, $sstacks);
@@ -107,12 +107,12 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	}
 	
 	ustacks($gbs_fastq_infile, $sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, 
-		$stacks_num_cpu, $alpha_value_ustacks, $max_locus_stacks, $stacks_output_dir);
+		$num_cpu_cores, $alpha_value_ustacks, $max_locus_stacks, $stacks_output_dir);
 	
 	$sql_id++;
 }
 
-my $cstacks_file = cstacks($stacks_output_dir, $stacks_num_cpu);
+my $cstacks_file = cstacks($stacks_output_dir, $num_cpu_cores);
 
 my ($ustacks_tags_files, $ustacks_tags_file_count) = find_files($stacks_output_dir, "tags.tsv");
 foreach my $file_name (sort keys %{$ustacks_tags_files}){
@@ -125,7 +125,7 @@ foreach my $file_name (sort keys %{$ustacks_tags_files}){
 		warn "Processing " . $ustacks_filename . ".....\n";
 		my $sstacks_infile = join('/', $stacks_output_dir, $ustacks_filename);
 		
-		sstacks($cstacks_file, $sstacks_infile, $stacks_num_cpu, $stacks_output_dir);
+		sstacks($cstacks_file, $sstacks_infile, $num_cpu_cores, $stacks_output_dir);
 	}
 }
 
@@ -147,8 +147,8 @@ sub ustacks{
 	my $max_align_distance_ustacks = shift;
 	die "Error lost the maximum distance allowed to align secondary reads to primary stacks" unless defined $max_align_distance_ustacks;
 
-	my $stacks_num_cpu = shift;
-	die "Error lost the number of cores for stacks" unless defined $stacks_num_cpu;
+	my $num_cpu_cores = shift;
+	die "Error lost the number of cores for stacks" unless defined $num_cpu_cores;
 	
 	my $alpha_value = shift;
 	die "Error lost the chi square significance level required to call a heterozygote or homozygote" unless defined $alpha_value;
@@ -169,7 +169,7 @@ sub ustacks{
 	
 	unless(-s $ustacks_alleles_file and -s $ustacks_snps_file and -s $ustacks_tags_file){
 		warn "Executing ustacks.....\n\n";
-		my $ustacksCmd  = "$ustacks -t fastq -f $fastq_infile -o $stacks_output_dir -i $sql_id -m $min_depth_coverage -M $max_nuc_distance_ustacks -N $max_align_distance_ustacks -p $stacks_num_cpu -d -r -R --model_type snp --alpha $alpha_value --max_locus_stacks $max_locus_stacks";
+		my $ustacksCmd  = "$ustacks -t fastq -f $fastq_infile -o $stacks_output_dir -i $sql_id -m $min_depth_coverage -M $max_nuc_distance_ustacks -N $max_align_distance_ustacks -p $num_cpu_cores -d -r -R --model_type snp --alpha $alpha_value --max_locus_stacks $max_locus_stacks";
 		warn $ustacksCmd . "\n\n";
 		system($ustacksCmd) == 0 or die "Error calling $ustacksCmd: $?";
 	}
@@ -193,8 +193,8 @@ sub cstacks{
 	my $stacks_input_dir = shift;
 	die "Error lost the padded sam output file directory" unless defined $stacks_input_dir;
 	
-	my $stacks_num_cpu = shift;
-	die "Error lost the number of cores for stacks" unless defined $stacks_num_cpu;
+	my $num_cpu_cores = shift;
+	die "Error lost the number of cores for stacks" unless defined $num_cpu_cores;
 	
 	my $cstacks_file = join('/', $stacks_output_dir, "batch_1");
 	
@@ -220,7 +220,7 @@ sub cstacks{
 		
 		warn "Executing cstacks.....\n\n";
 		my $cstacks_joined_soptions = join("\\\n", @cstacks_soptions);
-		my $cstacksCmd  = "$cstacks -b 1 -o $stacks_output_dir -p $stacks_num_cpu \\\n $cstacks_joined_soptions";
+		my $cstacksCmd  = "$cstacks -b 1 -o $stacks_output_dir -p $num_cpu_cores \\\n $cstacks_joined_soptions";
 		warn $cstacksCmd . "\n\n";
 		system($cstacksCmd) == 0 or die "Error calling $cstacksCmd: $?";
 	}
@@ -236,8 +236,8 @@ sub sstacks{
 	my $stacks_sample_infile = shift;
 	die "Error lost the stacks sample input file directory" unless defined $stacks_sample_infile;
 	
-	my $stacks_num_cpu = shift;
-	die "Error lost the number of cores for stacks" unless defined $stacks_num_cpu;
+	my $num_cpu_cores = shift;
+	die "Error lost the number of cores for stacks" unless defined $num_cpu_cores;
 	
 	my $stacks_output_dir = shift;
 	die "Error lost the stacks output file directory" unless defined $stacks_output_dir;
@@ -249,7 +249,7 @@ sub sstacks{
 	
 	unless(-s $sstacks_matches_file){
 		warn "Executing sstacks.....\n\n";
-		my $sstacksCmd  = "$sstacks -b 1 -c $stacks_catalog_infile -s $stacks_sample_infile -o $stacks_output_dir -p $stacks_num_cpu";
+		my $sstacksCmd  = "$sstacks -b 1 -c $stacks_catalog_infile -s $stacks_sample_infile -o $stacks_output_dir -p $num_cpu_cores";
 		warn $sstacksCmd . "\n\n";
 		system($sstacksCmd) == 0 or die "Error calling $sstacksCmd: $?";
 	}
