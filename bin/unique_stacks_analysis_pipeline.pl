@@ -282,11 +282,14 @@ sub gunzip_fastq_file{
 	my $fastq_file = shift;
 	die "Error lost the fastq file to compress using gunzip" unless defined $fastq_file;
 	
+	my $project_name = shift;
+	die "Error lost the project name" unless defined $project_name;
+	
 	my ($fastq_filename, $fastq_dir) = fileparse($fastq_file, qr/\.fastq.gz/);
 	
 	#9315_CGCCTTAT_5_E11_trimmed_offset_3.fastq.gz
 	$fastq_filename =~ s/\_[ACGT]+\_\d+\_[A-Z]+\d+\_trimmed\_offset\_\d+//g;
-	my $uncompressed_fastq_file = join('/', $fastq_dir, $fastq_filename . ".fastq");
+	my $uncompressed_fastq_file = join('/', $fastq_dir, join("_", $fastq_filename, $project_name) . ".fastq");
 	
 	unless(-s $uncompressed_fastq_file){
 		warn "Calling gunzip for $fastq_file....\n";

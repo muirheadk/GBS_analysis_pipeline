@@ -8,7 +8,7 @@ use File::Basename;
 use File::Copy;
 use Switch;
 
-# perl stacks_refgen_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR/STEPHEN_TREVOY/TRIMMED_OUTPUT_FILES/STEPHEN_TREVOY_trimmed_offset_3.fastq.gz -p MPB_MALE_GBS -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_sequence_data/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/DendPond_male_1.0_unplaced.scaf.fa -c 7 -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3
+# perl refgen_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/STEPHEN_TREVOY/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p MPB-MALE-GBS -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_sequence_data/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/DendPond_male_1.0_unplaced.scaf.fa -c 7 -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3
 my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $refgen_infile, $gbs_sequence_length, $min_depth_coverage_pstacks, $alpha_value_pstacks, $num_cpu_cores, $output_dir);
 
 GetOptions(
@@ -366,20 +366,24 @@ sub bwa_pad_sam_files{
 				my $fastq_quality_scores_length = length($fastq_quality_scores);
 # 				die join("\t", $fastq_sequence_length, $fastq_header, $bam_bitwise_flag, $fastq_sequence, $fastq_quality_scores);
 				if(($fastq_sequence_length ne $gbs_sequence_length) and ($fastq_quality_scores_length ne $gbs_sequence_length)){
-					my $padded_N_length =  ($gbs_sequence_length - $fastq_sequence_length);
-					my $padded_N_seq = 'N' x $padded_N_length;
+					my $padded_nucleotide_length =  ($gbs_sequence_length - $fastq_sequence_length);
+					my $padded_nucleotide_seq = 'A' x $padded_nucleotide_length;
 					
+					# Pad sequence based on alignment type.
 					my $padded_fastq_sequence = "";
+					
 					# Pad sequence if aligned to sense strand or unmatched sequence.
-					$padded_fastq_sequence = join("", $fastq_sequence, $padded_N_seq) if(($bam_bitwise_flag eq 0) or ($bam_bitwise_flag eq 4));
+					$padded_fastq_sequence = join("", $fastq_sequence, $padded_nucleotide_seq) if(($bam_bitwise_flag eq 0) or ($bam_bitwise_flag eq 4));
 					
 					# Pad sequence if aligned to antisense strand.
-					$padded_fastq_sequence = join("", $padded_N_seq, $fastq_sequence) if(($bam_bitwise_flag eq 16) or ($bam_bitwise_flag eq 20));
+					$padded_fastq_sequence = join("", $padded_nucleotide_seq, $fastq_sequence) if(($bam_bitwise_flag eq 16) or ($bam_bitwise_flag eq 20));
 					
 					my $padded_score_length =  ($gbs_sequence_length - $fastq_quality_scores_length);
 					my $padded_score_seq = '#' x $padded_score_length;
 					
+					# Pad quality scores based on alignment type.
 					my $padded_fastq_quality_scores = "";
+					
 					# Pad quality scores if aligned to sense strand or unmatched sequence in sense orientation.
 					$padded_fastq_quality_scores = join("", $fastq_quality_scores, $padded_score_seq) if(($bam_bitwise_flag eq 0) or ($bam_bitwise_flag eq 4));
 					
