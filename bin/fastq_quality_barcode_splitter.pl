@@ -97,7 +97,7 @@ while(<INFILE>){
 close(INFILE) or die "Couldn't close file $barcode_infile";
 
 # Create output directory if it doesn't already exist.
-my $mismatch_dir = join("_", $num_mismatches, "MISMATCHES");
+my $mismatch_dir = join("_", $num_mismatches, "MISMATCH");
 $mismatch_dir = "NO_MISMATCHES" if($num_mismatches eq 0);
 
 my $project_leader_dir = join('/', $output_dir, join("_", "PROJECT_LEADER_DIR", $mismatch_dir));
