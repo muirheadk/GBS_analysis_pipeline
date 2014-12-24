@@ -5,10 +5,10 @@ use Getopt::Long;
 
 use Bio::SeqIO;
 use File::Basename;
-use File::Copy;
-use Switch;
 
-# perl stacks_refgen_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR/STEPHEN_TREVOY/TRIMMED_OUTPUT_FILES/STEPHEN_TREVOY_trimmed_offset_3.fastq.gz -p MPB_MALE_GBS -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_sequence_data/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/DendPond_male_1.0_unplaced.scaf.fa -c 7 -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3
+# perl populations_stacks.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR/STEPHEN_TREVOY/TRIMMED_OUTPUT_FILES/STEPHEN_TREVOY_trimmed_offset_3.fastq.gz -p MPB_MALE_GBS -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_sequence_data/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/DendPond_male_1.0_unplaced.scaf.fa -c 7 -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3
+# populations -P ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES -M ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/mpb_poputlations.txt -b 1 -k -p 12 -r 0.75 -m 5 -a 0.1 -f p_value --p_value_cutoff 0.05 -t 7 --fasta
+
 my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $refgen_infile, $gbs_sequence_length, $min_depth_coverage_pstacks, $alpha_value_pstacks, $bwa_num_cpu, $stacks_num_cpu, $output_dir);
 
 GetOptions(
@@ -44,13 +44,8 @@ $bwa_num_cpu = 2 unless defined $bwa_num_cpu;
 
 $stacks_num_cpu = 2 unless defined $stacks_num_cpu;
 
-# Program dependencies - The absolute paths to gunzip to uncompress bulk compressed fastq.gz input file if present, bwa aligner, and stacks related programs.
-my ($gunzip, $bwa, $pstacks, $cstacks, $sstacks);
-$gunzip				= '/bin/gunzip';
-$bwa				= '/usr/local/bin/bwa';
-$pstacks			= '/usr/local/bin/pstacks';
-$cstacks			= '/usr/local/bin/cstacks';
-$sstacks			= '/usr/local/bin/sstacks';
+# Program dependencies - The stacks populations program.
+my $populations			= '/usr/local/bin/populations';
 
 sub usage {
 

@@ -5,10 +5,8 @@ use Getopt::Long;
 
 use Bio::SeqIO;
 use File::Basename;
-use File::Copy;
-use Switch;
 
-# perl unique_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/CHRISTIANNE_MCDONALD/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p CHRISTIANNE_MCDONALD -o ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/STACKS_DENOVO_ASSEMBLY
+# perl unique_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/CHRISTIANNE_MCDONALD/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p POLYGONIA -c 7 -o ~/workspace/GBS_data-08-10-2013/CHRISTIANNE_MCDONALD_POLYGONIA
 my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $alpha_value_ustacks, $max_locus_stacks, $num_cpu_cores, $output_dir);
 
 GetOptions(
@@ -56,7 +54,7 @@ sub usage {
 die <<"USAGE";
 
 
-Usage: $0 -i gbs_fastq_dir -p project_name -g refgen_infile -c bwa_num_cpu -o output_dir
+Usage: $0 -i gbs_fastq_dir -p project_name -g refgen_infile -c num_cpu_cores -o output_dir
 
 DESCRIPTION - 
 
@@ -68,7 +66,7 @@ OPTIONS:
 
 -g refgen_infile -  
 
--c bwa_num_cpu - 
+-c num_cpu_cores - 
 
 -o output_dir - 
 
@@ -102,7 +100,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
     
 	# If the bulk fastq file is compressed, uncompress the file and set the resulting fastq filename to be the fastq infile.
 	if($gbs_fastq_file_type eq "gzfastq"){
-		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
+		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile, $project_name);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
 	}
 	

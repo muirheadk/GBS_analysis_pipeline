@@ -5,8 +5,6 @@ use Getopt::Long;
 
 use Bio::SeqIO;
 use File::Basename;
-use File::Copy;
-use Switch;
 
 # perl refgen_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/STEPHEN_TREVOY/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p MPB-MALE-GBS -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_sequence_data/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/DendPond_male_1.0_unplaced.scaf.fa -c 7 -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3
 my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $refgen_infile, $gbs_sequence_length, $min_depth_coverage_pstacks, $alpha_value_pstacks, $num_cpu_cores, $output_dir);
@@ -367,7 +365,7 @@ sub bwa_pad_sam_files{
 # 				die join("\t", $fastq_sequence_length, $fastq_header, $bam_bitwise_flag, $fastq_sequence, $fastq_quality_scores);
 				if(($fastq_sequence_length ne $gbs_sequence_length) and ($fastq_quality_scores_length ne $gbs_sequence_length)){
 					my $padded_nucleotide_length =  ($gbs_sequence_length - $fastq_sequence_length);
-					my $padded_nucleotide_seq = 'A' x $padded_nucleotide_length;
+					my $padded_nucleotide_seq = 'N' x $padded_nucleotide_length;
 					
 					# Pad sequence based on alignment type.
 					my $padded_fastq_sequence = "";
