@@ -6,21 +6,29 @@ use Getopt::Long;
 use Bio::SeqIO;
 use File::Basename;
 
-# perl refgen_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/STEPHEN_TREVOY/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p MPB-MALE-GBS -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_sequence_data/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/DendPond_male_1.0_unplaced.scaf.fa -c 7 -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3
-my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $refgen_infile, $gbs_sequence_length, $min_depth_coverage_pstacks, $alpha_value_pstacks, $num_cpu_cores, $output_dir);
+# refgen_stacks_analysis_pipeline.pl - Program that aligns quality filtered, demultiplexed, and adapter trimmed GBS data sequences against a reference genome using the BWA alignment program. It then runs the Stacks reference genome pipeline using the pstacks, cstacks, and sstacks programs of the Stacks Software Suite.
 
+#### DESCRIPTION ####
+
+# This program takes the quality filtered, demultiplexed, and adapter trimmed *.fastq input files and a reference genome fasta input file as input. Converts a reference genome fasta file to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers. It then performs a BWA alignment to align the GBS fastq sequences to a reference genome. It then executes the pstacks program, which extracts sequence stacks that were aligned to a reference genome using the BWA alignment program and identifies SNPs. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
+
+
+#### SAMPLE COMMAND ####
+# perl refgen_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/STEPHEN_TREVOY/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p MPB-MALE-GBS -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_sequence_data/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/DendPond_male_1.0_unplaced.scaf.fa -c 7 -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3
+my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $refgen_infile, $gbs_sequence_length, $min_depth_coverage_pstacks, $alpha_value_pstacks, $num_threads, $output_dir);
 GetOptions(
-	'i=s'    => \$gbs_fastq_dir,
-	't=s'    => \$gbs_fastq_file_type,
-	'p=s'    => \$project_name,
-	'g=s'    => \$refgen_infile,
+	'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+    't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Default: gzfastq
+	'p=s'    => \$project_name, # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
+    'g=s'    => \$refgen_infile, # The absolute path to the reference genome input fasta file to align GBS fastq sequences.
 	'l=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
-	'd=s'    => \$min_depth_coverage_pstacks,
-	'a=s'    => \$alpha_value_pstacks,
-	'c=s'    => \$num_cpu_cores,
-	'o=s'    => \$output_dir,
+    'd=s'    => \$min_depth_coverage_pstacks, # The minimum depth of coverage to report a stack. Default: 1
+    'a=s'    => \$alpha_value_pstacks, # The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
+	'c=s'    => \$num_threads, # The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+    'o=s'    => \$output_dir, # The absolute path to the output directory to contain the renumerated reference genome, BWA sam, padded sam, and Stacks output files and directories.
 );
 
+# Print usage message if the following input parameters are not specified.
 usage() unless (
 	defined $gbs_fastq_dir
 	and defined $project_name
@@ -28,18 +36,22 @@ usage() unless (
 	and defined $output_dir
 );
 
+# The fastq input file type. Default: gzfastq
 $gbs_fastq_file_type = 'gzfastq' unless defined $gbs_fastq_file_type;
 
 # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 $gbs_sequence_length = 92 unless defined $gbs_sequence_length;
 
+# The minimum depth of coverage to report a stack. Default: 1
 $min_depth_coverage_pstacks = 1 unless defined $min_depth_coverage_pstacks;
 
+# The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 $alpha_value_pstacks = 0.05 unless defined $alpha_value_pstacks;
 
-$num_cpu_cores = 2 unless defined $num_cpu_cores;
+# The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+$num_threads = 2 unless defined $num_threads;
 
-# Program dependencies - The absolute paths to gunzip to uncompress bulk compressed fastq.gz input file if present, bwa aligner, and stacks related programs.
+# Program dependencies - The absolute paths to gunzip to uncompress fastq.gz input files, BWA alignment program, and Stacks related programs.
 my ($gunzip, $bwa, $pstacks, $cstacks, $sstacks);
 $gunzip				= '/bin/gunzip';
 $bwa				= '/usr/local/bin/bwa';
@@ -52,21 +64,29 @@ sub usage {
 die <<"USAGE";
 
 
-Usage: $0 -i gbs_fastq_dir -p project_name -g refgen_infile -c num_cpu_cores -o output_dir
+Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -p project_name -g refgen_infile -l gbs_sequence_length -d min_depth_coverage_pstacks -a alpha_value_pstacks -c num_cpu_cores -o output_dir
 
-DESCRIPTION - 
+DESCRIPTION - This program takes the quality filtered, demultiplexed, and adapter trimmed *.fastq input files and reference genome fasta input files as input. Converts the reference genome fasta file to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers. It then performs a BWA alignment to align the GBS fastq sequences to the reference genome. It then executes the pstacks program, which extracts sequence stacks that were aligned to the reference genome using the BWA alignment program and identifies SNPs. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
 
 OPTIONS:
 
--i gbs_fastq_dir -
+-i gbs_fastq_dir - The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 
--p project_name - 
+-t gbs_fastq_file_type - The fastq input file type. Default: gzfastq
+    
+-p project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 
--g refgen_infile -  
+-g refgen_infile - The absolute path to the reference genome input fasta file to align GBS fastq sequences using the BWA alignment program.
 
--c num_cpu_cores - 
+-l gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 
--o output_dir - 
+-d min_depth_coverage_pstacks - The minimum depth of coverage to report a stack. Default: 1
+
+-a alpha_value_pstacks - The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
+
+-c num_cpu_cores - The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+
+-o output_dir - The absolute path to the output directory to contain the renumerated reference genome, BWA, and Stacks output files and directories.
 
 USAGE
 }
@@ -82,7 +102,7 @@ unless(-d $refgen_output_dir){
       mkdir($refgen_output_dir, 0777) or die "Can't make directory: $!";
 }
 
-# Converts the reference genome to BWA input format and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers.
+# Converts the reference genome to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers.
 my ($refgen_fasta_outfile, $refgen_toc_outfile, $num_chromosomes) = convert_refgen_bwa_input_format($refgen_infile, $project_name, $refgen_output_dir);
 
 # Creates the BWA reference genome index file
@@ -94,7 +114,7 @@ unless(-d $bwa_output_dir){
       mkdir($bwa_output_dir, 0777) or die "Can't make directory: $!";
 }
 
-# Find all files in the specified directory with the extension *.fastq or *.fastq.qz.
+# Find all files in the processed GBS fastq file directory with the extension *.fastq or *.fastq.qz.
 my ($gbs_fastq_files, $gbs_fastq_file_count);
 if($gbs_fastq_file_type eq "gzfastq"){
 	($gbs_fastq_files, $gbs_fastq_file_count) = find_files($gbs_fastq_dir, "fastq.gz");
@@ -102,6 +122,7 @@ if($gbs_fastq_file_type eq "gzfastq"){
 	($gbs_fastq_files, $gbs_fastq_file_count) = find_files($gbs_fastq_dir, "fastq");
 }
 
+# Iterate through each GBS fastq file and perform an alignment to the reference genome using the BWA alignment program.
 foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	warn "Processing " . $file_name . ".....\n";
 	my $gbs_fastq_infile = $gbs_fastq_files->{$file_name};
@@ -113,20 +134,22 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	}
 
 	# Creates the BWA alignment file using the GBS fastq input file to align the fastq sequence reads to the reference genome.
-	my $bwa_alignment_outfile = bwa_aln($refgen_fasta_outfile, $gbs_fastq_infile, $project_name, $num_cpu_cores, $bwa_output_dir);
+	my $bwa_alignment_outfile = bwa_aln($refgen_fasta_outfile, $gbs_fastq_infile, $project_name, $num_threads, $bwa_output_dir);
 
 	# Creates the BWA single-ended alignment file in sam format using the GBS fastq input file to align the fastq sequence reads to the reference genome and the BWA aln format file.
 	my $bwa_aligned_master_outfile = bwa_samse($refgen_fasta_outfile, $gbs_fastq_infile, $project_name, $bwa_alignment_outfile, $bwa_output_dir);
 }
 
-
-# Create the padded sam file output directory if it doesn't already exist.
+# Create the padded sam alignment file output directory if it doesn't already exist.
 my $padded_sam_output_dir = join('/', $output_dir, "PADDED_SAM_OUTFILES");
 unless(-d $padded_sam_output_dir){
 	mkdir($padded_sam_output_dir, 0777) or die "Can't make directory: $!";
 }
-	
+
+# Find all the BWA sam alignment output files from the BWA alignment directory with the extension *.sam.
 my ($bwa_align_files, $bwa_align_file_count) = find_files($bwa_output_dir, "sam");
+
+# Iterate through each BWA sam alignment output file with extension *.sam and padd sequences with poly-Ns. If the sequence is aligned to the reference genome in the sense strand orientation padd the sequence on the 3' end. Otherwise the sequence is aligned to the reference genome in the antisense strand orientation padd the sequence on the 5' end.
 foreach my $file_name (sort keys %{$bwa_align_files}){
 	warn "Processing " . $file_name . ".....\n";
 	my $bwa_align_infile = $bwa_align_files->{$file_name};
@@ -139,49 +162,71 @@ unless(-d $stacks_output_dir){
 	mkdir($stacks_output_dir, 0777) or die "Can't make directory: $!";
 }
 
+# Find all padded sam alignment output files from the padded sam output output directory with the extension *.sam.
 my ($padded_sam_files, $padded_sam_file_count) = find_files($padded_sam_output_dir, "sam");
+
+# Iterate through each padded sam alignment output file with extension *.sam and execute the pstacks program.
 my $sql_id = 1;
 foreach my $file_name (sort keys %{$padded_sam_files}){
 	warn "Processing " . $file_name . ".....\n";
 	my $padded_sam_infile = $padded_sam_files->{$file_name};
-	
-	pstacks($padded_sam_infile, $sql_id, $min_depth_coverage_pstacks, $num_cpu_cores, $alpha_value_pstacks, $stacks_output_dir);
+    
+	# Execute the pstacks program, which extract stacks that have been aligned to a reference genome and identify SNPs. These stacks can then be processed with cstacks and sstacks.
+	pstacks($padded_sam_infile, $sql_id, $min_depth_coverage_pstacks, $num_threads, $alpha_value_pstacks, $stacks_output_dir);
 	
 	$sql_id++;
 }
 
-my $cstacks_file = cstacks($stacks_output_dir, $num_cpu_cores);
+# Execute the cstacks program to build a catalog from a set of samples processed by the pstacks program. The cstacks program creates a set of consensus loci, merging alleles together.
+my $cstacks_file = cstacks($stacks_output_dir, $num_threads);
 
+# Find all cstacks catalog tags output files from the stacks output directory with the extension *.tags.tsv.
 my ($pstacks_tags_files, $pstacks_tags_file_count) = find_files($stacks_output_dir, "tags.tsv");
+
+# Iterate through each catalog tags output file with extension *.tags.tsv and execute the sstacks program.
 foreach my $file_name (sort keys %{$pstacks_tags_files}){
-	if($file_name !~ m/batch_\d+\.catalog\.tags\.tsv/){
+	if($file_name !~ m/batch_\d+\.catalog\.tags\.tsv/){ # If *.tags.tsv file does not match batch_*.catalog.tags.tsv.
 		my $pstacks_tags_infile = $pstacks_tags_files->{$file_name};
 		
 		# Get the basename of the tags filename without the .tags.tsv extension.
 		my $pstacks_filename = fileparse($pstacks_tags_infile, qr/\.tags.tsv/);
-		
 		warn "Processing " . $pstacks_filename . ".....\n";
 		my $sstacks_infile = join('/', $stacks_output_dir, $pstacks_filename);
 		
-		sstacks($cstacks_file, $sstacks_infile, $num_cpu_cores, $stacks_output_dir);
+        # Execute the sstacks program. Sets of stacks constructed by the pstacks program is searched against the catalog produced by cstacks.
+		sstacks($cstacks_file, $sstacks_infile, $num_threads, $stacks_output_dir);
 	}
 }
 
+# convert_refgen_bwa_input_format($renum_refgen_fasta_infile, $project_name, $refgen_output_dir) - Converts the reference genome to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers.
+#
+# Input paramater(s):
+#
+# $renum_refgen_fasta_infile - The renumerated reference genome input fasta file.
+#
+# $project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
+#
+# $refgen_output_dir - The reference genome output directory.
 sub convert_refgen_bwa_input_format{
 
+    # The reference genome input fasta file.
 	my $refgen_fasta_infile = shift;
-	die "Error lost the reference genome fasta input file" unless defined $refgen_fasta_infile;
+	die "Error lost the reference genome input fasta file." unless defined $refgen_fasta_infile;
 	
+    # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 	my $project_name = shift;
 	die "Error lost the project name" unless defined $project_name;
 	
+    # The reference genome output directory.
 	my $refgen_output_dir = shift;
 	die "Error lost reference genome output directory" unless defined $refgen_output_dir;
 
+    # Format the renumerated fasta and table of contents .toc files.
 	my $refgen_fasta_filename = fileparse($refgen_fasta_infile);
 	my $refgen_fasta_outfile = join('/', $refgen_output_dir, join("_", $project_name, $refgen_fasta_filename . ".fasta"));
 	my $refgen_toc_outfile = join('/', $refgen_output_dir, join("_", $project_name, $refgen_fasta_filename . ".toc.txt"));
 	
+    # Generate the renumerated fasta and table of contents .toc files if the files are not already generated.
 	unless(-s $refgen_fasta_outfile and -s $refgen_toc_outfile){
 		warn "Converting $refgen_fasta_filename to BWA input format....\n\n";
 		my $seqio = Bio::SeqIO->new(-file => $refgen_fasta_infile, '-format' => 'Fasta');
@@ -236,19 +281,32 @@ sub convert_refgen_bwa_input_format{
 	return ($refgen_fasta_outfile, $refgen_toc_outfile, $num_chromosomes);
 }
 
+# bwa_index($renum_refgen_fasta_infile, $gbs_fastq_infile, $refgen_output_dir) - Executes the BWA alignment program using the index option to generate BWA index .amb .ann .bwt .pac .sa files from a renumerated reference genome file.
+#
+# Input paramater(s):
+#
+# $renum_refgen_fasta_infile - The renumerated reference genome input fasta file.
+#
+# $gbs_fastq_infile - The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
+#
+# $refgen_output_dir - The reference genome output directory that contains the .amb .ann .bwt .pac .sa index files.
+
 #bwa index -a bwtsw ./refgen/renumbered_Msequence.fasta
 sub bwa_index{
 
+    # The renumerated reference genome input fasta file.
 	my $renum_refgen_fasta_infile = shift;
-	die "Error lost the renumbered reference genome input file" unless defined $renum_refgen_fasta_infile;
+	die "Error lost the renumbered reference genome input fasta file" unless defined $renum_refgen_fasta_infile;
 
+    # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 	my $project_name = shift;
 	die "Error lost the project name" unless defined $project_name;
-        
+    
+    # The reference genome output directory that contains the .amb .ann .bwt .pac .sa index files.
 	my $refgen_output_dir = shift;
 	die "Error lost reference genome output directory" unless defined $refgen_output_dir;
 
-	# format the index file into .amb .ann .bwt .pac .sa files.
+	# Format the index file into .amb .ann .bwt .pac .sa files.
 	my ($renum_refgen_fastadbAMB, $renum_refgen_fastadbANN, $renum_refgen_fastadbBWT, $renum_refgen_fastadbPAC, $renum_refgen_fastadbSA);
 	$renum_refgen_fastadbAMB = $renum_refgen_fasta_infile . '.amb';
 	$renum_refgen_fastadbANN = $renum_refgen_fasta_infile . '.ann';
@@ -264,21 +322,44 @@ sub bwa_index{
 	}
 }
 
+# $bwa_alignment_outfile = bwa_samse($renum_refgen_fasta_infile, $gbs_fastq_infile, $project_name, $num_threads, $bwa_output_dir) - Executes the BWA alignment program using the aln option to generate BWA sai files from a renumerated reference genome and quality filtered and trimmed adapter GBS fastq input files.
+#
+# Input paramater(s):
+#
+# $renum_refgen_fasta_infile - The renumerated reference genome input fasta file.
+#
+# $gbs_fastq_infile - The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
+#
+# $project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
+#
+# $num_threads - The number of threads to use for BWA.
+#
+# $bwa_output_dir - The BWA alignment output directory that contains the sai alignment files.
+#
+# Output paramater(s):
+#
+# $bwa_alignment_outfile - The BWA sai alignment output file.
+
 #bwa aln -t 4 ./refgen/renumbered_Msequence.fasta ./mergedTagCounts/mpbGBSTags.cnt.fq > ./mergedTagCounts/AlignedGBSTags1.sai
 sub bwa_aln{
 
+    # The renumerated reference genome input fasta file.
 	my $renum_refgen_fasta_infile = shift;
-	die "Error lost the renumbered reference genome input file" unless defined $renum_refgen_fasta_infile;
-
+	die "Error lost the renumbered reference genome input fasta file" unless defined $renum_refgen_fasta_infile;
+    
+    # The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
 	my $gbs_fastq_infile = shift;
 	die "Error lost the GBS fastq input file" unless defined $gbs_fastq_infile;
 
+    # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 	my $project_name = shift;
 	die "Error lost the project name" unless defined $project_name;
+    
+	# The number of threads to use for BWA.
+	my $num_threads = shift;
+	die "Error lost the number of cores for BWA" unless defined $num_threads;
 
-	my $num_cpu_cores = shift;
-	die "Error lost the number of cores for BWA" unless defined $num_cpu_cores;
-
+    # The BWA alignment output directory that contains the sai alignment files.
 	my $bwa_output_dir = shift;
 	die "Error lost the bwa output directory" unless defined $bwa_output_dir;
 
@@ -286,35 +367,62 @@ sub bwa_aln{
 	my $gbs_fastq_filename = fileparse($gbs_fastq_infile, qr/\.fastq/);
 	
 	# Split the GBS fastq filename so that we can get the individual id.
-    	my @split_gbs_fastq_filename = split(/_/, $gbs_fastq_filename);
-    	my $individual_id = $split_gbs_fastq_filename[0];
-    	
+    my @split_gbs_fastq_filename = split(/_/, $gbs_fastq_filename);
+    my $individual_id = $split_gbs_fastq_filename[0];
+    
+    # Format the sai file.
 	my $bwa_alignment_outfile = join('/', $bwa_output_dir, join("_", $individual_id, $project_name . ".sai"));
 
+    # Execute the BWA alignment program if the SAI file is not already generated.
 	unless(-s $bwa_alignment_outfile){
 		warn "Generating the bwa alignment file.....\n\n";
-		my $bwaAlnCmd  = "$bwa aln -t $num_cpu_cores $renum_refgen_fasta_infile $gbs_fastq_infile > $bwa_alignment_outfile";
+		my $bwaAlnCmd  = "$bwa aln -t $num_threads $renum_refgen_fasta_infile $gbs_fastq_infile > $bwa_alignment_outfile";
 		warn $bwaAlnCmd . "\n\n";
 		system($bwaAlnCmd) == 0 or die "Error calling $bwaAlnCmd: $?";
 	}
+    
+    # Return the BWA sai alignment output file.
 	return $bwa_alignment_outfile;
 }
+
+# $bwa_aligned_master_outfile = bwa_samse($renum_refgen_fasta_infile, $gbs_fastq_infile, $project_name, $bwa_alignment_infile, $bwa_output_dir) - Executes the BWA alignment program using the samse option to generate sam alignment files from a renumerated reference genome, BWA sai, and quality filtered and trimmed adapter GBS fastq input files.
+# 
+# Input paramater(s):
+# 
+# $renum_refgen_fasta_infile - The renumerated reference genome input fasta file.
+# 
+# $gbs_fastq_infile - The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
+# 
+# $project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
+# 
+# $bwa_alignment_infile - The BWA alignment index input file.
+# 
+# $bwa_output_dir - The BWA alignment output directory that contains the sam alignment files.
+# 
+# Output paramater(s):
+# 
+# $bwa_aligned_master_outfile - The BWA sam alignment output file.
 
 #bwa samse ./refgen/renumbered_Msequence.fasta ./mergedTagCounts/AlignedGBSTags1.sai ./mergedTagCounts/mpbGBSTags.cnt.fq > mergedTagCounts/AlignedMasterTagsMPB.sam
 sub bwa_samse{
 
+    # The renumerated reference genome input fasta file.
 	my $renum_refgen_fasta_infile = shift;
 	die "Error lost the renumbered reference genome input file" unless defined $renum_refgen_fasta_infile;
 
+    # The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
 	my $gbs_fastq_infile = shift;
 	die "Error lost the GBS fastq input file" unless defined $gbs_fastq_infile;
 
+    # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 	my $project_name = shift;
 	die "Error lost the project name" unless defined $project_name;
 
+    # The BWA alignment index input file.
 	my $bwa_alignment_infile = shift;
 	die "Error lost the BWA SAI formatted alignment (.sai) file" unless defined $bwa_alignment_infile;
 
+    # The BWA alignment output directory that contains the sam alignment files.
 	my $bwa_output_dir = shift;
 	die "Error lost the bwa output directory" unless defined $bwa_output_dir;
 
@@ -322,9 +430,10 @@ sub bwa_samse{
 	my $gbs_fastq_filename = fileparse($gbs_fastq_infile, qr/\.fastq/);
 	
 	# Split the GBS fastq filename so that we can get the individual id.
-    	my @split_gbs_fastq_filename = split(/_/, $gbs_fastq_filename);
-    	my $individual_id = $split_gbs_fastq_filename[0];
+    my @split_gbs_fastq_filename = split(/_/, $gbs_fastq_filename);
+    my $individual_id = $split_gbs_fastq_filename[0];
 
+    # Execute the BWA alignment program if the sam alignment file is not already generated.
 	my $bwa_aligned_master_outfile = join('/', $bwa_output_dir, join("_", $individual_id, $project_name . ".sam"));
 	unless(-s $bwa_aligned_master_outfile){
 		warn "Generating the bwa sam file.....\n\n";
@@ -332,20 +441,33 @@ sub bwa_samse{
 		warn $bwaSamseCmd . "\n\n";
 		system($bwaSamseCmd) == 0 or die "Error calling $bwaSamseCmd: $?";
 	}
+    
+    # The BWA sam alignment output file.
 	return $bwa_aligned_master_outfile;
 }
 
+
+# bwa_pad_sam_files($sam_infile, $padded_sam_output_dir) - Pads the BWA sam alignment files with poly-Ns so that all sequences are of uniform length.
+# 
+# Input paramater(s):
+# 
+# $sam_infile - The unpadded BWA sam alignment input file.
+# 
+# $padded_sam_output_dir - The output directory that contains all the BWA sam alignment files.
 sub bwa_pad_sam_files{
 
+    # The unpadded BWA sam alignment input file.
 	my $sam_infile = shift;
 	die "Error lost the sam input file" unless defined $sam_infile;
 
+    # The output directory that contains all the BWA sam alignment files.
 	my $padded_sam_output_dir = shift;
 	die "Error lost the padded sam output file directory" unless defined $padded_sam_output_dir;
 	
 	# Get the basename of the sam filename without the .sam extension.
 	my $sam_filename = fileparse($sam_infile, qr/\.sam/);
 	
+    # Generate the padded sam output file if the file is not already generated.
 	my $padded_sam_outfile = join('/', $padded_sam_output_dir, $sam_filename . ".sam");
 	unless(-s $padded_sam_outfile){
 		open(PADDED_SAM_OUTFILE, ">$padded_sam_outfile") or die "Couldn't open file $padded_sam_outfile for writting, $!";
@@ -364,6 +486,8 @@ sub bwa_pad_sam_files{
 				my $fastq_quality_scores_length = length($fastq_quality_scores);
 # 				die join("\t", $fastq_sequence_length, $fastq_header, $bam_bitwise_flag, $fastq_sequence, $fastq_quality_scores);
 				if(($fastq_sequence_length ne $gbs_sequence_length) and ($fastq_quality_scores_length ne $gbs_sequence_length)){
+                    
+                    # Get the number of poly-Ns to pad.
 					my $padded_nucleotide_length =  ($gbs_sequence_length - $fastq_sequence_length);
 					my $padded_nucleotide_seq = 'N' x $padded_nucleotide_length;
 					
@@ -376,6 +500,7 @@ sub bwa_pad_sam_files{
 					# Pad sequence if aligned to antisense strand.
 					$padded_fastq_sequence = join("", $padded_nucleotide_seq, $fastq_sequence) if(($bam_bitwise_flag eq 16) or ($bam_bitwise_flag eq 20));
 					
+                    # Get the number of quality scores to pad.
 					my $padded_score_length =  ($gbs_sequence_length - $fastq_quality_scores_length);
 					my $padded_score_seq = '#' x $padded_score_length;
 					
@@ -411,42 +536,102 @@ sub bwa_pad_sam_files{
 
 }
 
+# pstacks($sam_infile, $sql_id, $min_depth_coverage, $num_threads, $alpha_value) - Executes the pstacks program in the Stacks Software Suite.
+# 
+# Input paramater(s):
+# 
+# $sam_infile - The padded sam alignment input file.
+#
+# $sql_id - The SQL ID to insert into the output to identify this sample.
+#
+# $min_depth_coverage - The minimum depth of coverage to report a stack.
+#
+# $num_threads - The number of threads to use for pstacks.
+#
+# $alpha_value - The chi square significance level required to call a heterozygote or homozygote.
+
 # pstacks -t sam -f ../PADDED_SAM_OUTFILES/LL-06_MPB-MALE-GBS.sam -o .. -i 1 -m 1 -p 7 --model_type snp --alpha 0.05
 sub pstacks{
 
+    # The padded sam alignment input file.
 	my $sam_infile = shift;
-	die "Error lost the sam input file" unless defined $sam_infile;
+	die "Error lost the sam alignment input file" unless defined $sam_infile;
 	
+    # The SQL ID to insert into the output to identify this sample.
 	my $sql_id = shift;
 	die "Error lost the SQL ID to insert into the output to identify this sample" unless defined $sql_id;
 	
+    # The minimum depth of coverage to report a stack.
 	my $min_depth_coverage = shift;
 	die "Error lost the minimum depth of coverage to report a stack" unless defined $min_depth_coverage;
 	
-	my $num_cpu_cores = shift;
-	die "Error lost the number of cores for stacks" unless defined $num_cpu_cores;
+    # The number of threads to use for pstacks.
+	my $num_threads = shift;
+	die "Error lost the number of cores for stacks" unless defined $num_threads;
 	
+    # The chi square significance level required to call a heterozygote or homozygote.
 	my $alpha_value = shift;
 	die "Error lost the chi square significance level required to call a heterozygote or homozygote" unless defined $alpha_value; 
 	
+    # The stacks output directory that contains the results from the pstacks program.
 	my $stacks_output_dir = shift;
 	die "Error lost the stacks output file directory" unless defined $stacks_output_dir;
 	
 	# Get the basename of the sam filename without the .sam extension.
 	my $sam_filename = fileparse($sam_infile, qr/\.sam/);
 	
+    # Format the pstacks individual alleles, snps, and tags output files.
 	my ($pstacks_alleles_file, $pstacks_snps_file, $pstacks_tags_file);
 	$pstacks_alleles_file = join('/', $stacks_output_dir, $sam_filename . '.alleles.tsv');
 	$pstacks_snps_file = join('/', $stacks_output_dir, $sam_filename . '.snps.tsv');
 	$pstacks_tags_file = join('/', $stacks_output_dir, $sam_filename . '.tags.tsv');
 	
+    #### USED PARAMETERS ####
+    # t — input file Type. Supported types: bowtie, sam, or bam.
+    # f — input file path.
+    # o — output path to write results.
+    # i — SQL ID to insert into the output to identify this sample.
+    # m — minimum depth of coverage to report a stack (default 1).
+    # p — enable parallel execution with num_threads threads.
+    
+    # Model options:
+    
+    # --model_type [type] — either 'snp' (default), 'bounded', or 'fixed'
+    
+    # For the SNP or Bounded SNP model:
+    
+    # --alpha [num] — chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05 (default), 0.01, or 0.001.
+    
+    #### NOT USED PARAMETERS ####
+    # h — display this help messsage.
+    
+    # For the Bounded SNP model:
+    # --bound_low [num] — lower bound for epsilon, the error rate, between 0 and 1.0 (default 0).
+    # --bound_high [num] — upper bound for epsilon, the error rate, between 0 and 1.0 (default 1).
+
+    # For the Fixed model:
+    # --bc_err_freq [num] — specify the barcode error frequency, between 0 and 1.0.
+    
+    # Execute the pstacks program if the pstacks alleles, snps, and tags output files are not already generated.
 	unless(-s $pstacks_alleles_file and -s $pstacks_snps_file and -s $pstacks_tags_file){
 		warn "Executing pstacks.....\n\n";
-		my $pstacksCmd  = "$pstacks -t sam -f $sam_infile -o $stacks_output_dir -i $sql_id -m $min_depth_coverage -p $num_cpu_cores --model_type snp --alpha $alpha_value";
+		my $pstacksCmd  = "$pstacks -t sam -f $sam_infile -o $stacks_output_dir -i $sql_id -m $min_depth_coverage -p $num_threads --model_type snp --alpha $alpha_value";
 		warn $pstacksCmd . "\n\n";
 		system($pstacksCmd) == 0 or die "Error calling $pstacksCmd: $?";
 	}
 }
+
+# cstacks($stacks_input_dir, $num_threads) - Executes the cstacks program in the Stacks Software Suite.
+# 
+# Input paramater(s):
+# 
+# $stacks_input_dir - The stacks directory that contains the results from the pstacks program.
+# 
+# $num_threads - The number of threads to use for sstacks.
+# 
+# Output paramater(s):
+# 
+# $cstacks_file - The cstacks output file prefix for the tab-delmited catalog alleles, snps, and tags files.
 
 # cstacks -b 1 -o /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES -g -p 7 \
 # -s /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES/LL-06_MPB-MALE-GBS \
@@ -463,78 +648,152 @@ sub pstacks{
 # -s /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES/RR-45_MPB-MALE-GBS
 sub cstacks{
 
+    # The stacks directory that contains the results from the pstacks program.
 	my $stacks_input_dir = shift;
-	die "Error lost the padded sam output file directory" unless defined $stacks_input_dir;
+	die "Error lost the stacks input directory" unless defined $stacks_input_dir;
+    
+	# The number of threads to use for cstacks.
+	my $num_threads = shift;
+	die "Error lost the number of threads to use for cstacks" unless defined $num_threads;
 	
-	my $num_cpu_cores = shift;
-	die "Error lost the number of cores for stacks" unless defined $num_cpu_cores;
-	
+    # The cstacks batch file prefix file path.
 	my $cstacks_file = join('/', $stacks_output_dir, "batch_1");
 	
+    # The cstacks catalog alleles, snps, and tags file paths.
 	my ($cstacks_alleles_file, $cstacks_snps_file, $cstacks_tags_file);
 	$cstacks_alleles_file = $cstacks_file . '.catalog.alleles.tsv';
 	$cstacks_snps_file = $cstacks_file . '.catalog.snps.tsv';
 	$cstacks_tags_file = $cstacks_file . '.catalog.tags.tsv';
 	
+    # Execute the cstacks program if the following files are not already generated.
 	unless(-s $cstacks_alleles_file and -s $cstacks_snps_file and -s $cstacks_tags_file){
 	
+        # Find all pstacks tags output files from the stacks output directory with the extension *.tags.tsv.
 		my ($pstacks_tags_files, $pstacks_tags_file_count) = find_files($stacks_input_dir, "tags.tsv");
 		my @cstacks_soptions = ();
+        # Iterate through each pstacks tags output file with extension *.tags.tsv and execute the cstacks program.
 		foreach my $file_name (sort keys %{$pstacks_tags_files}){
 			my $pstacks_tags_infile = $pstacks_tags_files->{$file_name};
 			
 			# Get the basename of the tags filename without the .tags.tsv extension.
 			my $pstacks_filename = fileparse($pstacks_tags_infile, qr/\.tags.tsv/);
 			
+            # Obtain a list of all the file prefix paths specifed by the -s option for cstacks.
 			warn "Processing " . $pstacks_filename . ".....\n";
 			my $cstacks_infile = join('/', $stacks_input_dir, $pstacks_filename);
 			push(@cstacks_soptions, "-s $cstacks_infile ");
 		}
 		
+        #### USED PARAMETERS ####
+        # b — MySQL ID of this batch.
+        # o — output path to write results.
+        # s — TSV file from which to load radtags.
+        # g — base catalog matching on genomic location, not sequence identity.
+        # p — enable parallel execution with num_threads threads.
+        
+        #### NOT USED PARAMETERS ####
+        # m — include tags in the catalog that match to more than one entry.
+        # n — number of mismatches allowed between sample tags when generating the catalog.
+        # h — display this help messsage.
+        
+        # Catalog editing:
+        # --catalog [path] — provide the path to an existing catalog. cstacks will add data to this existing catalog.
+        
+        # Advanced options:
+        # --report_mmatches — report query loci that match more than one catalog locus.
+
 		warn "Executing cstacks.....\n\n";
 		my $cstacks_joined_soptions = join("\\\n", @cstacks_soptions);
-		my $cstacksCmd  = "$cstacks -b 1 -o $stacks_output_dir -g -p $num_cpu_cores \\\n $cstacks_joined_soptions";
+		my $cstacksCmd  = "$cstacks -b 1 -o $stacks_output_dir -g -p $num_threads \\\n $cstacks_joined_soptions";
 		warn $cstacksCmd . "\n\n";
 		system($cstacksCmd) == 0 or die "Error calling $cstacksCmd: $?";
 	}
 	
+    # Returns the cstacks batch file prefix file path.
 	return $cstacks_file;
 }
 
+# sstacks($stacks_catalog_infile, $stacks_sample_infile, $num_threads, $stacks_output_dir) - Executes the sstacks program in the Stacks Software Suite.
+# 
+# Input paramater(s):
+# 
+# $stacks_catalog_infile - The stacks catalog input batch_*.catalog.*.tsv file from which to load the catalog GBS-Tags.
+# 
+# $stacks_sample_infile - The stacks sample input *.tags.tsv file from which to load sample GBS-Tags.
+# 
+# $num_threads - The number of threads to use for sstacks.
+# 
+# $stacks_output_dir - The stacks output file directory that contains all the results files generated by sstacks.
 sub sstacks{
-
+    
+    # The stacks catalog input batch_*.catalog.*.tsv file from which to load the catalog GBS-Tags.
 	my $stacks_catalog_infile = shift;
-	die "Error lost the stacks catalog input file directory" unless defined $stacks_catalog_infile;
-	
+	die "Error lost the stacks catalog input file" unless defined $stacks_catalog_infile;
+    
+	# The stacks sample input *.tags.tsv file from which to load sample GBS-Tags.
 	my $stacks_sample_infile = shift;
-	die "Error lost the stacks sample input file directory" unless defined $stacks_sample_infile;
+	die "Error lost the stacks sample input file" unless defined $stacks_sample_infile;
 	
-	my $num_cpu_cores = shift;
-	die "Error lost the number of cores for stacks" unless defined $num_cpu_cores;
+    # The number of threads to use for sstacks.
+	my $num_threads = shift;
+	die "Error lost the number of threads to use for sstacks" unless defined $num_threads;
 	
+    # The stacks output file directory that contains all the results files generated by sstacks.
 	my $stacks_output_dir = shift;
-	die "Error lost the stacks output file directory" unless defined $stacks_output_dir;
+	die "Error lost the stacks output file directory that contains all files generated by sstacks" unless defined $stacks_output_dir;
 	
  	# Get the basename of the sam filename without the .sam extension.
  	my $stacks_sample_filename = fileparse($stacks_sample_infile, qr//);
 
+    # The sstacks output matches file.
  	my $sstacks_matches_file = join('/', $stacks_output_dir, $stacks_sample_filename . '.matches.tsv');
-	
+    
+    #### USED PARAMETERS ####
+    # b — MySQL ID of this batch.
+    # c — TSV file from which to load the catalog RAD-Tags.
+    # s — TSV file from which to load sample RAD-Tags.
+    # o — output path to write results.
+    # g — base matching on genomic location, not sequence identity.
+    # p — enable parallel execution with num_threads threads.
+    
+    #### NOT USED PARAMETERS ####
+    # r — Load the TSV file of a single sample instead of a catalog.
+    # x — don’t verify haplotype of matching locus.
+    # v — print program version.
+    # h — display this help messsage.
+
+    # Execute the sstacks program if the matches sstacks results files are not already generated.
 	unless(-s $sstacks_matches_file){
 		warn "Executing sstacks.....\n\n";
-		my $sstacksCmd  = "$sstacks -b 1 -c $stacks_catalog_infile -s $stacks_sample_infile -o $stacks_output_dir -g -p $num_cpu_cores";
+		my $sstacksCmd  = "$sstacks -b 1 -c $stacks_catalog_infile -s $stacks_sample_infile -o $stacks_output_dir -g -p $num_threads";
 		warn $sstacksCmd . "\n\n";
 		system($sstacksCmd) == 0 or die "Error calling $sstacksCmd: $?";
 	}
 }
 
+# (\%files, $file_counter) = find_files($infile_dir) - Find all files in the specified input file directory with the file extension *.suffix.
+# 
+# Input paramater(s):
+# 
+# $infile_dir - The iinput file directory.
+# 
+# $suffix - The file extension suffix.
+# 
+# Output paramater(s):
+# 
+# \%files - A hash reference containing all the files with file extension *.suffix in key/value pairs.
+# 
+# key => filename ( e.g. filename.suffix )
+# value => absolue filepath ( e.g. /path/to/filename.suffix )
+# 
+# $file_count - The number of files stored with file extension *.suffix.
 sub find_files{
     
 	my $infile_dir = shift;
 	die "Error lost input file directory" unless defined $infile_dir;
 	
 	my $suffix = shift;
-	die "Error lost file extension suffix directory" unless defined $suffix;
+	die "Error lost file extension suffix" unless defined $suffix;
 	
 	my %files = ();
 	my $file_counter = 0;
@@ -549,7 +808,15 @@ sub find_files{
 	return (\%files, $file_counter);
 }
 
-# execute the gunzip program to uncompress the compressed fastq file.
+# $output_dir = gunzip_fastq_file($fastq_file) - Execute the gunzip program to uncompress the compressed fastq file.
+# 
+# Input paramater(s):
+# 
+# $fastq_file - The fastq file to compress using gunzip.
+# 
+# Output paramater(s):
+# 
+# $uncompressed_fastq_file - The uncompressed fastq file path.
 sub gunzip_fastq_file{
 	
 	my $fastq_file = shift;
