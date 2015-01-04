@@ -6,41 +6,56 @@ use Getopt::Long;
 use Bio::SeqIO;
 use File::Basename;
 
+# unique_stacks_analysis_pipeline.pl - Program that aligns quality filtered, demultiplexed, and adapter trimmed GBS data sequences into exactly-matching stacks. Comparing the stacks it will form a set of loci and detect SNPs at each locus using a maximum likelihood framework. Runs the Stacks unique pipeline using the ustacks, cstacks, and sstacks programs of the Stacks Software Suite.
+
+#### DESCRIPTION ####
+
+# This program takes the quality filtered, demultiplexed, and adapter trimmed GBS *.fastq files as input. It executes the ustacks program, which extracts sequence stacks using a denovo assembly approach to form exact matching stacks. Comparing the stacks it will form a set of loci and detect SNPs at each locus using a maximum likelihood framework. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
+
+#### SAMPLE COMMAND ####
 # perl unique_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/CHRISTIANNE_MCDONALD/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p POLYGONIA -c 7 -o ~/workspace/GBS_data-08-10-2013/CHRISTIANNE_MCDONALD_POLYGONIA
-my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $alpha_value_ustacks, $max_locus_stacks, $num_cpu_cores, $output_dir);
+my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $alpha_value_ustacks, $max_locus_stacks, $num_threads, $output_dir);
 
 GetOptions(
-	'i=s'    => \$gbs_fastq_dir,
-	't=s'    => \$gbs_fastq_file_type,
-	'p=s'    => \$project_name,
-	'd=s'    => \$min_depth_coverage_ustacks,
-	'm=s'    => \$max_nuc_distance_ustacks,
-	'n=s'    => \$max_align_distance_ustacks,
+	'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+	't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Default: gzfastq
+	'p=s'    => \$project_name, # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
+	'd=s'    => \$min_depth_coverage_ustacks, # The minimum depth of coverage to report a stack. Default: 2
+	'm=s'    => \$max_nuc_distance_ustacks, # The maximum distance (in nucleotides) allowed between stacks. Default: 2
+    'n=s'    => \$max_align_distance_ustacks, # The maximum distance allowed to align secondary reads to primary stacks. Default: ($max_nuc_distance_ustacks + 2)
 	'a=s'    => \$alpha_value_ustacks,
-	'l=s'    => \$max_locus_stacks,
-	'c=s'    => \$num_cpu_cores,
-	'o=s'    => \$output_dir,
+    'l=s'    => \$max_locus_stacks, # The maximum number of stacks at a single de novo locus. Default: 3
+	'c=s'    => \$num_threads, # The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+	'o=s'    => \$output_dir, # The absolute path to the output directory to contain the Stacks output files and directories.
 );
 
+# Print usage message if the following input parameters are not specified.
 usage() unless (
 	defined $gbs_fastq_dir
 	and defined $project_name
 	and defined $output_dir
 );
 
+# The fastq input file type. Default: gzfastq
 $gbs_fastq_file_type = 'gzfastq' unless defined $gbs_fastq_file_type;
 
+# The minimum depth of coverage to report a stack. Default: 2
 $min_depth_coverage_ustacks = 2 unless defined $min_depth_coverage_ustacks;
 
+# The maximum distance (in nucleotides) allowed between stacks. Default: 2
 $max_nuc_distance_ustacks = 2 unless defined $max_nuc_distance_ustacks;
 
+# The maximum distance allowed to align secondary reads to primary stacks. Default: ($max_nuc_distance_ustacks + 2)
 $max_align_distance_ustacks = ($max_nuc_distance_ustacks + 2) unless defined $max_align_distance_ustacks;
 
+# The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 $alpha_value_ustacks = 0.05 unless defined $alpha_value_ustacks;
 
+# The maximum number of stacks at a single de novo locus. Default: 3
 $max_locus_stacks = 3 unless defined $max_locus_stacks;
 
-$num_cpu_cores = 2 unless defined $num_cpu_cores;
+# The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+$num_threads = 2 unless defined $num_threads;
 
 # Program dependencies - The absolute paths to gunzip to uncompress bulk compressed fastq.gz input file if present and stacks related programs.
 my ($gunzip, $ustacks, $cstacks, $sstacks);
@@ -54,22 +69,32 @@ sub usage {
 die <<"USAGE";
 
 
-Usage: $0 -i gbs_fastq_dir -p project_name -g refgen_infile -c num_cpu_cores -o output_dir
+Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -p project_name -d min_depth_coverage_pstacks -m max_nuc_distance_ustacks -n max_align_distance_ustacks -a alpha_value_ustacks -l max_locus_stacks -c num_threads -o output_dir
 
-DESCRIPTION - 
+DESCRIPTION - This program takes the quality filtered, demultiplexed, and adapter trimmed GBS *.fastq files as input. It executes the ustacks program, which extracts sequence stacks using a denovo assembly approach to form exact matching stacks. Comparing the stacks it will form a set of loci and detect SNPs at each locus using a maximum likelihood framework. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
 
 OPTIONS:
 
--i gbs_fastq_dir -
+-i gbs_fastq_dir - The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 
--p project_name - 
+-t gbs_fastq_file_type - The fastq input file type. Default: gzfastq
 
--g refgen_infile -  
+-p project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 
--c num_cpu_cores - 
+-d min_depth_coverage_pstacks - The minimum depth of coverage to report a stack. Default: 2
 
--o output_dir - 
+-m max_nuc_distance_ustacks - Maximum distance (in nucleotides) allowed between stacks. Default: 2
+    
+-n max_align_distance_ustacks - The maximum distance allowed to align secondary reads to primary stacks. Default: ($max_nuc_distance_ustacks + 2)
+    
+-a alpha_value_ustacks - The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 
+-l max_locus_stacks - The maximum number of stacks at a single de novo locus. Default: 3
+    
+-c num_threads - The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+
+-o output_dir - The absolute path to the output directory to contain the Stacks output files and directories.
+    
 USAGE
 }
 
@@ -77,7 +102,6 @@ USAGE
 unless(-d $output_dir){
       mkdir($output_dir, 0777) or die "Can't make directory: $!";
 }
-
 
 # Create the stacks output directory if it doesn't already exist.
 my $stacks_output_dir = join('/', $output_dir, "STACKS_OUTFILES");
@@ -93,6 +117,7 @@ if($gbs_fastq_file_type eq "gzfastq"){
 	($gbs_fastq_files, $gbs_fastq_file_count) = find_files($gbs_fastq_dir, "fastq");
 }
 
+# Iterate through each GBS fastq file and execute the ustacks program, which extracts exact-matching stacks and detects SNPs at each locus using a maximum likelihood framework.
 my $sql_id = 1;
 foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	warn "Processing " . $file_name . ".....\n";
@@ -104,74 +129,124 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 		$gbs_fastq_infile = $uncompressed_fastq_file;
 	}
 	
+    # Execute the ustacks program, which extracts exact-matching stacks and detects SNPs at each locus using a maximum likelihood framework.
 	ustacks($gbs_fastq_infile, $sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, 
-		$num_cpu_cores, $alpha_value_ustacks, $max_locus_stacks, $stacks_output_dir);
+		$num_threads, $alpha_value_ustacks, $max_locus_stacks, $stacks_output_dir);
 	
 	$sql_id++;
 }
 
-my $cstacks_file = cstacks($stacks_output_dir, $num_cpu_cores);
+# Execute the cstacks program to build a catalog from a set of samples processed by the pstacks program. The cstacks program creates a set of consensus loci, merging alleles together.
+my $cstacks_file = cstacks($stacks_output_dir, $num_threads);
 
+# Find all cstacks catalog tags output files from the stacks output directory with the extension *.tags.tsv.
 my ($ustacks_tags_files, $ustacks_tags_file_count) = find_files($stacks_output_dir, "tags.tsv");
+
+# Iterate through each catalog tags output file with extension *.tags.tsv and execute the sstacks program.
 foreach my $file_name (sort keys %{$ustacks_tags_files}){
-	if($file_name !~ m/batch_\d+\.catalog\.tags\.tsv/){
+	if($file_name !~ m/batch_\d+\.catalog\.tags\.tsv/){ # If *.tags.tsv file does not match batch_*.catalog.tags.tsv.
 		my $ustacks_tags_infile = $ustacks_tags_files->{$file_name};
 		
 		# Get the basename of the tags filename without the .tags.tsv extension.
 		my $ustacks_filename = fileparse($ustacks_tags_infile, qr/\.tags.tsv/);
-		
 		warn "Processing " . $ustacks_filename . ".....\n";
 		my $sstacks_infile = join('/', $stacks_output_dir, $ustacks_filename);
 		
-		sstacks($cstacks_file, $sstacks_infile, $num_cpu_cores, $stacks_output_dir);
+        # Execute the sstacks program. Sets of stacks constructed by the pstacks program is searched against the catalog produced by cstacks.
+		sstacks($cstacks_file, $sstacks_infile, $num_threads, $stacks_output_dir);
 	}
 }
+
+# ustacks($fastq_infile, $sql_id, $min_depth_coverage, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $num_threads, $alpha_value, $max_locus_stacks, $stacks_output_dir) - Executes the ustacks program in the Stacks Software Suite.
+#
+# Input paramater(s):
+#
+# $fastq_infile - The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
+#
+# $sql_id - The SQL ID to insert into the output to identify this sample.
+#
+# $min_depth_coverage - The minimum depth of coverage to report a stack.
+#
+# $max_nuc_distance_ustacks - The maximum distance (in nucleotides) allowed between stacks.
+#
+# $max_align_distance_ustacks - The maximum distance (in nucleotides) allowed between stacks.
+#
+# $num_threads - The number of threads to use for ustacks.
+#
+# $alpha_value - The chi square significance level required to call a heterozygote or homozygote.
+#
+# $max_locus_stacks - The maximum number of stacks at a single de novo locus.
+#
+# $stacks_output_dir - The stacks output directory that contains the results from the pstacks program.
 
 # ustacks -t fastq -f ./samples/f0_male.fq -o ./stacks -i 1 -d -r -m 3 -p 15
 sub ustacks{
 
+    # The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
 	my $fastq_infile = shift;
-	die "Error lost the input file" unless defined $fastq_infile;
+	die "Error lost the GBS fastq input file" unless defined $fastq_infile;
 	
+    # The SQL ID to insert into the output to identify this sample.
 	my $sql_id = shift;
 	die "Error lost the SQL ID to insert into the output to identify this sample" unless defined $sql_id;
 	
+    # The minimum depth of coverage to report a stack.
 	my $min_depth_coverage = shift;
 	die "Error lost the minimum depth of coverage to report a stack" unless defined $min_depth_coverage;
 	
+    # The maximum distance (in nucleotides) allowed between stacks.
 	my $max_nuc_distance_ustacks = shift;
 	die "Error lost the maximum distance (in nucleotides) allowed between stacks" unless defined $max_nuc_distance_ustacks;
 
+    # The maximum distance allowed to align secondary reads to primary stacks.
 	my $max_align_distance_ustacks = shift;
 	die "Error lost the maximum distance allowed to align secondary reads to primary stacks" unless defined $max_align_distance_ustacks;
 
-	my $num_cpu_cores = shift;
-	die "Error lost the number of cores for stacks" unless defined $num_cpu_cores;
+    # The number of threads to use for ustacks.
+	my $num_threads = shift;
+	die "Error lost the number of threads to use for ustacks" unless defined $num_threads;
 	
+    # The chi square significance level required to call a heterozygote or homozygote.
 	my $alpha_value = shift;
 	die "Error lost the chi square significance level required to call a heterozygote or homozygote" unless defined $alpha_value;
 	
+    # The maximum number of stacks at a single de novo locus.
 	my $max_locus_stacks = shift;
 	die "Error lost the maximum number of stacks at a single de novo locus" unless defined $max_locus_stacks; 
 	
+    # The stacks output directory that contains the results from the pstacks program.
 	my $stacks_output_dir = shift;
 	die "Error lost the stacks output file directory" unless defined $stacks_output_dir;
 	
 	# Get the basename of the fastq filename without the .fastq extension.
 	my $fastq_filename = fileparse($fastq_infile, qr/\.fastq/);
 	
+    # Format the ustacks individual alleles, snps, and tags output files.
 	my ($ustacks_alleles_file, $ustacks_snps_file, $ustacks_tags_file);
 	$ustacks_alleles_file = join('/', $stacks_output_dir, $fastq_filename . '.alleles.tsv');
 	$ustacks_snps_file = join('/', $stacks_output_dir, $fastq_filename . '.snps.tsv');
 	$ustacks_tags_file = join('/', $stacks_output_dir, $fastq_filename . '.tags.tsv');
 	
+    # Execute the ustacks program if the pstacks alleles, snps, and tags output files are not already generated.
 	unless(-s $ustacks_alleles_file and -s $ustacks_snps_file and -s $ustacks_tags_file){
 		warn "Executing ustacks.....\n\n";
-		my $ustacksCmd  = "$ustacks -t fastq -f $fastq_infile -o $stacks_output_dir -i $sql_id -m $min_depth_coverage -M $max_nuc_distance_ustacks -N $max_align_distance_ustacks -p $num_cpu_cores -d -r -R --model_type snp --alpha $alpha_value --max_locus_stacks $max_locus_stacks";
+		my $ustacksCmd  = "$ustacks -t fastq -f $fastq_infile -o $stacks_output_dir -i $sql_id -m $min_depth_coverage -M $max_nuc_distance_ustacks -N $max_align_distance_ustacks -p $num_threads -d -r -R --model_type snp --alpha $alpha_value --max_locus_stacks $max_locus_stacks";
 		warn $ustacksCmd . "\n\n";
 		system($ustacksCmd) == 0 or die "Error calling $ustacksCmd: $?";
 	}
 }
+
+# cstacks($stacks_input_dir, $num_threads) - Executes the cstacks program in the Stacks Software Suite.
+#
+# Input paramater(s):
+#
+# $stacks_input_dir - The stacks directory that contains the results from the pstacks program.
+#
+# $num_threads - The number of threads to use for sstacks.
+#
+# Output paramater(s):
+#
+# $cstacks_file - The cstacks output file prefix for the tab-delmited catalog alleles, snps, and tags files.
 
 # cstacks -b 1 -o /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES -g -p 7 \
 # -s /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES/LL-06_MPB-MALE-GBS \
@@ -188,76 +263,150 @@ sub ustacks{
 # -s /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES/RR-45_MPB-MALE-GBS
 sub cstacks{
 
+    # The stacks directory that contains the results from the pstacks program.
 	my $stacks_input_dir = shift;
 	die "Error lost the padded sam output file directory" unless defined $stacks_input_dir;
 	
-	my $num_cpu_cores = shift;
-	die "Error lost the number of cores for stacks" unless defined $num_cpu_cores;
+    # The number of threads to use for cstacks.
+	my $num_threads = shift;
+	die "Error lost the number of cores for stacks" unless defined $num_threads;
 	
+    # The cstacks batch file prefix file path.
 	my $cstacks_file = join('/', $stacks_output_dir, "batch_1");
 	
+    # The cstacks catalog alleles, snps, and tags file paths.
 	my ($cstacks_alleles_file, $cstacks_snps_file, $cstacks_tags_file);
 	$cstacks_alleles_file = $cstacks_file . '.catalog.alleles.tsv';
 	$cstacks_snps_file = $cstacks_file . '.catalog.snps.tsv';
 	$cstacks_tags_file = $cstacks_file . '.catalog.tags.tsv';
 	
+    # Execute the cstacks program if the following files are not already generated.
 	unless(-s $cstacks_alleles_file and -s $cstacks_snps_file and -s $cstacks_tags_file){
 	
+        # Find all ustacks tags output files from the stacks output directory with the extension *.tags.tsv.
 		my ($ustacks_tags_files, $ustacks_tags_file_count) = find_files($stacks_input_dir, "tags.tsv");
 		my @cstacks_soptions = ();
+        # Iterate through each ustacks tags output file with extension *.tags.tsv and execute the cstacks program.
 		foreach my $file_name (sort keys %{$ustacks_tags_files}){
 			my $ustacks_tags_infile = $ustacks_tags_files->{$file_name};
 			
 			# Get the basename of the tags filename without the .tags.tsv extension.
 			my $ustacks_filename = fileparse($ustacks_tags_infile, qr/\.tags.tsv/);
 			
+            # Obtain a list of all the file prefix paths specifed by the -s option for cstacks.
 			warn "Processing " . $ustacks_filename . ".....\n";
 			my $cstacks_infile = join('/', $stacks_input_dir, $ustacks_filename);
 			push(@cstacks_soptions, "-s $cstacks_infile ");
 		}
 		
+        #### USED PARAMETERS ####
+        # b — MySQL ID of this batch.
+        # o — output path to write results.
+        # s — TSV file from which to load radtags.
+        # p — enable parallel execution with num_threads threads.
+        
+        #### NOT USED PARAMETERS ####
+        # g — base catalog matching on genomic location, not sequence identity.
+        # m — include tags in the catalog that match to more than one entry.
+        # n — number of mismatches allowed between sample tags when generating the catalog.
+        # h — display this help messsage.
+        
+        # Catalog editing:
+        # --catalog [path] — provide the path to an existing catalog. cstacks will add data to this existing catalog.
+        
+        # Advanced options:
+        # --report_mmatches — report query loci that match more than one catalog locus.
 		warn "Executing cstacks.....\n\n";
 		my $cstacks_joined_soptions = join("\\\n", @cstacks_soptions);
-		my $cstacksCmd  = "$cstacks -b 1 -o $stacks_output_dir -p $num_cpu_cores \\\n $cstacks_joined_soptions";
+		my $cstacksCmd  = "$cstacks -b 1 -o $stacks_output_dir -p $num_threads \\\n $cstacks_joined_soptions";
 		warn $cstacksCmd . "\n\n";
 		system($cstacksCmd) == 0 or die "Error calling $cstacksCmd: $?";
 	}
 	
+    # Returns the cstacks batch file prefix file path.
 	return $cstacks_file;
 }
 
+# sstacks($stacks_catalog_infile, $stacks_sample_infile, $num_threads, $stacks_output_dir) - Executes the sstacks program in the Stacks Software Suite.
+#
+# Input paramater(s):
+#
+# $stacks_catalog_infile - The stacks catalog input batch_*.catalog.*.tsv file from which to load the catalog GBS-Tags.
+#
+# $stacks_sample_infile - The stacks sample input *.tags.tsv file from which to load sample GBS-Tags.
+#
+# $num_threads - The number of threads to use for sstacks.
+#
+# $stacks_output_dir - The stacks output file directory that contains all the results files generated by sstacks.
 sub sstacks{
-
+    
+    # The stacks catalog input batch_*.catalog.*.tsv file from which to load the catalog GBS-Tags.
 	my $stacks_catalog_infile = shift;
 	die "Error lost the stacks catalog input file directory" unless defined $stacks_catalog_infile;
-	
+    
+	# The stacks sample input *.tags.tsv file from which to load sample GBS-Tags.
 	my $stacks_sample_infile = shift;
 	die "Error lost the stacks sample input file directory" unless defined $stacks_sample_infile;
 	
-	my $num_cpu_cores = shift;
-	die "Error lost the number of cores for stacks" unless defined $num_cpu_cores;
+    # The number of threads to use for sstacks.
+	my $num_threads = shift;
+	die "Error lost the number of cores for stacks" unless defined $num_threads;
 	
-	my $stacks_output_dir = shift;
+    # The stacks output file directory that contains all the results files generated by sstacks.my $stacks_output_dir = shift;
 	die "Error lost the stacks output file directory" unless defined $stacks_output_dir;
 	
  	# Get the basename of the sam filename without the .sam extension.
  	my $stacks_sample_filename = fileparse($stacks_sample_infile, qr//);
-
+    
+    # The sstacks output matches file.
  	my $sstacks_matches_file = join('/', $stacks_output_dir, $stacks_sample_filename . '.matches.tsv');
-	
+    
+    #### USED PARAMETERS ####
+    # b — MySQL ID of this batch.
+    # c — TSV file from which to load the catalog RAD-Tags.
+    # s — TSV file from which to load sample RAD-Tags.
+    # o — output path to write results.
+    # p — enable parallel execution with num_threads threads.
+    
+    #### NOT USED PARAMETERS ####
+    # g — base matching on genomic location, not sequence identity.
+    # r — Load the TSV file of a single sample instead of a catalog.
+    # x — don’t verify haplotype of matching locus.
+    # v — print program version.
+    # h — display this help messsage.
+    
+    # Execute the sstacks program if the matches sstacks results files are not already generated.
 	unless(-s $sstacks_matches_file){
 		warn "Executing sstacks.....\n\n";
-		my $sstacksCmd  = "$sstacks -b 1 -c $stacks_catalog_infile -s $stacks_sample_infile -o $stacks_output_dir -p $num_cpu_cores";
+		my $sstacksCmd  = "$sstacks -b 1 -c $stacks_catalog_infile -s $stacks_sample_infile -o $stacks_output_dir -p $num_threads";
 		warn $sstacksCmd . "\n\n";
 		system($sstacksCmd) == 0 or die "Error calling $sstacksCmd: $?";
 	}
 }
 
+# (\%files, $file_counter) = find_files($infile_dir) - Find all files in the specified input file directory with the file extension *.suffix.
+#
+# Input paramater(s):
+#
+# $infile_dir - The input file directory.
+#
+# $suffix - The file extension suffix.
+#
+# Output paramater(s):
+#
+# \%files - A hash reference containing all the files with file extension *.suffix in key/value pairs.
+#
+# key => filename ( e.g. filename.suffix )
+# value => absolue filepath ( e.g. /path/to/filename.suffix )
+#
+# $file_count - The number of files stored with file extension *.suffix.
 sub find_files{
     
+    # The input file directory.
 	my $infile_dir = shift;
 	die "Error lost input file directory" unless defined $infile_dir;
 	
+    # The file extension suffix.
 	my $suffix = shift;
 	die "Error lost file extension suffix directory" unless defined $suffix;
 	
@@ -274,12 +423,22 @@ sub find_files{
 	return (\%files, $file_counter);
 }
 
-# execute the gunzip program to uncompress the compressed fastq file.
+# $output_dir = gunzip_fastq_file($fastq_file) - Execute the gunzip program to uncompress the compressed fastq file.
+#
+# Input paramater(s):
+#
+# $fastq_file - The fastq file to compress using gunzip.
+#
+# Output paramater(s):
+#
+# $uncompressed_fastq_file - The uncompressed fastq file path.
 sub gunzip_fastq_file{
 	
+    # Tthe fastq file to uncompress using gunzip.
 	my $fastq_file = shift;
-	die "Error lost the fastq file to compress using gunzip" unless defined $fastq_file;
+	die "Error lost the fastq file to uncompress using gunzip" unless defined $fastq_file;
 	
+    # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 	my $project_name = shift;
 	die "Error lost the project name" unless defined $project_name;
 	
