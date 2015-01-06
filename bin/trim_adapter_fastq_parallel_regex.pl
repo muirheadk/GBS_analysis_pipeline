@@ -9,6 +9,13 @@ use File::Basename;
 use IPC::Open2;
 use List::Compare;
 
+#### PROGRAM NAME ####
+# refgen_stacks_analysis_pipeline.pl - Program to trim the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
+
+#### DESCRIPTION ####
+# This program trims the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
+
+#### SAMPLE COMMAND ####
 # perl trim_adapter_seq_fastq-new.pl -i ~/workspace/GBS_data-08-10-2013/PROJECT_LEADER_DIR/CHRISTIANNE_MCDONALD -p CHRISTIANNE_MCDONALD -c 7 -o ~/workspace/GBS_data-08-10-2013/TRIMMED_adapter_FASTQ_DIR-2014-10-29
 my ($fastq_file_dir, $project_name, $restriction_enzymes, $gbs_sequence_length, $adapter_length_min_threshold, $adapter_trim_offset, $min_trimmed_fastq_sequence_length, $regex_num_cpu, $pad_sequences, $output_dir);
 GetOptions(
@@ -60,10 +67,9 @@ sub usage {
 
 die <<"USAGE";
 
-
 Usage: $0 -i fastq_file_dir -p project_name -r restriction_enzymes -l gbs_sequence_length -m adapter_length_min_threshold -t adapter_trim_offset -q min_trimmed_fastq_sequence_length -c regex_num_cpu -o output_dir
 
-DESCRIPTION - A program to trim the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
+DESCRIPTION - This program trims the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
 
 OPTIONS:
 
@@ -397,7 +403,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 							print TRIMMED_LAYOUT_OUTFILE join("\t", join("_", $fasta_filename, $fastq_header), 1, (($target_start - $adapter_trim_offset) - 1), $trimmed_fastq_sequence_length, ($target_start - $adapter_trim_offset), $fastq_sequence_length, $trimmed_adapter_sequence_length, $target_start, $target_end, $align_length) . "\n";
 							
 							my $new_fastq_header = join("\001", $fastq_header, $fasta_filename, join("=", "length", $trimmed_fastq_sequence_length));
-							if($pad_sequences eq "true"){
+							if($pad_sequences eq "true"){ # Pad sequences with poly-Ns up to the common GBS sequence length.
 								my $padded_N_length =  ($gbs_sequence_length - $trimmed_fastq_sequence_length);
 								my $padded_N_seq = 'N' x $padded_N_length;
 								my $padded_fastq_sequence = join("", $trimmed_fastq_sequence, $padded_N_seq);
@@ -635,7 +641,6 @@ foreach my $fasta_filename (sort keys %trimmed_fastq_sequence_counter){
     $num_removed_seqs = 0 unless(defined($num_removed_seqs));
 
     # Calculate the total number of sequences.
-#    my $total_num_seqs = ($num_untrimmed_seqs + $num_trimmed_seqs + $num_removed_seqs);
     my $total_num_seqs = $original_fastq_sequence_counter{$fasta_filename};
     my $percent_untrimmed_seqs = (($num_untrimmed_seqs/$total_num_seqs) * 100);
     my $percent_trimmed_seqs = (($num_trimmed_seqs/$total_num_seqs) * 100);
@@ -700,13 +705,29 @@ close(OUTFILE) or die "Couldn't close file $adapter_length_counts_outfile";
 undef %trimmed_fastq_sequence_counter;
 undef %adapter_regex_length_counter;
 
-# find the fastq files found in the given fastq input file directory and return a hash list of the files and the number of files found.
-# Will add a pod documentation for this sub routine.
+# (\%files, $file_counter) = find_files($infile_dir) - Find all files in the specified input file directory with the file extension *.suffix.
+#
+# Input paramater(s):
+#
+# $infile_dir - The input file directory.
+#
+# $suffix - The file extension suffix.
+#
+# Output paramater(s):
+#
+# \%files - A hash reference containing all the files with file extension *.suffix in key/value pairs.
+#
+# key => filename ( e.g. filename.suffix )
+# value => absolue filepath ( e.g. /path/to/filename.suffix )
+#
+# $file_count - The number of files stored with file extension *.suffix.
 sub find_files{
-    
+
+	# The input file directory.
 	my $infile_dir = shift;
 	die "Error lost input file directory" unless defined $infile_dir;
 	
+	# The file extension suffix.
 	my $suffix = shift;
 	die "Error lost file extension suffix directory" unless defined $suffix;
 	
@@ -723,10 +744,14 @@ sub find_files{
 	return (\%files, $file_counter);
 }
 
-# Compress a file using gzip to save space.
-# Will add a pod documentation for this sub routine.
+# gzip_file($fastq_file) - Execute the gzip program to compress a fastq file to save space..
+#
+# Input paramater(s):
+#
+# $fastq_file - The fastq file to compress using gzip.
 sub gzip_file{
-	
+
+	# The fastq file to compress using gzip.
 	my $fastq_file = shift;
 	die "Error lost the fastq file to compress using gzip" unless defined $fastq_file ;
 
@@ -738,20 +763,32 @@ sub gzip_file{
 	) == 0 or die "Error calling $gzipCmd: $?";
 }
 
-# Get the subsequence based on the input sequence, sequence start, and sequence end.
-# Will add a pod documentation for this sub routine.
-# my $seq = get_subseq("AGCTTGCGTT", 3, 8);
-# warn $seq . "\n";
+# $trimmed_seq = get_subseq($sequence, $seq_start, $seq_end) - Get the subsequence based on the input sequence, sequence start, and sequence end.
+#
+# Input paramater(s):
+#
+# $sequence - The input sequence to obtain a subsequence.
+#
+# $seq_start - The start position of the sequence.
+#
+# $seq_end - The end position of the sequence.
+#
+# Output paramater(s):
+#
+# $trimmed_seq - The trimmed subsequence of the input sequence.
 sub get_subseq{
 
+	# The input sequence to obtain a subsequence.
         my $sequence = shift;
-        die "Error lost sequence" unless defined $sequence;
+        die "Error lost input sequence to obtain a subsequence" unless defined $sequence;
 
+        # The start position of the sequence.
         my $seq_start = shift;
-        die "Error lost start of sequence" unless defined $seq_start;
+        die "Error lost start position of the sequence" unless defined $seq_start;
 
+        # The end position of the sequence.
         my $seq_end = shift;
-        die "Error lost end of sequence" unless defined $seq_end;
+        die "Error lost end position of the sequence" unless defined $seq_end;
 
         $seq_start = $seq_start - 1;
         $seq_end = $seq_end;
