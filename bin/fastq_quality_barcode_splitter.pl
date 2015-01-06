@@ -7,12 +7,13 @@ use File::Copy;
 use File::Basename;
 use Switch;
 
-# Added fastq_quality_barcode_splitter.pl on 2014-12-17. This script works very similar to the fastq_barcode_cascade_splitter.pl in same respects, but is a lot faster. 
-# It also performs a quality assessment and quality control filtering step to filter out fastq reads that don't meet the quality threshold. It also demultiplexes the 
-# original raw bulk fastq file based on barcode. The quality filtering and quality threshold steps are performed using the process_radtags program in the STACKS software suite. 
-# Once the raw fastq file is demultiplexed by barcode the resulting files are renamed corresponding to the individual name, plate/well number, and barcode sequence in its 
-# corresponding project leader directory.
+#### PROGRAM NAME ####
+# fastq_quality_barcode_splitter.pl - A program that performs a quality assessment and quality control filtering step to filter out GBS fastq reads that do not meet the quality threshold given in the quality scores. It also demultiplexes the original raw bulk GBS fastq file based on barcode into separate samples that include the barcode in the filename. The quality filtering and quality threshold steps are performed using the process_radtags program in the STACKS software suite. Once the raw fastq file is demultiplexed by barcode the resulting files are renamed corresponding to the individual name, plate/well number, and barcode sequence and copied to the corresponding project leader directory.
 
+#### DESCRIPTION ####
+# This program performs a quality assessment and quality control filtering step to filter out GBS fastq reads that do not meet the quality threshold given in the quality scores. It also demultiplexes the original raw bulk GBS fastq file based on barcode into separate samples that include the barcode in the filename. The quality filtering and quality threshold steps are performed using the process_radtags program in the STACKS software suite. Once the raw fastq file is demultiplexed by barcode the resulting files are renamed corresponding to the individual name, plate/well number, and barcode sequence and copied to the corresponding project leader directory.
+
+#### SAMPLE COMMAND ####
 # perl fastq_quality_barcode_splitter.pl -i ~/workspace/GBS_data-08-10-2013/HI.1405.008.GQ03122013-5_R1.fastq.gz -b ~/workspace/GBS_data-08-10-2013/GBS_barcodes-2013-10-09.csv -n 0 -o ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS
 my ($fastq_infile, $restriction_enzymes, $barcode_infile, $num_mismatches, $output_dir);
 GetOptions(
@@ -36,35 +37,28 @@ $restriction_enzymes = 'Pstl/MspI' unless defined $restriction_enzymes;
 # The number of mismatches allowed within the barcode sequences. Default: 0
 $num_mismatches = 0 unless defined $num_mismatches;
 
-# Program dependencies - process_radtags.
+# Program dependencies - process_radtags program from the Stacks Software Suite.
 my $process_radtags 				= '/usr/local/bin/process_radtags';
 
 sub usage {
     
 die <<"USAGE";
     
-Usage: $0 -i fastq_infile -b barcode_infile -n num_mismatches -o output_dir
+Usage: $0 -i fastq_infile -r restriction_enzymes -b barcode_infile -n num_mismatches -o output_dir
     
-DESCRIPTION - Split a bulk fastq input file into separate fastq files based on the longest to shortest barcode sequences for 
-each individual specified by the barcodes input file and output the results based on project leader specified in the barcodes 
-input file.
-    
+DESCRIPTION - This program performs a quality assessment and quality control filtering step to filter out GBS fastq reads that do not meet the quality threshold given in the quality scores. It also demultiplexes the original raw bulk GBS fastq file based on barcode into separate samples that include the barcode in the filename. The quality filtering and quality threshold steps are performed using the process_radtags program in the STACKS software suite. Once the raw fastq file is demultiplexed by barcode the resulting files are renamed corresponding to the individual name, plate/well number, and barcode sequence and copied to the corresponding project leader directory.
+
 OPTIONS:
 
 -i fastq_infile - The absolute path to the bulk fastq input file to split sequences based on barcode sequences. Can either be *.fastq or *.fastq.gz extension.
 
-	e.g. /path/to/HI.1405.008.GQ03122013-5_R1.fastq    <---- fastq file format
-	     /path/to/HI.1405.008.GQ03122013-5_R1.fastq.gz <---- compressed fastq file format
-    
+-r restriction_enzymes - The restriction enzyme(s) used to digest the genomic sequences. Default: Pstl/MspI
+
 -b barcode_infile - The absolute path to the barcodes input file used to split sequences into individual fastq output files.
 
-	e.g. /path/to/GBS_barcodes-2013-10-09.csv
+-n num_mismatches - The number of mismatches allowed within the barcode sequences.
 
--n num_mismatches - The number of mismatches allowed within the barcode sequences. Default: 0
-      
 -o output_dir - The absolute path to the output directory to contain the split *.fastq output files.
-
-	e.g. /path/to/output_dir
 
 USAGE
 }
@@ -74,9 +68,10 @@ unless(-d $output_dir){
       mkdir($output_dir, 0777) or die "Can't make directory: $!";
 }
 
+# Execute the process_radtags program for quality assessment and quality control filtering and demultiplexing the files based on barcode and project leader name.
 my ($split_fastq_files, $split_fastq_file_counter) = process_radtags($fastq_infile, $restriction_enzymes, $barcode_infile, $num_mismatches, $output_dir);
 	
-# Parse the barcodes input file based on barcode length so that we can split the bulk fastq file using the longest to shortest barcode.
+# Parse the barcodes input file based on barcode sequence so that we can split the bulk fastq file using the process_radtags program.
 my %project_leader_barcodes = ();
 open(INFILE, "<$barcode_infile") or die "Couldn't open file $barcode_infile for reading, $!";
 my $i = 0;
@@ -87,7 +82,6 @@ while(<INFILE>){
 		my @split_row_entry = split(/\t/, $_);
 		my ($fastq_plate_num, $fastq_well_row, $fastq_well_column, $fastq_run_id, $fastq_project_leader, $fastq_barcode_seq) = @split_row_entry;
 
-		my $barcode_seq_length = length($fastq_barcode_seq);
 		my $fastq_barcode_name = join("_", $fastq_run_id, $fastq_barcode_seq, $fastq_plate_num, join("", $fastq_well_row, $fastq_well_column));
 		$project_leader_barcodes{$fastq_barcode_seq} = join("\t", $fastq_barcode_name, $fastq_barcode_seq, $fastq_project_leader);
 		
@@ -96,16 +90,15 @@ while(<INFILE>){
 }
 close(INFILE) or die "Couldn't close file $barcode_infile";
 
-# Create output directory if it doesn't already exist.
+# Create project leader output directory if it doesn't already exist.
 my $mismatch_dir = join("_", $num_mismatches, "MISMATCH");
 $mismatch_dir = "NO_MISMATCHES" if($num_mismatches eq 0);
-
 my $project_leader_dir = join('/', $output_dir, join("_", "PROJECT_LEADER_DIR", $mismatch_dir));
 unless(-d $project_leader_dir){
 	mkdir($project_leader_dir, 0777) or die "Can't make directory: $!";
 }
-	
-# Start from the longest to shortest barcode length and keep track of which fastq file belongs to which project leader.
+
+# Iterate through each split fastq sample file from the process_radtags program and rename the files based on project leader.
 foreach my $file_name (sort keys %{$split_fastq_files}){
 	warn "Processing " . $file_name . ".....\n";
 	my $split_fastq_infile = $split_fastq_files->{$file_name};
@@ -118,6 +111,7 @@ foreach my $file_name (sort keys %{$split_fastq_files}){
 	my @split_row_entry = split(/\t/, $project_leader_barcodes{$split_fastq_barcode_seq});
 	my ($fastq_barcode_name, $fastq_barcode_seq, $fastq_project_leader) = @split_row_entry;
 	
+	# Create project output directory if it doesn't already exist.
 	my $project_output_dir = join('/', $project_leader_dir, $fastq_project_leader);
 	unless(-d $project_output_dir){
 		mkdir($project_output_dir, 0777) or die "Can't make directory: $!";
@@ -129,17 +123,47 @@ foreach my $file_name (sort keys %{$split_fastq_files}){
 # 	unlink($split_fastq_infile) or die "Could not unlink $split_fastq_infile: $!";
 }
 
-# execute the process_radtags program from STACKS.
+# ($split_fastq_files, $split_fastq_file_counter) = process_radtags($fastq_infile, $restriction_enzymes, $barcode_infile, $num_mismatches, $output_dir) - Executes the process_radtags program from the Stacks Software Suite for quality assessment and quality control filtering and demultiplexing the files based on barcode and project leader name.
+#
+# Input paramater(s):
+# 
+# $fastq_infile - The absolute path to the bulk fastq input file to split sequences based on barcode sequences.
+#
+# $restriction_enzymes - The restriction enzyme(s) used to digest the genomic sequences.
+# 
+# $barcode_infile - The absolute path to the barcodes input file used to split sequences into individual fastq output files.
+# 
+# $num_mismatches - The number of mismatches allowed within the barcode sequences.
+#
+# $output_dir - The absolute path to the output directory to contain the split *.fq output files.
+#
+# Output paramater(s):
+# 
+# $split_fastq_files - A hash reference containing all the files with file extension *.fq in key/value pairs.
+# 
+# key => filename ( e.g. filename.suffix )
+# value => absolue filepath ( e.g. /path/to/filename.suffix )
+# 
+# $split_fastq_file_counter - The number of split fastq files stored with file extension *.fq.
 sub process_radtags{
-	
+
+	# The raw bulk GBS fastq input file to filter based on quality and demultiplex based on barcodes.
 	my $fastq_infile = shift;
 	die "Error lost fastq input file" unless defined $fastq_infile;
+	
+	# The restriction enzyme(s) used to digest the genomic sequences.
 	my $restriction_enzymes = shift;
 	die "Error lost restriction enzyme(s) used for GBS restriction digest protocol" unless defined $restriction_enzymes;
+	
+	# The absolute path to the barcodes input file used to split sequences into individual fastq output files.
 	my $barcode_infile = shift;
 	die "Error lost barcode sequence file" unless defined $barcode_infile;
+	
+	# The number of mismatches allowed within the barcode sequences.
 	my $num_mismatches = shift;
 	die "Error lost number of mismatches" unless defined $num_mismatches;
+	
+	# The absolute path to the output directory to contain the split *.fastq output files.
 	my $output_dir = shift;
 	die "Error lost output directory" unless defined $output_dir;
 
@@ -148,7 +172,6 @@ sub process_radtags{
 	unless(-d $split_fastq_output_dir){
 		mkdir($split_fastq_output_dir, 0777) or die "Can't make directory: $!";
 	}
-	
 	
 	# Check the $split_fastq_output_dir for files with extension *.fq and check to make sure the size of the resulting files are non-zero 
 	# indicating that the $fastq_infile file hasn't been already filtered based on quality and demultiplexed into separate files based on barcodes.  
@@ -165,7 +188,7 @@ sub process_radtags{
 	# If it hasn't, process the $fastq_infile file using the following process_radtags commands.
 	unless(($non_zero_split_fastq_files eq $split_fastq_file_counter) and ($split_fastq_file_counter ne 0)){
 	
-		# Parse the barcodes input file based on barcode length so that we can split the bulk fastq file using the longest to shortest barcode.
+		# Parse the barcodes input file based on barcode sequence and barcode sequence length so that we can split the bulk fastq file using the longest to shortest barcode so that we can use as input to the process_radtags program.
 		open(INFILE, "<$barcode_infile") or die "Couldn't open file $barcode_infile for reading, $!";
 		my @barcode_entries = ();
 		my $i = 0;
@@ -177,7 +200,6 @@ sub process_radtags{
 				my ($fastq_plate_num, $fastq_well_row, $fastq_well_column, $fastq_run_id, $fastq_project_leader, $fastq_barcode_seq) = ($split_row_entry[0], $split_row_entry[1], $split_row_entry[2], $split_row_entry[3], $split_row_entry[4], $split_row_entry[5]);
 
 				my $barcode_seq_length = length($fastq_barcode_seq);
-				
 				my $barcodes_entry = join("\t", $barcode_seq_length, $fastq_barcode_seq);
 	# 			warn $barcodes_entry . "\n";
 
@@ -188,6 +210,7 @@ sub process_radtags{
 		}
 		close(INFILE) or die "Couldn't close file $barcode_infile";
 		
+		# Generate the barcodes input file for the process_radtags program.
 		my $barcode_outfile = join('/', $output_dir, "process_radtags_barcodes.txt");
 		open(OUTFILE, ">$barcode_outfile") or die "Couldn't open file $barcode_outfile for writting, $!";
 		foreach my $barcodes_entry (sort {$b->[0] <=> $a->[0] || $a->[1] cmp $b->[1]} @barcode_entries){
@@ -195,7 +218,7 @@ sub process_radtags{
 		}
 		close(OUTFILE) or die "Couldn't close file $barcode_outfile";
 
-		
+		# Choose the process_radtags command based on the restriction enzyme(s) used and whether or not the bulk fastq file is compressed.
 		my $process_radtagsCmd = "";
 		switch($restriction_enzymes){
 			case 'ApeKI'{ # ApeKI: Not operational yet
@@ -232,13 +255,31 @@ sub process_radtags{
 	return ($split_fastq_files, $split_fastq_file_counter);
 }
 
+# (\%files, $file_counter) = find_files($infile_dir) - Find all files in the specified input file directory with the file extension *.suffix.
+# 
+# Input paramater(s):
+# 
+# $infile_dir - The iinput file directory.
+# 
+# $suffix - The file extension suffix.
+# 
+# Output paramater(s):
+# 
+# \%files - A hash reference containing all the files with file extension *.suffix in key/value pairs.
+# 
+# key => filename ( e.g. filename.suffix )
+# value => absolue filepath ( e.g. /path/to/filename.suffix )
+# 
+# $file_count - The number of files stored with file extension *.suffix.
 sub find_files{
-    
+
+	# The input file directory.
 	my $infile_dir = shift;
 	die "Error lost input file directory" unless defined $infile_dir;
 	
+	# The file extension suffix.
 	my $suffix = shift;
-	die "Error lost file extension suffix directory" unless defined $suffix;
+	die "Error lost file extension suffix" unless defined $suffix;
 	
 	my %files = ();
 	my $file_counter = 0;
