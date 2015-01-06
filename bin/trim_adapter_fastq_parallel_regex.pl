@@ -10,13 +10,13 @@ use IPC::Open2;
 use List::Compare;
 
 #### PROGRAM NAME ####
-# refgen_stacks_analysis_pipeline.pl - Program to trim the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
+# trim_adapter_fastq_parallel_regex.pl - Program to trim the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
 
 #### DESCRIPTION ####
 # This program trims the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
 
 #### SAMPLE COMMAND ####
-# perl trim_adapter_seq_fastq-new.pl -i ~/workspace/GBS_data-08-10-2013/PROJECT_LEADER_DIR/CHRISTIANNE_MCDONALD -p CHRISTIANNE_MCDONALD -c 7 -o ~/workspace/GBS_data-08-10-2013/TRIMMED_adapter_FASTQ_DIR-2014-10-29
+# perl trim_adapter_fastq_parallel_regex.pl -i /home/kevmu/scratch/GBS_test/PROJECT_LEADER_DIR_NO_MISMATCHES/CHRISTIANNE_MCDONALD -p CHRISTIANNE_MCDONALD -t 3 -q 32 -m 16 -l 92 -r Pstl/MspI -c 16 -n true -o /home/kevmu/scratch/GBS_test/GBS_TRIMMED_ADAPTER_DIR/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR
 my ($fastq_file_dir, $project_name, $restriction_enzymes, $gbs_sequence_length, $adapter_length_min_threshold, $adapter_trim_offset, $min_trimmed_fastq_sequence_length, $regex_num_cpu, $pad_sequences, $output_dir);
 GetOptions(
 	'i=s'    => \$fastq_file_dir, # The *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
