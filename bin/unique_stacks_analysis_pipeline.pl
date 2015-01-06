@@ -239,12 +239,12 @@ sub ustacks{
 	}
 
 	# The standard out log file for the ustacks program.
-	my $ustacks_stdout_log_outfile = join('/', $stacks_log_output_dir, join("_", $fastq_filename, "ustacks.log"));
+	my $ustacks_log_outfile = join('/', $stacks_log_output_dir, join("_", $fastq_filename, "ustacks.log"));
         
 	# Execute the ustacks program if the pstacks alleles, snps, and tags output files are not already generated.
 	unless(-s $ustacks_alleles_file and -s $ustacks_snps_file and -s $ustacks_tags_file){
 		warn "Executing ustacks.....\n\n";
-		my $ustacksCmd  = "$ustacks -t fastq -f $fastq_infile -o $stacks_output_dir -i $sql_id -m $min_depth_coverage -M $max_nuc_distance_ustacks -N $max_align_distance_ustacks -p $num_threads -d -r -R --model_type snp --alpha $alpha_value --max_locus_stacks $max_locus_stacks 2> $ustacks_stdout_log_outfile";
+		my $ustacksCmd  = "$ustacks -t fastq -f $fastq_infile -o $stacks_output_dir -i $sql_id -m $min_depth_coverage -M $max_nuc_distance_ustacks -N $max_align_distance_ustacks -p $num_threads -d -r -R --model_type snp --alpha $alpha_value --max_locus_stacks $max_locus_stacks 2> $ustacks_log_outfile";
 		warn $ustacksCmd . "\n\n";
 		system($ustacksCmd) == 0 or die "Error calling $ustacksCmd: $?";
 	}
@@ -307,7 +307,7 @@ sub cstacks{
 	}
 
 	# The standard out log file for the cstacks program.
-	my $cstacks_stdout_log_outfile = join('/', $stacks_log_output_dir, "cstacks.log");
+	my $cstacks_log_outfile = join('/', $stacks_log_output_dir, "cstacks.log");
 	
 	# Execute the cstacks program if the following files are not already generated.
 	unless(-s $cstacks_alleles_file and -s $cstacks_snps_file and -s $cstacks_tags_file){
@@ -347,7 +347,7 @@ sub cstacks{
 		# --report_mmatches — report query loci that match more than one catalog locus.
 		warn "Executing cstacks.....\n\n";
 		my $cstacks_joined_soptions = join("\\\n", @cstacks_soptions);
-		my $cstacksCmd  = "$cstacks -b $stacks_sql_id -o $stacks_output_dir -p $num_threads \\\n $cstacks_joined_soptions 2> $cstacks_stdout_log_outfile";
+		my $cstacksCmd  = "$cstacks -b $stacks_sql_id -o $stacks_output_dir -p $num_threads \\\n $cstacks_joined_soptions 2> $cstacks_log_outfile";
 		warn $cstacksCmd . "\n\n";
 		system($cstacksCmd) == 0 or die "Error calling $cstacksCmd: $?";
 	}
@@ -403,7 +403,7 @@ sub sstacks{
 	}
 
 	# The standard out log file for the cstacks program.
-	my $sstacks_stdout_log_outfile = join('/', $stacks_log_output_dir, join("_", $stacks_sample_filename, "sstacks.log"));
+	my $sstacks_log_outfile = join('/', $stacks_log_output_dir, join("_", $stacks_sample_filename, "sstacks.log"));
     
 	#### USED PARAMETERS ####
 	# b — MySQL ID of this batch.
@@ -422,7 +422,7 @@ sub sstacks{
 	# Execute the sstacks program if the matches sstacks results files are not already generated.
 	unless(-s $sstacks_matches_file){
 		warn "Executing sstacks.....\n\n";
-		my $sstacksCmd  = "$sstacks -b $stacks_sql_id -c $stacks_catalog_infile -s $stacks_sample_infile -o $stacks_output_dir -p $num_threads 2> $sstacks_stdout_log_outfile";
+		my $sstacksCmd  = "$sstacks -b $stacks_sql_id -c $stacks_catalog_infile -s $stacks_sample_infile -o $stacks_output_dir -p $num_threads 2> $sstacks_log_outfile";
 		warn $sstacksCmd . "\n\n";
 		system($sstacksCmd) == 0 or die "Error calling $sstacksCmd: $?";
 	}
