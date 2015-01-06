@@ -33,7 +33,7 @@ sub usage {
     
 die <<"USAGE";
     
-Usage: $0 -i GBS_shipment_infile -l barcodes_legend_infile -o output_dir
+Usage: $0 -i GBS_shipment_infile -l barcodes_legend_infile -o barcodes_output_dir
     
 DESCRIPTION - This program generates barcode input files for input into the Stacks fastq_quality_barcode_splitter.pl script and TASSEL GBS variant pipelines. Takes a GBS shipment and barcode legend file as input and generates a barcode file for each GBS plate listed in the GBS shipment file.
 
@@ -41,11 +41,17 @@ OPTIONS:
 
 -i GBS_shipment_infile - The GBS shipment file in tab-delimited format (i.e. GBS_shipment_9Oct2013.csv)
 
+	e.g. /path/to/GBS_shipment_9Oct2013.csv
+
 -l barcodes_legend_infile - The barcodes legend file in tab-delimited format (i.e. Pstl_MspI_barcodes_legend.csv)
+
+	e.g. /path/to/Pstl_MspI_barcodes_legend.csv
 
 -f flowcell_name - The flow cell name used for the TASSEL GBS variant pipeline barcodes file format. Default: GQ03122013
 
 -o barcodes_output_dir - The absolute path to the output directory to contain the barcodes output files
+
+	e.g. /path/to/barcodes_output_dir
 
 USAGE
 }
