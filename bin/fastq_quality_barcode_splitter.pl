@@ -223,20 +223,20 @@ sub process_radtags{
 		switch($restriction_enzymes){
 			case 'ApeKI'{ # ApeKI: Not operational yet
 				if($fastq_infile =~ m/\.gz$/){ # If the bulk fastq file is compressed with extension *.gz.
-					# process_radtags -f ./HI.1405.008.GQ03122013-5_R1.fastq.gz -i gzfastq -b ./process_radtags_barcodes.txt -o ./GBS_filtered_fastq -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 -e apeKI --filter_illumina --barcode_dist 0
-					$process_radtagsCmd = "$process_radtags -f $fastq_infile -i gzfastq -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 -e apeKI --filter_illumina --barcode_dist $num_mismatches";
+					# process_radtags -f ./HI.1405.008.GQ03122013-5_R1.fastq.gz -i gzfastq -b ./process_radtags_barcodes.txt -o ./GBS_filtered_fastq -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 --inline_null -e apeKI --filter_illumina --barcode_dist 0
+					$process_radtagsCmd = "$process_radtags -f $fastq_infile -i gzfastq -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 --inline_null -e apeKI --filter_illumina --barcode_dist $num_mismatches";
 				}else{ # If the bulk fastq file is not compressed with extension *.fastq.
-					# process_radtags -f ./HI.1405.008.GQ03122013-5_R1.fastq -i fastq -b ./process_radtags_barcodes.txt -o ./GBS_filtered_fastq -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 -e apeKI --filter_illumina --barcode_dist 0
-					$process_radtagsCmd = "$process_radtags -f $fastq_infile -i fastq -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 -e apeKI --filter_illumina --barcode_dist $num_mismatches";
+					# process_radtags -f ./HI.1405.008.GQ03122013-5_R1.fastq -i fastq -b ./process_radtags_barcodes.txt -o ./GBS_filtered_fastq -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 --inline_null -e apeKI --filter_illumina --barcode_dist 0
+					$process_radtagsCmd = "$process_radtags -f $fastq_infile -i fastq -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 --inline_null -e apeKI --filter_illumina --barcode_dist $num_mismatches";
 				}
 			}
 			case 'Pstl/MspI'{ # Pstl/MspI
 				if($fastq_infile =~ m/\.gz$/){ # If the bulk fastq file is compressed with extension *.gz.
-					# process_radtags -f ./HI.1405.008.GQ03122013-5_R1.fastq.gz -i gzfastq -b ./process_radtags_barcodes.txt -o ./GBS_filtered_fastq -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 --renz_1 pstI --renz_2 mspI --filter_illumina --barcode_dist 0
-					$process_radtagsCmd = "$process_radtags -f $fastq_infile -i gzfastq -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 --renz_1 pstI --renz_2 mspI --filter_illumina --barcode_dist $num_mismatches";
+					# process_radtags -f ./HI.1405.008.GQ03122013-5_R1.fastq.gz -i gzfastq -b ./process_radtags_barcodes.txt -o ./GBS_filtered_fastq -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 --inline_null --renz_1 pstI --renz_2 mspI --filter_illumina --barcode_dist 0
+					$process_radtagsCmd = "$process_radtags -f $fastq_infile -i gzfastq -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 --inline_null --renz_1 pstI --renz_2 mspI --filter_illumina --barcode_dist $num_mismatches";
 				}else{ # If the bulk fastq file is not compressed with extension *.fastq.
-					# process_radtags -f ./HI.1405.008.GQ03122013-5_R1.fastq -i fastq -b ./process_radtags_barcodes.txt -o ./GBS_filtered_fastq -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 --renz_1 pstI --renz_2 mspI --filter_illumina --barcode_dist 0
-					$process_radtagsCmd = "$process_radtags -f $fastq_infile -i fastq -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 --renz_1 pstI --renz_2 mspI --filter_illumina --barcode_dist $num_mismatches";
+					# process_radtags -f ./HI.1405.008.GQ03122013-5_R1.fastq -i fastq -b ./process_radtags_barcodes.txt -o ./GBS_filtered_fastq -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 --inline_null --renz_1 pstI --renz_2 mspI --filter_illumina --barcode_dist 0
+					$process_radtagsCmd = "$process_radtags -f $fastq_infile -i fastq -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E phred33 -D -w 0.15 -s 10 --inline_null --renz_1 pstI --renz_2 mspI --filter_illumina --barcode_dist $num_mismatches";
 				}
 			}
 			else{ 

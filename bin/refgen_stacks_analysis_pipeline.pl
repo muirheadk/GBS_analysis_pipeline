@@ -256,7 +256,7 @@ sub convert_refgen_bwa_input_format{
  			my $padded_zeros_length = ($num_digits - length($seq_num));
  			my $padded_seq_num = '0' x $padded_zeros_length . $seq_num;
 			
-			warn join("\t", $padded_seq_num, $fasta_header) . "\n";
+# 			warn join("\t", $padded_seq_num, $fasta_header) . "\n";
 			print REFGEN_FASTA_OUTFILE join("\n", ">$padded_seq_num", $sequence) . "\n";
 			print REFGEN_TOC_OUTFILE join("\t", $padded_seq_num, $fasta_header) . "\n";
 
@@ -274,7 +274,7 @@ sub convert_refgen_bwa_input_format{
 	my $num_chromosomes = 0;
 	while(<REFGEN_TOC_INFILE>){
 		chomp $_;
-		warn $_ . "\n";
+# 		warn $_ . "\n";
 		if($i ne 0){
 			$num_chromosomes++;
 		}
@@ -621,7 +621,7 @@ sub pstacks{
 	}
 
 	# The standard out file for the pstacks program.
-	my $pstacks_stdout_log_outfile = join('/', $stacks_log_output_dir, "pstacks.stdout.log");
+	my $pstacks_stdout_log_outfile = join('/', $stacks_log_output_dir, "pstacks.log");
         
 	# Execute the pstacks program if the pstacks alleles, snps, and tags output files are not already generated.
 	unless(-s $pstacks_alleles_file and -s $pstacks_snps_file and -s $pstacks_tags_file){
@@ -689,7 +689,7 @@ sub cstacks{
 	}
 
 	# The standard out log file for the cstacks program.
-	my $cstacks_stdout_log_outfile = join('/', $stacks_log_output_dir, "cstacks.stdout.log");
+	my $cstacks_stdout_log_outfile = join('/', $stacks_log_output_dir, "cstacks.log");
 	
 	# Execute the cstacks program if the following files are not already generated.
 	unless(-s $cstacks_alleles_file and -s $cstacks_snps_file and -s $cstacks_tags_file){
@@ -787,7 +787,7 @@ sub sstacks{
 	}
 
 	# The standard out log file for the cstacks program.
-	my $sstacks_stdout_log_outfile = join('/', $stacks_log_output_dir, join("_", $stacks_sample_filename, "sstacks.stdout.log"));
+	my $sstacks_stdout_log_outfile = join('/', $stacks_log_output_dir, join("_", $stacks_sample_filename, "sstacks.log"));
         
 	#### USED PARAMETERS ####
 	# b — MySQL ID of this batch.

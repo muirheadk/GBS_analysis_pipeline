@@ -239,7 +239,7 @@ sub ustacks{
 	}
 
 	# The standard out log file for the ustacks program.
-	my $ustacks_stdout_log_outfile = join('/', $stacks_log_output_dir, "ustacks.stdout.log");
+	my $ustacks_stdout_log_outfile = join('/', $stacks_log_output_dir, join("_", $fastq_filename, "ustacks.log"));
         
 	# Execute the ustacks program if the pstacks alleles, snps, and tags output files are not already generated.
 	unless(-s $ustacks_alleles_file and -s $ustacks_snps_file and -s $ustacks_tags_file){
@@ -307,7 +307,7 @@ sub cstacks{
 	}
 
 	# The standard out log file for the cstacks program.
-	my $cstacks_stdout_log_outfile = join('/', $stacks_log_output_dir, "cstacks.stdout.log");
+	my $cstacks_stdout_log_outfile = join('/', $stacks_log_output_dir, "cstacks.log");
 	
 	# Execute the cstacks program if the following files are not already generated.
 	unless(-s $cstacks_alleles_file and -s $cstacks_snps_file and -s $cstacks_tags_file){
@@ -403,7 +403,7 @@ sub sstacks{
 	}
 
 	# The standard out log file for the cstacks program.
-	my $sstacks_stdout_log_outfile = join('/', $stacks_log_output_dir, join("_", $stacks_sample_filename, "sstacks.stdout.log"));
+	my $sstacks_stdout_log_outfile = join('/', $stacks_log_output_dir, join("_", $stacks_sample_filename, "sstacks.log"));
     
 	#### USED PARAMETERS ####
 	# b — MySQL ID of this batch.
