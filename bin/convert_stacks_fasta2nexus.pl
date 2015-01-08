@@ -13,7 +13,7 @@ use File::Basename;
 # This program generates files in NEXUS format from a Stacks fasta formatted file.
 
 #### SAMPLE COMMAND ####
-# perl convert_stacks_fasta2nexus.pl -i ~/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES -f ~/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES/batch_1.fa -o ~/Desktop
+# perl convert_stacks_fasta2nexus.pl -i ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES -f ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES/batch_1.fa -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/NEXUS_STACKS_OUTFILES
 my ($stacks_input_dir, $stacks_fasta_infile, $gbs_sequence_length, $output_dir);
 GetOptions(
 	'i=s'    => \$stacks_input_dir, # The directory that contains all the Stacks generated output files.
@@ -57,12 +57,6 @@ USAGE
 # Create output directory if it doesn't already exist.
 unless(-d $output_dir){
       mkdir($output_dir, 0777) or die "Can't make directory: $!";
-}
-
-# Create NEXUS output directory if it doesn't already exist.
-my $nexus_output_dir = join('/', $output_dir, "NEXUS_OUTFILES");
-unless(-d $nexus_output_dir){
-    mkdir($nexus_output_dir, 0777) or die "Can't make directory: $!";
 }
 
 # Find all stacks alleles output files from the stacks output directory with the extension *.alleles.tsv.
@@ -141,13 +135,13 @@ foreach my $locus_id (sort {$a <=> $b} keys %fasta_locus_nexus){
 		$refgen_strand = "Minus" if($refgen_seq_strand eq "-"); # If the sequence is in the antisense strand orientation substitute "-" for "minus".
 
 		# Print out the locus metadata contents in nexus file format.
-		my $nexus_outfile = join('/', $nexus_output_dir, join("_", "locus$locus_id", "refSeq$refgen_seq_id", "pos$snp_position", "strand$refgen_strand") . ".nex");
+		my $nexus_outfile = join('/', $output_dir, join("_", "locus$locus_id", "refSeq$refgen_seq_id", "pos$snp_position", "strand$refgen_strand") . ".nex");
 		open(OUTFILE, ">$nexus_outfile") or die "Couldn't open file $nexus_outfile for writting, $!";
 		print OUTFILE "#NEXUS" . "\n";
 		print OUTFILE "Begin data;" . "\n";
-		print OUTFILE "Dimensions ntax=$fasta_locus_seq_counts{$locus_id} nchar=$gbs_sequence_length" . "\n";
+		print OUTFILE "Dimensions ntax=$fasta_locus_seq_counts{$locus_id} nchar=$gbs_sequence_length;" . "\n";
 		print OUTFILE "Format datatype=dna symbols=\"ACTG\" missing=N gap=-;" . "\n";
-		print OUTFILE "Matrix;" . "\n";
+		print OUTFILE "Matrix" . "\n";
 		print OUTFILE join("\n", @nexus_sequence_list) . "\n";
 		print OUTFILE ";" . "\n";
 		print OUTFILE "End;" . "\n";

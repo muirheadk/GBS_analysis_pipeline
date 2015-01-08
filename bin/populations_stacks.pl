@@ -19,14 +19,14 @@ GetOptions(
 	'p=s'    => \$min_num_pops_locus,
 	'r=s'    => \$min_percent_indvs_pop,
 	'm=s'    => \$min_stack_depth,
-    'a=s'    => \$min_allele_freq,
-    'f=s'    => \$corr_value_fst,
-    'p_value_cutoff=s'    => \$p_value_cutoff,
-    'lnl_lim=s'    => \$filt_loci_lnl_lim,
-    'fstats=s'    => \$enable_fstat,
-    'k=s'    => \$enable_kernel_smoothed_calcs,
-    'window_size=s'    => \$kernel_smoothed_window_size,
-    'n=s'    => \$output_option,
+	'a=s'    => \$min_allele_freq,
+	'f=s'    => \$corr_value_fst,
+	'p_value_cutoff=s'    => \$p_value_cutoff,
+	'lnl_lim=s'    => \$filt_loci_lnl_lim,
+	'fstats=s'    => \$enable_fstat,
+	'k=s'    => \$enable_kernel_smoothed_calcs,
+	'window_size=s'    => \$kernel_smoothed_window_size,
+	'n=s'    => \$output_option,
 	't=s'    => \$num_cpu_cores,
 );
 
@@ -79,14 +79,14 @@ OPTIONS:
 	-p min_num_pops_locus -
 	-r min_percent_indvs_pop -
 	-m min_stack_depth -
-    -a min_allele_freq -
-    -f corr_value_fst -
-    --p_value_cutoff p_value_cutoff -
-    --lnl_lim filt_loci_lnl_lim -
-    --fstats enable_fstat -
-    -k enable_kernel_smoothed_calcs -
-    --window_size kernel_smoothed_window_size -
-    -n output_option -
+	-a min_allele_freq -
+	-f corr_value_fst -
+	--p_value_cutoff p_value_cutoff -
+	--lnl_lim filt_loci_lnl_lim -
+	--fstats enable_fstat -
+	-k enable_kernel_smoothed_calcs -
+	--window_size kernel_smoothed_window_size -
+	-n output_option -
 	-t num_cpu_cores -
 
 USAGE

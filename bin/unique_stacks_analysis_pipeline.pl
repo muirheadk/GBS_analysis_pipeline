@@ -13,7 +13,7 @@ use File::Basename;
 # This program takes the quality filtered, demultiplexed, and adapter trimmed GBS *.fastq files as input. It executes the ustacks program, which extracts sequence stacks using a denovo assembly approach to form exact matching stacks. Comparing the stacks it will form a set of loci and detect SNPs at each locus using a maximum likelihood framework. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
 
 #### SAMPLE COMMAND ####
-# perl unique_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/CHRISTIANNE_MCDONALD/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p POLYGONIA -c 7 -o ~/workspace/GBS_data-08-10-2013/CHRISTIANNE_MCDONALD_POLYGONIA
+# perl unique_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/GBS_TRIMMED_ADAPTER_DIR/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR/CHRISTIANNE_MCDONALD/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p POLYGONIA -c 7 -o ~/workspace/GBS_data-08-10-2013/CHRISTIANNE_MCDONALD_POLYGONIA
 my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $stacks_sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $alpha_value_ustacks, $max_locus_stacks, $num_threads, $output_dir);
 
 GetOptions(
