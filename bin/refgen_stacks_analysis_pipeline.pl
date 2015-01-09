@@ -540,7 +540,7 @@ sub bwa_pad_sam_files{
 
 }
 
-# pstacks($sam_infile, $sql_id, $min_depth_coverage, $num_threads, $alpha_value) - Executes the pstacks program in the Stacks Software Suite.
+# pstacks($sam_infile, $sql_id, $min_depth_coverage, $num_threads, $alpha_value) - Executes the pstacks program in the Stacks Software Suite. Extracts stacks that have been aligned to a reference genome and identify SNPs. These stacks can then be processed with cstacks and sstacks.
 # 
 # Input paramater(s):
 # 
@@ -632,7 +632,7 @@ sub pstacks{
 	}
 }
 
-# $cstacks_file = cstacks($stacks_output_dir, $stacks_sql_id, $num_threads) - Executes the cstacks program in the Stacks Software Suite.
+# $cstacks_file = cstacks($stacks_output_dir, $stacks_sql_id, $num_threads) - Executes the cstacks program in the Stacks Software Suite. Build a catalog from a set of samples processed by the ustacks program. Creates a set of consensus loci, merging alleles together.
 # 
 # Input paramater(s):
 # 
@@ -739,7 +739,7 @@ sub cstacks{
 	return $cstacks_file;
 }
 
-# sstacks($stacks_catalog_infile, $stacks_sample_infile, $stacks_sql_id, $num_threads, $stacks_output_dir) - Executes the sstacks program in the Stacks Software Suite.
+# sstacks($stacks_catalog_infile, $stacks_sample_infile, $stacks_sql_id, $num_threads, $stacks_output_dir) - Executes the sstacks program in the Stacks Software Suite. Sets of stacks constructed by the pstacks program is searched against the catalog produced by cstacks.
 # 
 # Input paramater(s):
 # 
