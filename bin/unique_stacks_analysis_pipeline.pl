@@ -14,7 +14,7 @@ use File::Basename;
 
 #### SAMPLE COMMAND ####
 # perl unique_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/GBS_TRIMMED_ADAPTER_DIR/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR/CHRISTIANNE_MCDONALD/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p POLYGONIA -c 7 -o ~/workspace/GBS_data-08-10-2013/CHRISTIANNE_MCDONALD_POLYGONIA
-my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $stacks_sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $alpha_value_ustacks, $max_locus_stacks, $num_threads, $output_dir);
+my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $stacks_sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $alpha_value_ustacks, $max_locus_stacks, $num_mismatches_tag, $num_threads, $output_dir);
 
 GetOptions(
 	'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
@@ -26,6 +26,7 @@ GetOptions(
 	'n=s'    => \$max_align_distance_ustacks, # The maximum distance allowed to align secondary reads to primary stacks. Default: ($max_nuc_distance_ustacks + 2)
 	'a=s'    => \$alpha_value_ustacks, # The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 	'l=s'    => \$max_locus_stacks, # The maximum number of stacks at a single de novo locus. Default: 3
+	's=s'    => \$num_mismatches_tag, # The number of mismatches allowed between sample tags when generating the catalog. Default: 1
 	'c=s'    => \$num_threads, # The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
 	'o=s'    => \$output_dir, # The absolute path to the output directory to contain the Stacks output files and directories.
 );
@@ -58,6 +59,9 @@ $alpha_value_ustacks = 0.05 unless defined $alpha_value_ustacks;
 # The maximum number of stacks at a single de novo locus. Default: 3
 $max_locus_stacks = 3 unless defined $max_locus_stacks;
 
+# The number of mismatches allowed between sample tags when generating the catalog. Default: 1
+$num_mismatches_tag = 1 unless defined $num_mismatches_tag;
+
 # The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
 $num_threads = 2 unless defined $num_threads;
 
@@ -72,7 +76,7 @@ sub usage {
 
 die <<"USAGE";
 
-Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -p project_name -b stacks_sql_id -d min_depth_coverage_pstacks -m max_nuc_distance_ustacks -n max_align_distance_ustacks -a alpha_value_ustacks -l max_locus_stacks -c num_threads -o output_dir
+Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -p project_name -b stacks_sql_id -d min_depth_coverage_pstacks -m max_nuc_distance_ustacks -n max_align_distance_ustacks -a alpha_value_ustacks -l max_locus_stacks -s num_mismatches_tag -c num_threads -o output_dir
 
 DESCRIPTION - This program takes the quality filtered, demultiplexed, and adapter trimmed GBS *.fastq files as input. It executes the ustacks program, which extracts sequence stacks using a denovo assembly approach to form exact matching stacks. Comparing the stacks it will form a set of loci and detect SNPs at each locus using a maximum likelihood framework. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
 
@@ -95,7 +99,9 @@ OPTIONS:
 -a alpha_value_ustacks - The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 
 -l max_locus_stacks - The maximum number of stacks at a single de novo locus. Default: 3
-    
+
+-s num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog. Default: 1
+
 -c num_threads - The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
 
 -o output_dir - The absolute path to the output directory to contain the Stacks output files and directories.
@@ -141,8 +147,8 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	$sql_id++;
 }
 
-# Execute the cstacks program to build a catalog from a set of samples processed by the pstacks program. The cstacks program creates a set of consensus loci, merging alleles together.
-my $cstacks_file = cstacks($stacks_output_dir, $stacks_sql_id, $num_threads);
+# Execute the cstacks program to build a catalog from a set of samples processed by the ustacks program. The cstacks program creates a set of consensus loci, merging alleles together.
+my $cstacks_file = cstacks($stacks_output_dir, $stacks_sql_id, $num_mismatches_tag, $num_threads);
 
 # Find all ustacks tags output files from the stacks output directory with the extension *.tags.tsv.
 my ($ustacks_tags_files, $ustacks_tags_file_count) = find_files($stacks_output_dir, "tags.tsv");
@@ -162,7 +168,7 @@ foreach my $file_name (sort keys %{$ustacks_tags_files}){
 	}
 }
 
-# ustacks($fastq_infile, $sql_id, $min_depth_coverage, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $num_threads, $alpha_value, $max_locus_stacks, $stacks_output_dir) - Executes the ustacks program in the Stacks Software Suite.
+# ustacks($fastq_infile, $sql_id, $min_depth_coverage, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $num_threads, $alpha_value, $max_locus_stacks, $stacks_output_dir) - Executes the ustacks program in the Stacks Software Suite. Extracts exact-matching stacks and detects SNPs at each locus using a maximum likelihood framework.
 #
 # Input paramater(s):
 #
@@ -250,13 +256,15 @@ sub ustacks{
 	}
 }
 
-# $cstacks_file = cstacks($stacks_output_dir, $stacks_sql_id, $num_threads) - Executes the cstacks program in the Stacks Software Suite.
+# $cstacks_file = cstacks($stacks_output_dir, $stacks_sql_id, $num_mismatches_tag, $num_threads) - Executes the cstacks program in the Stacks Software Suite. Build a catalog from a set of samples processed by the ustacks program. Creates a set of consensus loci, merging alleles together.
 # 
 # Input paramater(s):
 # 
-# $stacks_output_dir - The stacks directory that contains the results from the pstacks program.
+# $stacks_output_dir - The stacks directory that contains the results from the ustacks program.
 #
 # $stacks_sql_id - The SQL ID to insert into the output to identify this sample.
+#
+# $num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog. Default: 1
 #
 # $num_threads - The number of threads to use for sstacks.
 # 
@@ -286,6 +294,10 @@ sub cstacks{
 	# The SQL ID to insert into the output to identify this sample.
 	my $stacks_sql_id = shift;
 	die "Error lost the SQL ID to insert into the output to identify this sample" unless defined $stacks_sql_id;
+	
+	# The number of mismatches allowed between sample tags when generating the catalog.
+	my $num_mismatches_tag = shift;
+	die "Error lost the number of mismatches allowed between sample tags when generating the catalog" unless defined $num_mismatches_tag;
 	
 	# The number of threads to use for cstacks.
 	my $num_threads = shift;
@@ -333,11 +345,11 @@ sub cstacks{
 		# o — output path to write results.
 		# s — TSV file from which to load radtags.
 		# p — enable parallel execution with num_threads threads.
+		# n — number of mismatches allowed between sample tags when generating the catalog.
 
 		#### UNUSED PARAMETERS ####
 		# g — base catalog matching on genomic location, not sequence identity.
 		# m — include tags in the catalog that match to more than one entry.
-		# n — number of mismatches allowed between sample tags when generating the catalog.
 		# h — display this help messsage.
 
 		# Catalog editing:
@@ -345,9 +357,10 @@ sub cstacks{
 
 		# Advanced options:
 		# --report_mmatches — report query loci that match more than one catalog locus.
+		
 		warn "Executing cstacks.....\n\n";
 		my $cstacks_joined_soptions = join("\\\n", @cstacks_soptions);
-		my $cstacksCmd  = "$cstacks -b $stacks_sql_id -o $stacks_output_dir -p $num_threads \\\n $cstacks_joined_soptions 2> $cstacks_log_outfile";
+		my $cstacksCmd  = "$cstacks -b $stacks_sql_id -o $stacks_output_dir -n $num_mismatches_tag -p $num_threads \\\n $cstacks_joined_soptions 2> $cstacks_log_outfile";
 		warn $cstacksCmd . "\n\n";
 		system($cstacksCmd) == 0 or die "Error calling $cstacksCmd: $?";
 	}
@@ -356,7 +369,7 @@ sub cstacks{
 	return $cstacks_file;
 }
 
-# sstacks($stacks_catalog_infile, $stacks_sample_infile, $stacks_sql_id, $num_threads, $stacks_output_dir) - Executes the sstacks program in the Stacks Software Suite.
+# sstacks($stacks_catalog_infile, $stacks_sample_infile, $stacks_sql_id, $num_threads, $stacks_output_dir) - Executes the sstacks program in the Stacks Software Suite. Sets of stacks constructed by the pstacks program is searched against the catalog produced by cstacks.
 # 
 # Input paramater(s):
 # 
