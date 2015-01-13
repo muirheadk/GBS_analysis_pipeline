@@ -157,7 +157,7 @@ my ($bwa_align_files, $bwa_align_file_count) = find_files($bwa_output_dir, "sam"
 foreach my $file_name (sort keys %{$bwa_align_files}){
 	warn "Processing " . $file_name . ".....\n";
 	my $bwa_align_infile = $bwa_align_files->{$file_name};
-	bwa_pad_sam_files($bwa_align_infile, $padded_sam_output_dir);
+	bwa_pad_sam_files($bwa_align_infile, $gbs_sequence_length, $padded_sam_output_dir);
 }
 
 # Create the stacks output directory if it doesn't already exist.
@@ -285,13 +285,13 @@ sub convert_refgen_bwa_input_format{
 	return ($refgen_fasta_outfile, $refgen_toc_outfile, $num_chromosomes);
 }
 
-# bwa_index($renum_refgen_fasta_infile, $gbs_fastq_infile, $refgen_output_dir) - Executes the BWA alignment program using the index option to generate BWA index .amb .ann .bwt .pac .sa files from a renumerated reference genome file.
+# bwa_index($renum_refgen_fasta_infile, $project_name, $refgen_output_dir) - Executes the BWA alignment program using the index option to generate BWA index .amb .ann .bwt .pac .sa files from a renumerated reference genome file.
 #
 # Input paramater(s):
 #
 # $renum_refgen_fasta_infile - The renumerated reference genome input fasta file.
 #
-# $gbs_fastq_infile - The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
+# $project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 #
 # $refgen_output_dir - The reference genome output directory that contains the .amb .ann .bwt .pac .sa index files.
 
@@ -451,18 +451,24 @@ sub bwa_samse{
 }
 
 
-# bwa_pad_sam_files($sam_infile, $padded_sam_output_dir) - Pads the BWA sam alignment files with poly-Ns so that all sequences are of uniform length.
+# bwa_pad_sam_files($sam_infile, $gbs_sequence_length, $padded_sam_output_dir) - Pads the BWA sam alignment files with poly-Ns so that all sequences are of uniform length.
 # 
 # Input paramater(s):
 # 
 # $sam_infile - The unpadded BWA sam alignment input file.
-# 
+#
+# $gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences.
+#
 # $padded_sam_output_dir - The output directory that contains all the BWA sam alignment files.
 sub bwa_pad_sam_files{
 
 	# The unpadded BWA sam alignment input file.
 	my $sam_infile = shift;
 	die "Error lost the sam input file" unless defined $sam_infile;
+	
+	# The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences.
+	my $gbs_sequence_length = shift;
+	die "Error lost the GBS fastq sequence length in base pairs (bps)" unless defined $gbs_sequence_length;
 
 	# The output directory that contains all the BWA sam alignment files.
 	my $padded_sam_output_dir = shift;
