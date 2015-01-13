@@ -4,10 +4,8 @@ use strict;
 use Getopt::Long;
 
 use Parallel::Loops;
-use Switch;
 use File::Basename;
 use IPC::Open2;
-use List::Compare;
 
 #### PROGRAM NAME ####
 # trim_adapter_fastq_parallel_regex.pl - Program to trim the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
@@ -16,7 +14,7 @@ use List::Compare;
 # This program trims the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
 
 #### SAMPLE COMMAND ####
-# perl trim_adapter_fastq_parallel_regex.pl -i /home/kevmu/scratch/GBS_test/PROJECT_LEADER_DIR_NO_MISMATCHES/CHRISTIANNE_MCDONALD -p CHRISTIANNE_MCDONALD -t 3 -q 32 -m 16 -l 92 -r Pstl/MspI -c 16 -n true -o /home/kevmu/scratch/GBS_test/GBS_TRIMMED_ADAPTER_DIR/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR
+# perl trim_adapter_fastq_parallel_regex.pl -i ~/workspace/GBS_data-08-10-2013/PstI_MspI_GBS_Data/PstI_MspI_PROCESSED_RADTAGS/PROJECT_LEADER_DIR_NO_MISMATCHES/CHRISTIANNE_MCDONALD -p CHRISTIANNE_MCDONALD -t 3 -q 32 -m 16 -l 92 -r Pstl/MspI -c 16 -n true -o ~/workspace/GBS_data-08-10-2013/PstI_MspI_GBS_Data/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR
 my ($fastq_file_dir, $project_name, $restriction_enzymes, $gbs_sequence_length, $adapter_length_min_threshold, $adapter_trim_offset, $min_trimmed_fastq_sequence_length, $regex_num_cpu, $pad_sequences, $output_dir);
 GetOptions(
 	'i=s'    => \$fastq_file_dir, # The *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
@@ -102,11 +100,13 @@ USAGE
 }
 
 # Obtain the GBS common adapter sequence to trim from the GBS fastq sequences based on the restriction enzyme(s) used in the digest.
-my $fastq_adapter_sequence = '';
-switch($restriction_enzymes){
-   case 'ApeKI'       { $fastq_adapter_sequence = 'CWGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAG' } # Not operational yet
-   case 'Pstl/MspI'   { $fastq_adapter_sequence = 'CCGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATCTCGTATGCCGTCTTCTGCTTG' }
-   else               { die "Input $restriction_enzymes is not one of the recognized restriction enzyme(s)! Please specify either ApeKI or Pstl/MspI on the command line" }
+my $fastq_adapter_sequence;
+if($restriction_enzymes eq 'ApeKI'){ # ApeKI
+	$fastq_adapter_sequence = 'CWGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAG';
+}elsif($restriction_enzymes eq 'Pstl/MspI'){ # Pstl/MspI
+	$fastq_adapter_sequence = 'CCGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATCTCGTATGCCGTCTTCTGCTTG';
+}else{
+	die "Input $restriction_enzymes is not one of the recognized restriction enzyme(s)! Please specify either ApeKI or Pstl/MspI on the command line.";
 }
 
 # Create output directory if it doesn't already exist.
@@ -296,9 +296,18 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 				my $alignment_found = "false";
 				for(my $i = $adapter_sequence_length; $i >= $adapter_length_min_threshold; $i--){
 
-		# 				warn "$i eq $adapter_sequence_length\n";
+# 					warn "$i eq $adapter_sequence_length\n";
 					if($i eq $adapter_sequence_length){
-						my $common_adapter_regex = qr($common_adapter_sequence);
+						my $common_adapter_regex;
+						if($restriction_enzymes eq 'ApeKI'){
+							my $common_adapter_sequence_ApeKI = $common_adapter_sequence;
+							$common_adapter_sequence_ApeKI =~ s/W/\[AT\]/g;
+							$common_adapter_regex = qr($common_adapter_sequence_ApeKI);
+						}elsif($restriction_enzymes eq 'Pstl/MspI'){
+							my $common_adapter_sequence_Pstl_MspI = $common_adapter_sequence;
+							$common_adapter_regex = qr($common_adapter_sequence_Pstl_MspI);
+						}
+						
 						if($fastq_sequence =~ /$common_adapter_regex/g){
 							$target_start = ($-[0] + 1);
 							$target_end = $+[0];
@@ -313,8 +322,18 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 							$alignment_found = "true";
 							last;
 						}
+						
 					}elsif($i < $adapter_sequence_length){
-						my $common_adapter_regex = qr($common_adapter_sequence);
+						my $common_adapter_regex;
+						if($restriction_enzymes eq 'ApeKI'){
+							my $common_adapter_sequence_ApeKI = $common_adapter_sequence;
+							$common_adapter_sequence_ApeKI =~ s/W/\[AT\]/g;
+							$common_adapter_regex = qr($common_adapter_sequence_ApeKI);
+						}elsif($restriction_enzymes eq 'Pstl/MspI'){
+							my $common_adapter_sequence_Pstl_MspI = $common_adapter_sequence;
+							$common_adapter_regex = qr($common_adapter_sequence_Pstl_MspI);
+						}
+						
 						while($fastq_sequence =~ /$common_adapter_regex/g){
 							if($+[0] eq $gbs_sequence_length){
 								$target_start = ($-[0] + 1);
