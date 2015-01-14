@@ -3,8 +3,8 @@ use warnings;
 use strict;
 use Getopt::Long;
 
-use File::Copy;
 use File::Basename;
+use File::Copy;
 use Switch;
 
 #### PROGRAM NAME ####
@@ -123,20 +123,20 @@ OPTIONS:
 USAGE
 }
 
+# Choose the restriction enzyme option based on the restriction enzyme(s) used.
+my $renzyme_option = "";
+if($restriction_enzymes eq 'ApeKI'){ # ApeKI
+	$renzyme_option = 'apeKI';
+}elsif($restriction_enzymes eq 'PstI/MspI'){ # PstI/MspI
+	$renzyme_option = 'pstI';
+}
+else{ 
+	die "Input $restriction_enzymes is not one of the recognized restriction enzyme(s)! Please specify either ApeKI or PstI/MspI on the command line."
+}
+
 # Create output directory if it doesn't already exist.
 unless(-d $output_dir){
       mkdir($output_dir, 0777) or die "Can't make directory: $!";
-}
-
-my ($split_fastq_files, $split_fastq_file_counter);
-if(defined($single_end_fastq_infile)){
-	# Execute the process_radtags_single_end program for quality assessment and quality control filtering and demultiplexing the files based on barcode and project leader name.
-	($split_fastq_files, $split_fastq_file_counter) = process_radtags_single_end($single_end_fastq_infile, $restriction_enzymes, $sliding_window_size, $quality_score_limit, $gbs_sequence_length, $barcode_infile, $barcode_option, $num_mismatches, $output_dir);
-}elsif(defined($first_paired_end_fastq_infile) and defined($second_paired_end_fastq_infile)){
-	# Execute the process_radtags_paired_end program for quality assessment and quality control filtering and demultiplexing the files based on barcode and project leader name.
-	($split_fastq_files, $split_fastq_file_counter) = process_radtags_paired_end($first_paired_end_fastq_infile, $second_paired_end_fastq_infile, $restriction_enzymes, $sliding_window_size, $quality_score_limit, $gbs_sequence_length, $barcode_infile, $barcode_option, $num_mismatches, $output_dir);
-}else{
-	die usage();
 }
 
 # Parse the barcodes input file based on barcode sequence so that we can split the bulk fastq file using the process_radtags program variants.
@@ -166,38 +166,77 @@ unless(-d $project_leader_dir){
 	mkdir($project_leader_dir, 0777) or die "Can't make directory: $!";
 }
 
-# Iterate through each split fastq sample file from the process_radtags program and rename the files based on project leader.
-foreach my $file_name (sort keys %{$split_fastq_files}){
-	warn "Processing " . $file_name . ".....\n";
-	my $split_fastq_infile = $split_fastq_files->{$file_name};
-	
-	# Get the basename of the fastq filename without the .fastq extension.
-	my $fastq_filename = fileparse($split_fastq_infile, qr/\.fq/);
-	
-	my ($split_sample_name, $split_fastq_barcode_seq) = split(/_/, $fastq_filename);
-	
-	my @split_row_entry = split(/\t/, $project_leader_barcodes{$split_fastq_barcode_seq});
-	my ($fastq_barcode_name, $fastq_barcode_seq, $fastq_project_leader) = @split_row_entry;
-	
-	# Create project output directory if it doesn't already exist.
-	my $project_output_dir = join('/', $project_leader_dir, $fastq_project_leader);
-	unless(-d $project_output_dir){
-		mkdir($project_output_dir, 0777) or die "Can't make directory: $!";
+my ($split_fastq_files, $split_fastq_file_counter);
+if(defined($single_end_fastq_infile)){
+	# Execute the process_radtags_single_end program for quality assessment and quality control filtering and demultiplexing the files based on barcode and project leader name.
+	($split_fastq_files, $split_fastq_file_counter) = process_radtags_single_end($single_end_fastq_infile, $renzyme_option, $sliding_window_size, $quality_score_limit, $gbs_sequence_length, $barcode_infile, $barcode_option, $num_mismatches, $output_dir);
+
+	# Iterate through each split fastq sample file from the process_radtags program and rename the files based on project leader.
+	foreach my $file_name (sort keys %{$split_fastq_files}){
+		warn "Processing " . $file_name . ".....\n";
+		my $split_fastq_infile = $split_fastq_files->{$file_name};
+		
+		# Get the basename of the fastq filename without the .fastq extension.
+		my $fastq_filename = fileparse($split_fastq_infile, qr/\.fq/);
+		
+		my ($split_sample_name, $split_fastq_barcode_seq) = split(/_/, $fastq_filename);
+		
+		my @split_row_entry = split(/\t/, $project_leader_barcodes{$split_fastq_barcode_seq});
+		my ($fastq_barcode_name, $fastq_barcode_seq, $fastq_project_leader) = @split_row_entry;
+		
+		# Create project output directory if it doesn't already exist.
+		my $project_output_dir = join('/', $project_leader_dir, $fastq_project_leader);
+		unless(-d $project_output_dir){
+			mkdir($project_output_dir, 0777) or die "Can't make directory: $!";
+		}
+		
+		my $fastq_barcode_project_filename = join('/', $project_output_dir, join("", $fastq_barcode_name, ".fastq"));
+		warn "Copying $file_name to $fastq_barcode_project_filename.....";
+		copy($split_fastq_infile, $fastq_barcode_project_filename) or die "Copy failed: $!";
+	# 	unlink($split_fastq_infile) or die "Could not unlink $split_fastq_infile: $!";
 	}
 	
-	my $fastq_barcode_project_filename = join('/', $project_output_dir, join("", $fastq_barcode_name, ".fastq"));
-	warn "Copying $file_name to $fastq_barcode_project_filename.....";
-	copy($split_fastq_infile, $fastq_barcode_project_filename) or die "Copy failed: $!";
-# 	unlink($split_fastq_infile) or die "Could not unlink $split_fastq_infile: $!";
+}elsif(defined($first_paired_end_fastq_infile) and defined($second_paired_end_fastq_infile)){
+	# Execute the process_radtags_paired_end program for quality assessment and quality control filtering and demultiplexing the files based on barcode and project leader name.
+	($split_fastq_files, $split_fastq_file_counter) = process_radtags_paired_end($first_paired_end_fastq_infile, $second_paired_end_fastq_infile, $renzyme_option, $sliding_window_size, $quality_score_limit, $gbs_sequence_length, $barcode_infile, $barcode_option, $num_mismatches, $output_dir);
+
+	# Iterate through each split fastq sample file from the process_radtags program and rename the files based on project leader.
+	foreach my $file_name (sort keys %{$split_fastq_files}){
+		warn "Processing " . $file_name . ".....\n";
+		my $split_fastq_infile = $split_fastq_files->{$file_name};
+		
+		# Get the basename of the fastq filename without the .fastq extension.
+		my ($fastq_filename, $fastq_dirname, $fastq_suffix) = fileparse($split_fastq_infile, qr/\.\d+\.fq|\.rem\.\d+\.fq/);
+		$fastq_suffix =~ s/\.fq//g;
+		
+		my ($split_sample_name, $split_fastq_barcode_seq) = split(/_/, $fastq_filename);
+		
+		my @split_row_entry = split(/\t/, $project_leader_barcodes{$split_fastq_barcode_seq});
+		my ($fastq_barcode_name, $fastq_barcode_seq, $fastq_project_leader) = @split_row_entry;
+		
+		# Create project output directory if it doesn't already exist.
+		my $project_output_dir = join('/', $project_leader_dir, $fastq_project_leader);
+		unless(-d $project_output_dir){
+			mkdir($project_output_dir, 0777) or die "Can't make directory: $!";
+		}
+		
+		my $fastq_barcode_project_filename = join('/', $project_output_dir, join("", $fastq_barcode_name, "$fastq_suffix.fastq"));
+		warn "Copying $file_name to $fastq_barcode_project_filename.....";
+		copy($split_fastq_infile, $fastq_barcode_project_filename) or die "Copy failed: $!";
+	# 	unlink($split_fastq_infile) or die "Could not unlink $split_fastq_infile: $!";
+	}
+	
+}else{
+	die usage();
 }
 
-# ($split_fastq_files, $split_fastq_file_counter) = process_radtags_single_end($single_end_fastq_infile, $restriction_enzymes, $sliding_window_size, $quality_score_limit, $gbs_sequence_length, $barcode_infile, $barcode_option, $num_mismatches, $output_dir) - Executes the process_radtags program from the Stacks Software Suite using a single-end fastq input file for quality assessment and quality control filtering and demultiplexing the files based on barcode and project leader name.
+# ($split_fastq_files, $split_fastq_file_counter) = process_radtags_single_end($single_end_fastq_infile, $renzyme_option, $sliding_window_size, $quality_score_limit, $gbs_sequence_length, $barcode_infile, $barcode_option, $num_mismatches, $output_dir) - Executes the process_radtags program from the Stacks Software Suite using a single-end fastq input file for quality assessment and quality control filtering and demultiplexing the files based on barcode and project leader name.
 #
 # Input paramater(s):
 # 
 # $single_end_fastq_infile - The absolute path to the single-end fastq input file to split sequences based on barcode sequences.
 #
-# $restriction_enzymes - The restriction enzyme(s) used to digest the genomic sequences.
+# $renzyme_option - The restriction enzyme used (cut site occurs on single-end read).
 # 
 # $sliding_window_size - The size of the sliding window as a fraction of the read length.
 #
@@ -227,9 +266,9 @@ sub process_radtags_single_end{
 	my $single_end_fastq_infile = shift;
 	die "Error lost fastq input file" unless defined $single_end_fastq_infile;
 	
-	# The restriction enzyme(s) used to digest the genomic sequences.
-	my $restriction_enzymes = shift;
-	die "Error lost restriction enzyme(s) used for GBS restriction digest protocol" unless defined $restriction_enzymes;
+	# The restriction enzyme used (cut site occurs on single-end read).
+	my $renzyme_option = shift;
+	die "Error lost restriction enzyme option" unless defined $renzyme_option;
 	
 	# The size of the sliding window as a fraction of the read length.
 	my $sliding_window_size = shift;
@@ -321,20 +360,6 @@ sub process_radtags_single_end{
 			$infile_type = 'fastq';
 		}
 		
-		# Choose the restriction enzyme option based on the restriction enzyme(s) used.
-		my $renzyme_option = "";
-		switch($restriction_enzymes){
-			case 'ApeKI'{ # ApeKI
-				$renzyme_option = 'apeKI';
-			}
-			case 'PstI/MspI'{ # PstI/MspI
-				$renzyme_option = 'pstI';
-			}
-			else{ 
-				die "Input $restriction_enzymes is not one of the recognized restriction enzyme(s)! Please specify either ApeKI or PstI/MspI on the command line"
-			}
-		}
-		
 		# Execute the process_radtags command using system.
 		my $process_radtagsCmd = "$process_radtags -f $single_end_fastq_infile -i $infile_type -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E $encoded_phred_offset -D -w $sliding_window_size -s $quality_score_limit -t $gbs_sequence_length --$barcode_option -e $renzyme_option --filter_illumina --barcode_dist $num_mismatches";
 		warn $process_radtagsCmd . "\n\n";
@@ -346,7 +371,7 @@ sub process_radtags_single_end{
 	return ($split_fastq_files, $split_fastq_file_counter);
 }
 
-# ($split_fastq_files, $split_fastq_file_counter) = process_radtags_paired_end($first_paired_end_fastq_infile, $second_paired_end_fastq_infile, $restriction_enzymes, $sliding_window_size, $quality_score_limit, $gbs_sequence_length, $barcode_infile, $barcode_option, $num_mismatches, $output_dir) - Executes the process_radtags program from the Stacks Software Suite using paired-end fastq input files for quality assessment and quality control filtering and demultiplexing the files based on barcode and project leader name.
+# ($split_fastq_files, $split_fastq_file_counter) = process_radtags_paired_end($first_paired_end_fastq_infile, $second_paired_end_fastq_infile, $renzyme_option, $sliding_window_size, $quality_score_limit, $gbs_sequence_length, $barcode_infile, $barcode_option, $num_mismatches, $output_dir) - Executes the process_radtags program from the Stacks Software Suite using paired-end fastq input files for quality assessment and quality control filtering and demultiplexing the files based on barcode and project leader name.
 #
 # Input paramater(s):
 # 
@@ -354,7 +379,7 @@ sub process_radtags_single_end{
 #
 # $second_paired_end_fastq_infile - The absolute path to the second GBS paired-end fastq fastq input file to split sequences based on barcode sequences.
 #
-# $restriction_enzymes - The restriction enzyme(s) used to digest the genomic sequences.
+# $renzyme_option - The restriction enzyme used (cut site occurs on single-end read).
 # 
 # $sliding_window_size - The size of the sliding window as a fraction of the read length.
 #
@@ -388,9 +413,9 @@ sub process_radtags_paired_end{
 	my $second_paired_end_fastq_infile = shift;
 	die "Error lost second paired-end fastq input file" unless defined $second_paired_end_fastq_infile;
 	
-	# The restriction enzyme(s) used to digest the genomic sequences.
-	my $restriction_enzymes = shift;
-	die "Error lost restriction enzyme(s) used for GBS restriction digest protocol" unless defined $restriction_enzymes;
+	# The restriction enzyme used (cut site occurs on single-end read).
+	my $renzyme_option = shift;
+	die "Error lost restriction enzyme option" unless defined $renzyme_option;
 	
 	# The size of the sliding window as a fraction of the read length.
 	my $sliding_window_size = shift;
@@ -480,20 +505,6 @@ sub process_radtags_paired_end{
 			$infile_type = 'gzfastq';
 		}elsif(($first_paired_end_fastq_infile =~ m/\.fastq$/) and ($second_paired_end_fastq_infile =~ m/\.fastq$/)){ # If the bulk fastq file is not compressed with extension *.fastq.
 			$infile_type = 'fastq';
-		}
-		
-		# Choose the restriction enzyme option based on the restriction enzyme(s) used.
-		my $renzyme_option = "";
-		switch($restriction_enzymes){
-			case 'ApeKI'{ # ApeKI
-				$renzyme_option = 'apeKI';
-			}
-			case 'PstI/MspI'{ # PstI/MspI
-				$renzyme_option = 'pstI';
-			}
-			else{ 
-				die "Input $restriction_enzymes is not one of the recognized restriction enzyme(s)! Please specify either ApeKI or PstI/MspI on the command line"
-			}
 		}
 		
 		# Execute the process_radtags command using system.
