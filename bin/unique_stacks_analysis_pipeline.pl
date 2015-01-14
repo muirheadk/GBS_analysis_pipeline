@@ -34,9 +34,11 @@ GetOptions(
 # Print usage message if the following input parameters are not specified.
 usage() unless (
 	defined $gbs_fastq_dir
-	and defined $project_name
 	and defined $output_dir
 );
+
+# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
+$project_name = '' unless defined $project_name;
 
 # The fastq input file type. Default: gzfastq
 $gbs_fastq_file_type = 'gzfastq' unless defined $gbs_fastq_file_type;
@@ -147,6 +149,9 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	# Execute the ustacks program, which extracts exact-matching stacks and detects SNPs at each locus using a maximum likelihood framework.
 	ustacks($gbs_fastq_infile, $sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, 
 		$num_threads, $alpha_value_ustacks, $max_locus_stacks, $stacks_output_dir);
+	
+	# unlink uncompressed file if gbs_fastq_file_type is gzfastq.
+	unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if($gbs_fastq_file_type eq "gzfastq");
 	
 	$sql_id++;
 }
@@ -504,10 +509,17 @@ sub gunzip_fastq_file{
 	die "Error lost the project name" unless defined $project_name;
 	
 	my ($fastq_filename, $fastq_dir) = fileparse($fastq_file, qr/\.fastq.gz/);
+
+	# Split the fastq filename so that we can get the individual id.
+	my @split_fastq_filename = split(/_/, $fastq_filename);
+	my $individual_id = $split_fastq_filename[0];
 	
-	#9315_CGCCTTAT_5_E11_trimmed_offset_3.fastq.gz
-	$fastq_filename =~ s/\_[ACGT]+\_\d+\_[A-Z]+\d+\_trimmed\_offset\_\d+//g;
-	my $uncompressed_fastq_file = join('/', $fastq_dir, join("_", $fastq_filename, $project_name) . ".fastq");
+	my $uncompressed_fastq_file;
+	if($project_name ne ''){
+		$uncompressed_fastq_file = join('/', $fastq_dir, join("_", $individual_id, $project_name) . ".fastq");
+	}else{
+		$uncompressed_fastq_file = join('/', $fastq_dir, $individual_id . ".fastq");
+	}
 	
 	unless(-s $uncompressed_fastq_file){
 		warn "Calling gunzip for $fastq_file....\n";
