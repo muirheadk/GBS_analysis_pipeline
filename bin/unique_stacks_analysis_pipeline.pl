@@ -126,7 +126,11 @@ if($gbs_fastq_file_type eq "gzfastq"){
 	($gbs_fastq_files, $gbs_fastq_file_count) = find_files($gbs_fastq_dir, "fastq.gz");
 }elsif($gbs_fastq_file_type eq "fastq"){
 	($gbs_fastq_files, $gbs_fastq_file_count) = find_files($gbs_fastq_dir, "fastq");
+}else{
+	die "Error: $gbs_fastq_file_type is not a recognized input file type. Use the -t option and specify gzfastq for *.fastq.gz files or fastq for *.fastq files.";
 }
+
+die "Error: The GBS fastq file count was $gbs_fastq_file_count. The input file type was specified as $gbs_fastq_file_type. Either you specified the wrong directory or the files in $gbs_fastq_dir are a different format than $gbs_fastq_file_type. Use the -t option and specify gzfastq for *.fastq.gz files or fastq for *fastq files." unless($gbs_fastq_file_count > 0);
 
 # Iterate through each GBS fastq file and execute the ustacks program, which extracts exact-matching stacks and detects SNPs at each locus using a maximum likelihood framework.
 my $sql_id = 1;
