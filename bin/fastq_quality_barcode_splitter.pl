@@ -139,7 +139,7 @@ unless(-d $output_dir){
 }
 
 # Parse the barcodes input file based on barcode sequence so that we can split the bulk fastq file using the process_radtags program variants.
-my %project_leader_barcodes = ();
+my %project_leader_names = ();
 open(INFILE, "<$barcode_infile") or die "Couldn't open file $barcode_infile for reading, $!";
 my $i = 0;
 while(<INFILE>){
@@ -148,10 +148,7 @@ while(<INFILE>){
 	if($i ne 0){
 		my @split_row_entry = split(/\t/, $_);
 		my ($fastq_plate_num, $fastq_well_row, $fastq_well_column, $fastq_run_id, $fastq_project_leader, $fastq_barcode_seq) = @split_row_entry;
-
-		my $fastq_barcode_name = join("_", $fastq_run_id, $fastq_barcode_seq, $fastq_plate_num, join("", $fastq_well_row, $fastq_well_column));
-		$project_leader_barcodes{$fastq_barcode_seq} = join("\t", $fastq_barcode_name, $fastq_barcode_seq, $fastq_project_leader);
-		
+		$project_leader_names{$fastq_run_id} = $fastq_project_leader;
 	}
 	$i++;
 }
@@ -167,6 +164,7 @@ unless(-d $project_leader_dir){
 
 my ($split_fastq_files, $split_fastq_file_counter);
 if(defined($single_end_fastq_infile)){
+
 	# Execute the process_radtags_single_end program for quality assessment and quality control filtering and demultiplexing the files based on barcode and project leader name.
 	($split_fastq_files, $split_fastq_file_counter) = process_radtags_single_end($single_end_fastq_infile, $renzyme_option, $sliding_window_size, $quality_score_limit, $gbs_sequence_length, $barcode_infile, $barcode_option, $num_mismatches, $output_dir);
 
@@ -178,10 +176,7 @@ if(defined($single_end_fastq_infile)){
 		# Get the basename of the fastq filename without the .fastq extension.
 		my $fastq_filename = fileparse($split_fastq_infile, qr/\.fq/);
 		
-		my ($split_sample_name, $split_fastq_barcode_seq) = split(/_/, $fastq_filename);
-		
-		my @split_row_entry = split(/\t/, $project_leader_barcodes{$split_fastq_barcode_seq});
-		my ($fastq_barcode_name, $fastq_barcode_seq, $fastq_project_leader) = @split_row_entry;
+		my $fastq_project_leader = $project_leader_names{$fastq_filename};
 		
 		# Create project output directory if it doesn't already exist.
 		my $project_output_dir = join('/', $project_leader_dir, $fastq_project_leader);
@@ -189,13 +184,14 @@ if(defined($single_end_fastq_infile)){
 			mkdir($project_output_dir, 0777) or die "Can't make directory: $!";
 		}
 		
-		my $fastq_barcode_project_filename = join('/', $project_output_dir, join("", $fastq_barcode_name, ".fastq"));
-		warn "Copying $file_name to $fastq_barcode_project_filename.....";
-		copy($split_fastq_infile, $fastq_barcode_project_filename) or die "Copy failed: $!";
+		my $fastq_project_leader_outfile = join('/', $project_output_dir, join("", $fastq_filename, ".fastq"));
+		warn "Copying $file_name to $fastq_project_leader_outfile.....";
+		copy($split_fastq_infile, $fastq_project_leader_outfile) or die "Copy failed: $!";
 	# 	unlink($split_fastq_infile) or die "Could not unlink $split_fastq_infile: $!";
 	}
 	
 }elsif(defined($first_paired_end_fastq_infile) and defined($second_paired_end_fastq_infile)){
+
 	# Execute the process_radtags_paired_end program for quality assessment and quality control filtering and demultiplexing the files based on barcode and project leader name.
 	($split_fastq_files, $split_fastq_file_counter) = process_radtags_paired_end($first_paired_end_fastq_infile, $second_paired_end_fastq_infile, $renzyme_option, $sliding_window_size, $quality_score_limit, $gbs_sequence_length, $barcode_infile, $barcode_option, $num_mismatches, $output_dir);
 
@@ -208,10 +204,7 @@ if(defined($single_end_fastq_infile)){
 		my ($fastq_filename, $fastq_dirname, $fastq_suffix) = fileparse($split_fastq_infile, qr/\.\d+\.fq|\.rem\.\d+\.fq/);
 		$fastq_suffix =~ s/\.fq//g;
 		
-		my ($split_sample_name, $split_fastq_barcode_seq) = split(/_/, $fastq_filename);
-		
-		my @split_row_entry = split(/\t/, $project_leader_barcodes{$split_fastq_barcode_seq});
-		my ($fastq_barcode_name, $fastq_barcode_seq, $fastq_project_leader) = @split_row_entry;
+		my $fastq_project_leader = $project_leader_names{$fastq_filename};
 		
 		# Create project output directory if it doesn't already exist.
 		my $project_output_dir = join('/', $project_leader_dir, $fastq_project_leader);
@@ -219,9 +212,9 @@ if(defined($single_end_fastq_infile)){
 			mkdir($project_output_dir, 0777) or die "Can't make directory: $!";
 		}
 		
-		my $fastq_barcode_project_filename = join('/', $project_output_dir, join("", $fastq_barcode_name, "$fastq_suffix.fastq"));
-		warn "Copying $file_name to $fastq_barcode_project_filename.....";
-		copy($split_fastq_infile, $fastq_barcode_project_filename) or die "Copy failed: $!";
+		my $fastq_project_leader_outfile = join('/', $project_output_dir, join("", $fastq_filename, "$fastq_suffix.fastq"));
+		warn "Copying $file_name to $fastq_project_leader_outfile.....";
+		copy($split_fastq_infile, $fastq_project_leader_outfile) or die "Copy failed: $!";
 	# 	unlink($split_fastq_infile) or die "Could not unlink $split_fastq_infile: $!";
 	}
 	
@@ -330,7 +323,7 @@ sub process_radtags_single_end{
 				my ($fastq_plate_num, $fastq_well_row, $fastq_well_column, $fastq_run_id, $fastq_project_leader, $fastq_barcode_seq) = ($split_row_entry[0], $split_row_entry[1], $split_row_entry[2], $split_row_entry[3], $split_row_entry[4], $split_row_entry[5]);
 
 				my $barcode_seq_length = length($fastq_barcode_seq);
-				my $barcodes_entry = join("\t", $barcode_seq_length, $fastq_barcode_seq);
+				my $barcodes_entry = join("\t", $barcode_seq_length, $fastq_barcode_seq, $fastq_run_id);
 	# 			warn $barcodes_entry . "\n";
 
 				push(@barcode_entries, [split(/\t/, $barcodes_entry)]);
@@ -346,8 +339,8 @@ sub process_radtags_single_end{
 		my $barcode_outfile = join('/', $output_dir, join("_", $restriction_enzyme_names, "single-end", "process_radtags_barcodes.txt"));
 		open(OUTFILE, ">$barcode_outfile") or die "Couldn't open file $barcode_outfile for writting, $!";
 		foreach my $barcodes_entry (sort {$b->[0] <=> $a->[0] || $a->[1] cmp $b->[1]} @barcode_entries){
-			my $fastq_barcode_seq = @$barcodes_entry[1];
-			print OUTFILE $fastq_barcode_seq . "\n";
+			my ($fastq_barcode_seq, $fastq_run_id) = (@$barcodes_entry[1], @$barcodes_entry[2]);
+			print OUTFILE join("\t", $fastq_barcode_seq, $fastq_run_id) . "\n";
 		}
 		close(OUTFILE) or die "Couldn't close file $barcode_outfile";
 
@@ -477,7 +470,7 @@ sub process_radtags_paired_end{
 				my ($fastq_plate_num, $fastq_well_row, $fastq_well_column, $fastq_run_id, $fastq_project_leader, $fastq_barcode_seq) = ($split_row_entry[0], $split_row_entry[1], $split_row_entry[2], $split_row_entry[3], $split_row_entry[4], $split_row_entry[5]);
 
 				my $barcode_seq_length = length($fastq_barcode_seq);
-				my $barcodes_entry = join("\t", $barcode_seq_length, $fastq_barcode_seq);
+				my $barcodes_entry = join("\t", $barcode_seq_length, $fastq_barcode_seq, $fastq_run_id);
 	# 			warn $barcodes_entry . "\n";
 
 				push(@barcode_entries, [split(/\t/, $barcodes_entry)]);
@@ -493,8 +486,8 @@ sub process_radtags_paired_end{
 		my $barcode_outfile = join('/', $output_dir, join("_", $restriction_enzyme_names, "paired-end", "process_radtags_barcodes.txt"));
 		open(OUTFILE, ">$barcode_outfile") or die "Couldn't open file $barcode_outfile for writting, $!";
 		foreach my $barcodes_entry (sort {$b->[0] <=> $a->[0] || $a->[1] cmp $b->[1]} @barcode_entries){
-			my $fastq_barcode_seq = @$barcodes_entry[1];
-			print OUTFILE $fastq_barcode_seq . "\n";
+			my ($fastq_barcode_seq, $fastq_run_id) = (@$barcodes_entry[1], @$barcodes_entry[2]);
+			print OUTFILE join("\t", $fastq_barcode_seq, $fastq_run_id) . "\n";
 		}
 		close(OUTFILE) or die "Couldn't close file $barcode_outfile";
 
