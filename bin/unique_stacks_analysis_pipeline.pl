@@ -150,7 +150,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	ustacks($gbs_fastq_infile, $sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, 
 		$num_threads, $alpha_value_ustacks, $max_locus_stacks, $stacks_output_dir);
 	
-	# unlink uncompressed file if gbs_fastq_file_type is gzfastq.
+	# unlink uncompressed file if $gbs_fastq_file_type is gzfastq.
 	unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if($gbs_fastq_file_type eq "gzfastq");
 	
 	$sql_id++;

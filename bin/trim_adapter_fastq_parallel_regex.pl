@@ -14,12 +14,12 @@ use IPC::Open2;
 # This program trims the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
 
 #### SAMPLE COMMAND ####
-# perl trim_adapter_fastq_parallel_regex.pl -i ~/workspace/GBS_data-08-10-2013/PstI_MspI_GBS_Data/PstI_MspI_PROCESSED_RADTAGS/PROJECT_LEADER_DIR_NO_MISMATCHES/CHRISTIANNE_MCDONALD -p CHRISTIANNE_MCDONALD -t 3 -q 32 -m 16 -l 92 -r Pstl/MspI -c 16 -n true -o ~/workspace/GBS_data-08-10-2013/PstI_MspI_GBS_Data/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR
+# perl trim_adapter_fastq_parallel_regex.pl -i ~/workspace/GBS_data-08-10-2013/PstI_MspI_GBS_Data/PstI_MspI_PROCESSED_RADTAGS/PROJECT_LEADER_DIR_NO_MISMATCHES/CHRISTIANNE_MCDONALD -p CHRISTIANNE_MCDONALD -t 3 -q 32 -m 16 -l 92 -r PstI/MspI -c 16 -n true -o ~/workspace/GBS_data-08-10-2013/PstI_MspI_GBS_Data/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR
 my ($fastq_file_dir, $project_name, $restriction_enzymes, $gbs_sequence_length, $adapter_length_min_threshold, $adapter_trim_offset, $min_trimmed_fastq_sequence_length, $regex_num_cpu, $pad_sequences, $output_dir);
 GetOptions(
 	'i=s'    => \$fastq_file_dir, # The *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 	'p=s'    => \$project_name, # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-	'r=s'    => \$restriction_enzymes, # The restriction enzyme(s) used to digest the genomic sequences. Default: Pstl/MspI
+	'r=s'    => \$restriction_enzymes, # The restriction enzyme(s) used to digest the genomic sequences. Default: PstI/MspI
 	'l=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 	'm=s'    => \$adapter_length_min_threshold, # The minimum GBS common adapter sequence length cut-off in base pairs (bps) to retain for trimming if found in a given GBS fastq sequence hit found in the adapter regex searches. Default: 16
 	't=s'    => \$adapter_trim_offset, # The trimming offset length in base pairs (bps) to trim upstream of the start of the GBS common adapter sequence found in the adapter regex searches. Default: 5
@@ -36,8 +36,8 @@ usage() unless (
 	and defined $output_dir
 );
 
-# The restriction enzyme(s) used to digest the genomic sequences. Default: Pstl/MspI
-$restriction_enzymes = 'Pstl/MspI' unless defined $restriction_enzymes;
+# The restriction enzyme(s) used to digest the genomic sequences. Default: PstI/MspI
+$restriction_enzymes = 'PstI/MspI' unless defined $restriction_enzymes;
 
 # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 $gbs_sequence_length = 92 unless defined $gbs_sequence_length;
@@ -75,9 +75,9 @@ OPTIONS:
 	e.g. /path/to/fastq_file_dir
 	
 -p project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-	e.g. MPB_MALE_GBS
+	e.g. MPB-MALE-GBS
 	
--r restriction_enzymes - The restriction enzyme(s) used to digest the genomic sequences. Default: Pstl/MspI
+-r restriction_enzymes - The restriction enzyme(s) used to digest the genomic sequences. Default: PstI/MspI
 
 -l gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 
@@ -103,10 +103,10 @@ USAGE
 my $fastq_adapter_sequence;
 if($restriction_enzymes eq 'ApeKI'){ # ApeKI
 	$fastq_adapter_sequence = 'CWGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAG';
-}elsif($restriction_enzymes eq 'Pstl/MspI'){ # Pstl/MspI
+}elsif($restriction_enzymes eq 'PstI/MspI'){ # PstI/MspI
 	$fastq_adapter_sequence = 'CCGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATCTCGTATGCCGTCTTCTGCTTG';
 }else{
-	die "Input $restriction_enzymes is not one of the recognized restriction enzyme(s)! Please specify either ApeKI or Pstl/MspI on the command line.";
+	die "Input $restriction_enzymes is not one of the recognized restriction enzyme(s)! Please specify either ApeKI or PstI/MspI on the command line.";
 }
 
 # Create output directory if it doesn't already exist.
@@ -303,7 +303,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 							my $common_adapter_sequence_ApeKI = $common_adapter_sequence;
 							$common_adapter_sequence_ApeKI =~ s/W/\[AT\]/g;
 							$common_adapter_regex = qr($common_adapter_sequence_ApeKI);
-						}elsif($restriction_enzymes eq 'Pstl/MspI'){
+						}elsif($restriction_enzymes eq 'PstI/MspI'){
 							my $common_adapter_sequence_Pstl_MspI = $common_adapter_sequence;
 							$common_adapter_regex = qr($common_adapter_sequence_Pstl_MspI);
 						}
@@ -329,7 +329,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 							my $common_adapter_sequence_ApeKI = $common_adapter_sequence;
 							$common_adapter_sequence_ApeKI =~ s/W/\[AT\]/g;
 							$common_adapter_regex = qr($common_adapter_sequence_ApeKI);
-						}elsif($restriction_enzymes eq 'Pstl/MspI'){
+						}elsif($restriction_enzymes eq 'PstI/MspI'){
 							my $common_adapter_sequence_Pstl_MspI = $common_adapter_sequence;
 							$common_adapter_regex = qr($common_adapter_sequence_Pstl_MspI);
 						}

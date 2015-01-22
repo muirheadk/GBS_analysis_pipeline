@@ -31,10 +31,12 @@ GetOptions(
 # Print usage message if the following input parameters are not specified.
 usage() unless (
 	defined $gbs_fastq_dir
-	and defined $project_name
 	and defined $refgen_infile
 	and defined $output_dir
 );
+
+# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
+$project_name = '' unless defined $project_name;
 
 # The fastq input file type. Default: gzfastq
 $gbs_fastq_file_type = 'gzfastq' unless defined $gbs_fastq_file_type;
@@ -110,7 +112,7 @@ unless(-d $refgen_output_dir){
 my ($refgen_fasta_outfile, $refgen_toc_outfile, $num_chromosomes) = convert_refgen_bwa_input_format($refgen_infile, $project_name, $refgen_output_dir);
 
 # Creates the BWA reference genome index file
-bwa_index($refgen_fasta_outfile, $project_name, $refgen_output_dir);
+bwa_index($refgen_fasta_outfile, $refgen_output_dir);
 
 # Create the BWA alignment file output directory if it doesn't already exist.
 my $bwa_output_dir = join('/', $output_dir, "BWA_ALIGNMENT_FILES");
@@ -137,7 +139,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
     
 	# If the bulk fastq file is compressed, uncompress the file and set the resulting fastq filename to be the fastq infile.
 	if($gbs_fastq_file_type eq "gzfastq"){
-		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
+		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile, $project_name);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
 	}
 
@@ -289,13 +291,11 @@ sub convert_refgen_bwa_input_format{
 	return ($refgen_fasta_outfile, $refgen_toc_outfile, $num_chromosomes);
 }
 
-# bwa_index($renum_refgen_fasta_infile, $project_name, $refgen_output_dir) - Executes the BWA alignment program using the index option to generate BWA index .amb .ann .bwt .pac .sa files from a renumerated reference genome file.
+# bwa_index($renum_refgen_fasta_infile, $refgen_output_dir) - Executes the BWA alignment program using the index option to generate BWA index .amb .ann .bwt .pac .sa files from a renumerated reference genome file.
 #
 # Input paramater(s):
 #
 # $renum_refgen_fasta_infile - The renumerated reference genome input fasta file.
-#
-# $project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 #
 # $refgen_output_dir - The reference genome output directory that contains the .amb .ann .bwt .pac .sa index files.
 
@@ -305,10 +305,6 @@ sub bwa_index{
 	# The renumerated reference genome input fasta file.
 	my $renum_refgen_fasta_infile = shift;
 	die "Error lost the renumbered reference genome input fasta file" unless defined $renum_refgen_fasta_infile;
-
-	# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-	my $project_name = shift;
-	die "Error lost the project name" unless defined $project_name;
     
 	# The reference genome output directory that contains the .amb .ann .bwt .pac .sa index files.
 	my $refgen_output_dir = shift;
@@ -862,23 +858,37 @@ sub find_files{
 }
 
 # $output_dir = gunzip_fastq_file($fastq_file) - Execute the gunzip program to uncompress the compressed fastq file.
-# 
+#
 # Input paramater(s):
-# 
+#
 # $fastq_file - The fastq file to uncompress using gunzip.
-# 
+#
 # Output paramater(s):
-# 
+#
 # $uncompressed_fastq_file - The uncompressed fastq file path.
 sub gunzip_fastq_file{
-
+	
 	# The fastq file to uncompress using gunzip.
 	my $fastq_file = shift;
 	die "Error lost the fastq file to uncompress using gunzip" unless defined $fastq_file;
 	
-	my ($fastq_filename, $fastq_dir) = fileparse($fastq_file, ".gz");
+	# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
+	my $project_name = shift;
+	die "Error lost the project name" unless defined $project_name;
 	
-	my $uncompressed_fastq_file = join('/', $fastq_dir, $fastq_filename);
+	my ($fastq_filename, $fastq_dir) = fileparse($fastq_file, qr/\.fastq.gz/);
+
+	# Split the fastq filename so that we can get the individual id.
+	my @split_fastq_filename = split(/_/, $fastq_filename);
+	my $individual_id = $split_fastq_filename[0];
+	
+	my $uncompressed_fastq_file;
+	if($project_name ne ''){
+		$uncompressed_fastq_file = join('/', $fastq_dir, join("_", $individual_id, $project_name) . ".fastq");
+	}else{
+		$uncompressed_fastq_file = join('/', $fastq_dir, $individual_id . ".fastq");
+	}
+	
 	unless(-s $uncompressed_fastq_file){
 		warn "Calling gunzip for $fastq_file....\n";
 		my $gunzipCmd  = "$gunzip -c $fastq_file > $uncompressed_fastq_file";
