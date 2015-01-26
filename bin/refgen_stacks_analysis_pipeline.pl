@@ -13,12 +13,11 @@ use File::Basename;
 # This program takes the quality filtered, demultiplexed, and adapter trimmed *.fastq input files and a reference genome fasta input file as input. Converts a reference genome fasta file to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers. It then performs a BWA alignment to align the GBS fastq sequences to a reference genome. It then executes the pstacks program, which extracts sequence stacks that were aligned to a reference genome using the BWA alignment program and identifies SNPs. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
 
 #### SAMPLE COMMAND ####
-# perl refgen_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/STEPHEN_TREVOY/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p MPB-MALE-GBS -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_sequence_data/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/DendPond_male_1.0_unplaced.scaf.fa -c 7 -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3
-my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $refgen_infile, $gbs_sequence_length, $stacks_sql_id, $min_depth_coverage_pstacks, $alpha_value_pstacks, $num_threads, $output_dir);
+# perl refgen_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/STEPHEN_TREVOY/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_sequence_data/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/DendPond_male_1.0_unplaced.scaf.fa -c 7 -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3
+my ($gbs_fastq_dir, $gbs_fastq_file_type, $refgen_infile, $gbs_sequence_length, $stacks_sql_id, $min_depth_coverage_pstacks, $alpha_value_pstacks, $num_threads, $output_dir);
 GetOptions(
 	'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 	't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Default: gzfastq
-	'p=s'    => \$project_name, # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 	'g=s'    => \$refgen_infile, # The absolute path to the reference genome input fasta file to align GBS fastq sequences.
 	'l=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 	'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
@@ -34,9 +33,6 @@ usage() unless (
 	and defined $refgen_infile
 	and defined $output_dir
 );
-
-# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-$project_name = '' unless defined $project_name;
 
 # The fastq input file type. Default: gzfastq
 $gbs_fastq_file_type = 'gzfastq' unless defined $gbs_fastq_file_type;
@@ -68,7 +64,7 @@ sub usage {
 
 die <<"USAGE";
 
-Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -p project_name -g refgen_infile -l gbs_sequence_length -b stacks_sql_id -d min_depth_coverage_pstacks -a alpha_value_pstacks -c num_cpu_cores -o output_dir
+Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -g refgen_infile -l gbs_sequence_length -b stacks_sql_id -d min_depth_coverage_pstacks -a alpha_value_pstacks -c num_cpu_cores -o output_dir
 
 DESCRIPTION - This program takes the quality filtered, demultiplexed, and adapter trimmed *.fastq input files and reference genome fasta input files as input. Converts the reference genome fasta file to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers. It then performs a BWA alignment to align the GBS fastq sequences to the reference genome. It then executes the pstacks program, which extracts sequence stacks that were aligned to the reference genome using the BWA alignment program and identifies SNPs. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
 
@@ -77,8 +73,6 @@ OPTIONS:
 -i gbs_fastq_dir - The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 
 -t gbs_fastq_file_type - The fastq input file type. Default: gzfastq
-    
--p project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 
 -g refgen_infile - The absolute path to the reference genome input fasta file to align GBS fastq sequences using the BWA alignment program.
 
@@ -109,7 +103,7 @@ unless(-d $refgen_output_dir){
 }
 
 # Converts the reference genome to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers.
-my ($refgen_fasta_outfile, $refgen_toc_outfile, $num_chromosomes) = convert_refgen_bwa_input_format($refgen_infile, $project_name, $refgen_output_dir);
+my ($refgen_fasta_outfile, $refgen_toc_outfile, $num_chromosomes) = convert_refgen_bwa_input_format($refgen_infile, $refgen_output_dir);
 
 # Creates the BWA reference genome index file
 bwa_index($refgen_fasta_outfile, $refgen_output_dir);
@@ -139,15 +133,15 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
     
 	# If the bulk fastq file is compressed, uncompress the file and set the resulting fastq filename to be the fastq infile.
 	if($gbs_fastq_file_type eq "gzfastq"){
-		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile, $project_name);
+		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
 	}
 
 	# Creates the BWA alignment file using the GBS fastq input file to align the fastq sequence reads to the reference genome.
-	my $bwa_alignment_outfile = bwa_aln($refgen_fasta_outfile, $gbs_fastq_infile, $project_name, $num_threads, $bwa_output_dir);
+	my $bwa_alignment_outfile = bwa_aln($refgen_fasta_outfile, $gbs_fastq_infile, $num_threads, $bwa_output_dir);
 
 	# Creates the BWA single-ended alignment file in sam format using the GBS fastq input file to align the fastq sequence reads to the reference genome and the BWA aln format file.
-	my $bwa_aligned_master_outfile = bwa_samse($refgen_fasta_outfile, $gbs_fastq_infile, $project_name, $bwa_alignment_outfile, $bwa_output_dir);
+	my $bwa_aligned_master_outfile = bwa_samse($refgen_fasta_outfile, $gbs_fastq_infile, $bwa_alignment_outfile, $bwa_output_dir);
 }
 
 # Create the padded sam alignment file output directory if it doesn't already exist.
@@ -208,13 +202,11 @@ foreach my $file_name (sort keys %{$pstacks_tags_files}){
 	}
 }
 
-# convert_refgen_bwa_input_format($renum_refgen_fasta_infile, $project_name, $refgen_output_dir) - Converts the reference genome to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers.
+# convert_refgen_bwa_input_format($renum_refgen_fasta_infile, $refgen_output_dir) - Converts the reference genome to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers.
 #
 # Input paramater(s):
 #
 # $renum_refgen_fasta_infile - The renumerated reference genome input fasta file.
-#
-# $project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 #
 # $refgen_output_dir - The reference genome output directory.
 sub convert_refgen_bwa_input_format{
@@ -223,18 +215,14 @@ sub convert_refgen_bwa_input_format{
 	my $refgen_fasta_infile = shift;
 	die "Error lost the reference genome input fasta file." unless defined $refgen_fasta_infile;
 	
-	# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-	my $project_name = shift;
-	die "Error lost the project name" unless defined $project_name;
-	
 	# The reference genome output directory.
 	my $refgen_output_dir = shift;
 	die "Error lost reference genome output directory" unless defined $refgen_output_dir;
 
 	# Format the renumerated fasta and table of contents .toc files.
 	my $refgen_fasta_filename = fileparse($refgen_fasta_infile);
-	my $refgen_fasta_outfile = join('/', $refgen_output_dir, join("_", $project_name, $refgen_fasta_filename . ".fasta"));
-	my $refgen_toc_outfile = join('/', $refgen_output_dir, join("_", $project_name, $refgen_fasta_filename . ".toc.txt"));
+	my $refgen_fasta_outfile = join('/', $refgen_output_dir, $refgen_fasta_filename . ".fasta");
+	my $refgen_toc_outfile = join('/', $refgen_output_dir, $refgen_fasta_filename . ".toc.txt");
 	
 	# Generate the renumerated fasta and table of contents .toc files if the files are not already generated.
 	unless(-s $refgen_fasta_outfile and -s $refgen_toc_outfile){
@@ -253,6 +241,7 @@ sub convert_refgen_bwa_input_format{
 			$seq_counter++;
 		
 		}
+		
  		my $num_digits = length($seq_counter - 1);
 		open(REFGEN_FASTA_OUTFILE, ">$refgen_fasta_outfile") or die "Couldn't open file $refgen_fasta_outfile for writting, $!";
 		open(REFGEN_TOC_OUTFILE, ">$refgen_toc_outfile") or die "Couldn't open file $refgen_toc_outfile for writting, $!"; 
@@ -326,15 +315,13 @@ sub bwa_index{
 	}
 }
 
-# $bwa_alignment_outfile = bwa_samse($renum_refgen_fasta_infile, $gbs_fastq_infile, $project_name, $num_threads, $bwa_output_dir) - Executes the BWA alignment program using the aln option to generate BWA sai files from a renumerated reference genome and quality filtered and trimmed adapter GBS fastq input files.
+# $bwa_alignment_outfile = bwa_samse($renum_refgen_fasta_infile, $gbs_fastq_infile, $num_threads, $bwa_output_dir) - Executes the BWA alignment program using the aln option to generate BWA sai files from a renumerated reference genome and quality filtered and trimmed adapter GBS fastq input files.
 #
 # Input paramater(s):
 #
 # $renum_refgen_fasta_infile - The renumerated reference genome input fasta file.
 #
 # $gbs_fastq_infile - The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
-#
-# $project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 #
 # $num_threads - The number of threads to use for BWA.
 #
@@ -354,10 +341,6 @@ sub bwa_aln{
 	# The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
 	my $gbs_fastq_infile = shift;
 	die "Error lost the GBS fastq input file" unless defined $gbs_fastq_infile;
-
-	# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-	my $project_name = shift;
-	die "Error lost the project name" unless defined $project_name;
     
 	# The number of threads to use for BWA.
 	my $num_threads = shift;
@@ -375,7 +358,7 @@ sub bwa_aln{
 	my $individual_id = $split_gbs_fastq_filename[0];
     
 	# Format the sai file.
-	my $bwa_alignment_outfile = join('/', $bwa_output_dir, join("_", $individual_id, $project_name . ".sai"));
+	my $bwa_alignment_outfile = join('/', $bwa_output_dir, $individual_id . ".sai");
 
 	# Execute the BWA alignment program if the SAI file is not already generated.
 	unless(-s $bwa_alignment_outfile){
@@ -389,15 +372,13 @@ sub bwa_aln{
 	return $bwa_alignment_outfile;
 }
 
-# $bwa_aligned_master_outfile = bwa_samse($renum_refgen_fasta_infile, $gbs_fastq_infile, $project_name, $bwa_alignment_infile, $bwa_output_dir) - Executes the BWA alignment program using the samse option to generate sam alignment files from a renumerated reference genome, BWA sai, and quality filtered and trimmed adapter GBS fastq input files.
+# $bwa_aligned_master_outfile = bwa_samse($renum_refgen_fasta_infile, $gbs_fastq_infile, $bwa_alignment_infile, $bwa_output_dir) - Executes the BWA alignment program using the samse option to generate sam alignment files from a renumerated reference genome, BWA sai, and quality filtered and trimmed adapter GBS fastq input files.
 # 
 # Input paramater(s):
 # 
 # $renum_refgen_fasta_infile - The renumerated reference genome input fasta file.
 # 
 # $gbs_fastq_infile - The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
-# 
-# $project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 # 
 # $bwa_alignment_infile - The BWA alignment index input file.
 # 
@@ -418,10 +399,6 @@ sub bwa_samse{
 	my $gbs_fastq_infile = shift;
 	die "Error lost the GBS fastq input file" unless defined $gbs_fastq_infile;
 
-	# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-	my $project_name = shift;
-	die "Error lost the project name" unless defined $project_name;
-
 	# The BWA alignment index input file.
 	my $bwa_alignment_infile = shift;
 	die "Error lost the BWA SAI formatted alignment (.sai) file" unless defined $bwa_alignment_infile;
@@ -438,7 +415,7 @@ sub bwa_samse{
 	my $individual_id = $split_gbs_fastq_filename[0];
 
 	# Execute the BWA alignment program if the sam alignment file is not already generated.
-	my $bwa_aligned_master_outfile = join('/', $bwa_output_dir, join("_", $individual_id, $project_name . ".sam"));
+	my $bwa_aligned_master_outfile = join('/', $bwa_output_dir, $individual_id . ".sam");
 	unless(-s $bwa_aligned_master_outfile){
 		warn "Generating the bwa sam file.....\n\n";
 		my $bwaSamseCmd  = "$bwa samse $renum_refgen_fasta_infile $bwa_alignment_infile $gbs_fastq_infile > $bwa_aligned_master_outfile";
@@ -872,22 +849,13 @@ sub gunzip_fastq_file{
 	my $fastq_file = shift;
 	die "Error lost the fastq file to uncompress using gunzip" unless defined $fastq_file;
 	
-	# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-	my $project_name = shift;
-	die "Error lost the project name" unless defined $project_name;
-	
 	my ($fastq_filename, $fastq_dir) = fileparse($fastq_file, qr/\.fastq.gz/);
 
 	# Split the fastq filename so that we can get the individual id.
 	my @split_fastq_filename = split(/_/, $fastq_filename);
 	my $individual_id = $split_fastq_filename[0];
 	
-	my $uncompressed_fastq_file;
-	if($project_name ne ''){
-		$uncompressed_fastq_file = join('/', $fastq_dir, join("_", $individual_id, $project_name) . ".fastq");
-	}else{
-		$uncompressed_fastq_file = join('/', $fastq_dir, $individual_id . ".fastq");
-	}
+	my $uncompressed_fastq_file = join('/', $fastq_dir, $individual_id . ".fastq");
 	
 	unless(-s $uncompressed_fastq_file){
 		warn "Calling gunzip for $fastq_file....\n";
