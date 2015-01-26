@@ -853,11 +853,17 @@ sub gunzip_fastq_file{
 	die "Error lost the fastq file to uncompress using gunzip" unless defined $fastq_file;
 	
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> d9c5952412eae3e01fc97293c267a80877439838
 	# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 	my $project_name = shift;
 	die "Error lost the project name" unless defined $project_name;
 	
+<<<<<<< HEAD
+>>>>>>> d9c5952412eae3e01fc97293c267a80877439838
+=======
 >>>>>>> d9c5952412eae3e01fc97293c267a80877439838
 	my ($fastq_filename, $fastq_dir) = fileparse($fastq_file, qr/\.fastq.gz/);
 
@@ -866,14 +872,20 @@ sub gunzip_fastq_file{
 	my $individual_id = $split_fastq_filename[0];
 	
 <<<<<<< HEAD
+<<<<<<< HEAD
 	my $uncompressed_fastq_file = join('/', $fastq_dir, $individual_id . ".fastq");
 =======
+=======
+>>>>>>> d9c5952412eae3e01fc97293c267a80877439838
 	my $uncompressed_fastq_file;
 	if($project_name ne ''){
 		$uncompressed_fastq_file = join('/', $fastq_dir, join("_", $individual_id, $project_name) . ".fastq");
 	}else{
 		$uncompressed_fastq_file = join('/', $fastq_dir, $individual_id . ".fastq");
 	}
+<<<<<<< HEAD
+>>>>>>> d9c5952412eae3e01fc97293c267a80877439838
+=======
 >>>>>>> d9c5952412eae3e01fc97293c267a80877439838
 	
 	unless(-s $uncompressed_fastq_file){
