@@ -14,12 +14,11 @@ use File::Basename;
 
 #### SAMPLE COMMAND ####
 # perl unique_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/GBS_TRIMMED_ADAPTER_DIR/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR/CHRISTIANNE_MCDONALD/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p POLYGONIA -c 7 -o ~/workspace/GBS_data-08-10-2013/CHRISTIANNE_MCDONALD_POLYGONIA
-my ($gbs_fastq_dir, $gbs_fastq_file_type, $project_name, $stacks_sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $alpha_value_ustacks, $max_locus_stacks, $num_mismatches_tag, $num_threads, $output_dir);
+my ($gbs_fastq_dir, $gbs_fastq_file_type, $stacks_sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $alpha_value_ustacks, $max_locus_stacks, $num_mismatches_tag, $num_threads, $output_dir);
 
 GetOptions(
 	'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 	't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Default: gzfastq
-	'p=s'    => \$project_name, # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 	'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
 	'd=s'    => \$min_depth_coverage_ustacks, # The minimum depth of coverage to report a stack. Default: 2
 	'm=s'    => \$max_nuc_distance_ustacks, # The maximum distance (in nucleotides) allowed between stacks. Default: 2
@@ -36,9 +35,6 @@ usage() unless (
 	defined $gbs_fastq_dir
 	and defined $output_dir
 );
-
-# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-$project_name = '' unless defined $project_name;
 
 # The fastq input file type. Default: gzfastq
 $gbs_fastq_file_type = 'gzfastq' unless defined $gbs_fastq_file_type;
@@ -87,8 +83,6 @@ OPTIONS:
 -i gbs_fastq_dir - The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 
 -t gbs_fastq_file_type - The fastq input file type. Default: gzfastq
-
--p project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 
 -b stacks_sql_id - The SQL ID to insert into the output to identify this sample.
 
@@ -142,7 +136,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
     
 	# If the bulk fastq file is compressed, uncompress the file and set the resulting fastq filename to be the fastq infile.
 	if($gbs_fastq_file_type eq "gzfastq"){
-		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile, $project_name);
+		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
 	}
 	
@@ -504,22 +498,13 @@ sub gunzip_fastq_file{
 	my $fastq_file = shift;
 	die "Error lost the fastq file to uncompress using gunzip" unless defined $fastq_file;
 	
-	# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-	my $project_name = shift;
-	die "Error lost the project name" unless defined $project_name;
-	
 	my ($fastq_filename, $fastq_dir) = fileparse($fastq_file, qr/\.fastq.gz/);
 
 	# Split the fastq filename so that we can get the individual id.
 	my @split_fastq_filename = split(/_/, $fastq_filename);
 	my $individual_id = $split_fastq_filename[0];
 	
-	my $uncompressed_fastq_file;
-	if($project_name ne ''){
-		$uncompressed_fastq_file = join('/', $fastq_dir, join("_", $individual_id, $project_name) . ".fastq");
-	}else{
-		$uncompressed_fastq_file = join('/', $fastq_dir, $individual_id . ".fastq");
-	}
+	my $uncompressed_fastq_file = join('/', $fastq_dir, $individual_id . ".fastq");
 	
 	unless(-s $uncompressed_fastq_file){
 		warn "Calling gunzip for $fastq_file....\n";
