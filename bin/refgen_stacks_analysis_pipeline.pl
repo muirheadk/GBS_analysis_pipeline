@@ -34,9 +34,6 @@ usage() unless (
 	and defined $output_dir
 );
 
-# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-$project_name = '' unless defined $project_name;
-
 # The fastq input file type. Default: gzfastq
 $gbs_fastq_file_type = 'gzfastq' unless defined $gbs_fastq_file_type;
 
@@ -136,7 +133,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
     
 	# If the bulk fastq file is compressed, uncompress the file and set the resulting fastq filename to be the fastq infile.
 	if($gbs_fastq_file_type eq "gzfastq"){
-		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile, $project_name);
+		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
 	}
 
@@ -852,41 +849,13 @@ sub gunzip_fastq_file{
 	my $fastq_file = shift;
 	die "Error lost the fastq file to uncompress using gunzip" unless defined $fastq_file;
 	
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> d9c5952412eae3e01fc97293c267a80877439838
-	# The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-	my $project_name = shift;
-	die "Error lost the project name" unless defined $project_name;
-	
-<<<<<<< HEAD
->>>>>>> d9c5952412eae3e01fc97293c267a80877439838
-=======
->>>>>>> d9c5952412eae3e01fc97293c267a80877439838
 	my ($fastq_filename, $fastq_dir) = fileparse($fastq_file, qr/\.fastq.gz/);
 
 	# Split the fastq filename so that we can get the individual id.
 	my @split_fastq_filename = split(/_/, $fastq_filename);
 	my $individual_id = $split_fastq_filename[0];
 	
-<<<<<<< HEAD
-<<<<<<< HEAD
 	my $uncompressed_fastq_file = join('/', $fastq_dir, $individual_id . ".fastq");
-=======
-=======
->>>>>>> d9c5952412eae3e01fc97293c267a80877439838
-	my $uncompressed_fastq_file;
-	if($project_name ne ''){
-		$uncompressed_fastq_file = join('/', $fastq_dir, join("_", $individual_id, $project_name) . ".fastq");
-	}else{
-		$uncompressed_fastq_file = join('/', $fastq_dir, $individual_id . ".fastq");
-	}
-<<<<<<< HEAD
->>>>>>> d9c5952412eae3e01fc97293c267a80877439838
-=======
->>>>>>> d9c5952412eae3e01fc97293c267a80877439838
 	
 	unless(-s $uncompressed_fastq_file){
 		warn "Calling gunzip for $fastq_file....\n";
