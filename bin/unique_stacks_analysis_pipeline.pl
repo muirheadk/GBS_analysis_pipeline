@@ -470,17 +470,22 @@ sub find_files{
 	my $suffix = shift;
 	die "Error lost file extension suffix directory" unless defined $suffix;
 	
-	my %files = ();
-	my $file_counter = 0;
-	opendir(DIR, $infile_dir) || die "Error in opening dir $infile_dir\n";
-	while( my $file_name = readdir(DIR)){
-		my $infile_name = join('/', $infile_dir, $file_name) if ($file_name =~ m/\.$suffix$/);
-		warn "$infile_name\n" if ($file_name =~ m/\.$suffix$/);
-		$files{$file_name} = $infile_name if ($file_name =~ m/\.$suffix$/);
-		$file_counter++ if ($file_name =~ m/\.$suffix$/);
+	if(-d $infile_dir){ # Check if $infile_dir is a directory.
+		my %files = ();
+		my $file_counter = 0;
+		opendir(DIR, $infile_dir) || die "Error in opening dir $infile_dir\n";
+		while( my $file_name = readdir(DIR)){
+			my $infile_name = join('/', $infile_dir, $file_name) if ($file_name =~ m/\.$suffix$/);
+			warn "$infile_name\n" if ($file_name =~ m/\.$suffix$/);
+			$files{$file_name} = $infile_name if ($file_name =~ m/\.$suffix$/);
+			$file_counter++ if ($file_name =~ m/\.$suffix$/);
+		}
+		closedir(DIR);
+		
+		return (\%files, $file_counter);
+	}else{
+		die "Error $infile_dir does not exist!\n";
 	}
-	closedir(DIR);
-	return (\%files, $file_counter);
 }
 
 # $output_dir = gunzip_fastq_file($fastq_file) - Execute the gunzip program to uncompress the compressed fastq file.
