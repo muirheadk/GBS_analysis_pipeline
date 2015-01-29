@@ -7,17 +7,17 @@ use Bio::SeqIO;
 use File::Basename;
 
 #### PROGRAM NAME ####
-# unique_stacks_analysis_pipeline.pl - Program that aligns quality filtered, demultiplexed, and adapter trimmed GBS data sequences into exactly-matching stacks. Comparing the stacks it will form a set of loci and detect SNPs at each locus using a maximum likelihood framework. Runs the Stacks unique pipeline using the ustacks, cstacks, and sstacks programs of the Stacks Software Suite.
+# unique_stacks_analysis_pipeline.pl - Program that aligns quality filtered, demultiplexed, and adapter trimmed GBS data sequences (padded) into exactly-matching stacks. Comparing the stacks it will form a set of loci and detect SNPs at each locus using a maximum likelihood framework. Runs the Stacks unique pipeline using the ustacks, cstacks, and sstacks programs of the Stacks Software Suite.
 
 #### DESCRIPTION ####
-# This program takes the quality filtered, demultiplexed, and adapter trimmed GBS *.fastq files as input. It executes the ustacks program, which extracts sequence stacks using a denovo assembly approach to form exact matching stacks. Comparing the stacks it will form a set of loci and detect SNPs at each locus using a maximum likelihood framework. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
+# This program takes the quality filtered, demultiplexed, and adapter trimmed GBS *.fastq files (padded) as input. It executes the ustacks program, which extracts sequence stacks using a denovo assembly approach to form exact matching stacks. Comparing the stacks it will form a set of loci and detect SNPs at each locus using a maximum likelihood framework. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
 
 #### SAMPLE COMMAND ####
-# perl unique_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/GBS_TRIMMED_ADAPTER_DIR/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR/CHRISTIANNE_MCDONALD/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -p POLYGONIA -c 7 -o ~/workspace/GBS_data-08-10-2013/CHRISTIANNE_MCDONALD_POLYGONIA
+# perl unique_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/GBS_TRIMMED_ADAPTER_DIR/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR/CHRISTIANNE_MCDONALD/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -c 7 -o ~/workspace/GBS_data-08-10-2013/CHRISTIANNE_MCDONALD_POLYGONIA
 my ($gbs_fastq_dir, $gbs_fastq_file_type, $stacks_sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $alpha_value_ustacks, $max_locus_stacks, $num_mismatches_tag, $num_threads, $output_dir);
 
 GetOptions(
-	'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+	'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (padded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 	't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Default: gzfastq
 	'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
 	'd=s'    => \$min_depth_coverage_ustacks, # The minimum depth of coverage to report a stack. Default: 2
@@ -76,11 +76,11 @@ die <<"USAGE";
 
 Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -p project_name -b stacks_sql_id -d min_depth_coverage_pstacks -m max_nuc_distance_ustacks -n max_align_distance_ustacks -a alpha_value_ustacks -l max_locus_stacks -s num_mismatches_tag -c num_threads -o output_dir
 
-DESCRIPTION - This program takes the quality filtered, demultiplexed, and adapter trimmed GBS *.fastq files as input. It executes the ustacks program, which extracts sequence stacks using a denovo assembly approach to form exact matching stacks. Comparing the stacks it will form a set of loci and detect SNPs at each locus using a maximum likelihood framework. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
+DESCRIPTION - This program takes the quality filtered, demultiplexed, and adapter trimmed GBS *.fastq files (padded) as input. It executes the ustacks program, which extracts sequence stacks using a denovo assembly approach to form exact matching stacks. Comparing the stacks it will form a set of loci and detect SNPs at each locus using a maximum likelihood framework. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
 
 OPTIONS:
 
--i gbs_fastq_dir - The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+-i gbs_fastq_dir - The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (padded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 
 -t gbs_fastq_file_type - The fastq input file type. Default: gzfastq
 
