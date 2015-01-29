@@ -24,7 +24,7 @@ GetOptions(
 	'm=s'    => \$adapter_length_min_threshold, # The minimum GBS common adapter sequence length cut-off in base pairs (bps) to retain for trimming if found in a given GBS fastq sequence hit found in the adapter regex searches. Default: 16
 	't=s'    => \$adapter_trim_offset, # The trimming offset length in base pairs (bps) to trim upstream of the start of the GBS common adapter sequence found in the adapter regex searches. Default: 5
 	'q=s'    => \$min_trimmed_fastq_sequence_length, # The minimum trimmed fastq sequence length in base pairs (bps) to retain after trimming. Default: 32
-	'n=s'    => \$pad_sequences, # The padded sequence controller. Default: true
+	'n=s'    => \$pad_sequences, # The padded sequence controller. Specify true for padded trimmed sequences or false for unpadded trimmed sequences. Default: true
 	'c=s'    => \$regex_num_cpu, # The number of cpu cores to use for the adapter regex searches. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
 	'o=s'    => \$output_dir, # The absolute path to the output directory to contain the trimmed adapter sequence fastq output files.
 );
@@ -52,7 +52,7 @@ $adapter_trim_offset = 5 unless defined $adapter_trim_offset;
 # used for splitting each individual fastq file. Tassel requires sequences at least 32 base pairs (bps) plus the length of a particular barcode that can be in the range of 4-8 base pairs (bps) in length. Default: 32
 $min_trimmed_fastq_sequence_length = 32  unless defined $min_trimmed_fastq_sequence_length;
 
-# The padded sequence controller. Default: true
+# The padded sequence controller. Specify true for padded trimmed sequences or false for unpadded trimmed sequences. Default: true
 $pad_sequences = 'true' unless defined $pad_sequences;
 
 # The number of cpu cores to use for the adapter regex searches. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
@@ -89,7 +89,7 @@ OPTIONS:
 length of the barcode used for splitting each individual fastq file. Tassel requires sequences at least 32 base pairs (bps) plus the length of a particular barcode that can be in the range of 4-8 base pairs (bps) in 
 length. Default: 32
 
--n pad_sequences - The padded sequence controller. Default: true
+-n pad_sequences - The padded sequence controller. Specify true for padded trimmed sequences or false for unpadded trimmed sequences. Default: true
 
 -c regex_num_cpu - The number of cpu cores to use for the adapter regex searches. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
 
