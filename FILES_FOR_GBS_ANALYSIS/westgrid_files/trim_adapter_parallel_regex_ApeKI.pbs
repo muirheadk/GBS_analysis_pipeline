@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l walltime=72:00:00
+#PBS -l pmem=2gb
+#PBS -l procs=16
+#PBS -M kevin5@ualberta.ca
+#PBS -m bea
+cd $PBS_O_WORKDIR
+
+perl trim_adapter_fastq_parallel_regex.pl -i ~/scratch/GBS_test/ApeKI_single-end_lane1_PROCESSED_RADTAGS/PROJECT_LEADER_DIR_NO_MISMATCHES/HEATHER_BIRD -p HEATHER_BIRD -t 3 -q 32 -m 16 -l 92 -r ApeKI -c 16 -n true -o /home/kevmu/scratch/GBS_test/ApeKI_single-end_lane1_trim_offset_3_padded
+perl trim_adapter_fastq_parallel_regex.pl -i ~/scratch/GBS_test/ApeKI_single-end_lane1_PROCESSED_RADTAGS/PROJECT_LEADER_DIR_NO_MISMATCHES/HEATHER_BIRD -p HEATHER_BIRD -t 3 -q 32 -m 16 -l 92 -r ApeKI -c 16 -n false -o /home/kevmu/scratch/GBS_test/ApeKI_single-end_lane1_trim_offset_3_unpadded
+
+

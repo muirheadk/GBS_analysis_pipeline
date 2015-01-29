@@ -1,0 +1,16 @@
+#!/bin/bash
+#PBS -l walltime=72:00:00
+#PBS -l pmem=2gb
+#PBS -l procs=16
+#PBS -M kevin5@ualberta.ca
+#PBS -m bea
+cd $PBS_O_WORKDIR
+
+perl trim_adapter_fastq_parallel_regex.pl -i /home/kevmu/scratch/GBS_test/PROJECT_LEADER_DIR_NO_MISMATCHES/CHRISTIANNE_MCDONALD -p CHRISTIANNE_MCDONALD -t 3 -q 32 -m 16 -l 92 -r PstI/MspI -c 16 -n false -o /home/kevmu/scratch/GBS_test/PstI_MspI_GBS_TRIMMED_ADAPTER_UNPADDED_DIR/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR
+perl trim_adapter_fastq_parallel_regex.pl -i /home/kevmu/scratch/GBS_test/PROJECT_LEADER_DIR_NO_MISMATCHES/CHRISTIANNE_MCDONALD -p CHRISTIANNE_MCDONALD -t 5 -q 32 -m 16 -l 92 -r PstI/MspI -c 16 -n false -o /home/kevmu/scratch/GBS_test/PstI_MspI_GBS_TRIMMED_ADAPTER_UNPADDED_DIR/TRIMMED_OFFSET_5_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR
+perl trim_adapter_fastq_parallel_regex.pl -i /home/kevmu/scratch/GBS_test/PROJECT_LEADER_DIR_NO_MISMATCHES/JASMINE_JANES -p JASMINE_JANES -t 3 -q 32 -m 16 -l 92 -r PstI/MspI -c 16 -n false -o /home/kevmu/scratch/GBS_test/PstI_MspI_GBS_TRIMMED_ADAPTER_UNPADDED_DIR/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR
+perl trim_adapter_fastq_parallel_regex.pl -i /home/kevmu/scratch/GBS_test/PROJECT_LEADER_DIR_NO_MISMATCHES/JASMINE_JANES -p JASMINE_JANES -t 5 -q 32 -m 16 -l 92 -r PstI/MspI -c 16 -n false -o /home/kevmu/scratch/GBS_test/PstI_MspI_GBS_TRIMMED_ADAPTER_UNPADDED_DIR/TRIMMED_OFFSET_5_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR
+perl trim_adapter_fastq_parallel_regex.pl -i /home/kevmu/scratch/GBS_test/PROJECT_LEADER_DIR_NO_MISMATCHES/JULIAN_DUPUIS -p JULIAN_DUPUIS -t 3 -q 32 -m 16 -l 92 -r PstI/MspI -c 16 -n false -o /home/kevmu/scratch/GBS_test/PstI_MspI_GBS_TRIMMED_ADAPTER_UNPADDED_DIR/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR
+perl trim_adapter_fastq_parallel_regex.pl -i /home/kevmu/scratch/GBS_test/PROJECT_LEADER_DIR_NO_MISMATCHES/JULIAN_DUPUIS -p JULIAN_DUPUIS -t 5 -q 32 -m 16 -l 92 -r PstI/MspI -c 16 -n false -o /home/kevmu/scratch/GBS_test/PstI_MspI_GBS_TRIMMED_ADAPTER_UNPADDED_DIR/TRIMMED_OFFSET_5_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR
+perl trim_adapter_fastq_parallel_regex.pl -i /home/kevmu/scratch/GBS_test/PROJECT_LEADER_DIR_NO_MISMATCHES/STEPHEN_TREVOY -p STEPHEN_TREVOY -t 3 -q 32 -m 16 -l 92 -r PstI/MspI -c 16 -n false -o /home/kevmu/scratch/GBS_test/PstI_MspI_GBS_TRIMMED_ADAPTER_UNPADDED_DIR/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR
+perl trim_adapter_fastq_parallel_regex.pl -i /home/kevmu/scratch/GBS_test/PROJECT_LEADER_DIR_NO_MISMATCHES/STEPHEN_TREVOY -p STEPHEN_TREVOY -t 5 -q 32 -m 16 -l 92 -r PstI/MspI -c 16 -n false -o /home/kevmu/scratch/GBS_test/PstI_MspI_GBS_TRIMMED_ADAPTER_UNPADDED_DIR/TRIMMED_OFFSET_5_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR

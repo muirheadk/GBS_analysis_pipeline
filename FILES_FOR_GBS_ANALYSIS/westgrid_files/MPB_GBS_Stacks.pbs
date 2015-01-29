@@ -1,0 +1,9 @@
+#!/bin/bash
+#PBS -l walltime=72:00:00
+#PBS -M kevin5@ualberta.ca
+#PBS -l mem=12gb
+#PBS -m bea
+#PBS -l procs=16
+cd $PBS_O_WORKDIR
+
+perl /home/kevmu/software/GBS_analysis_pipeline/refgen_stacks_analysis_pipeline.pl -i /home/kevmu/scratch/GBS_test/MPB-MALE-GBS-TEST/TRIMMED_FASTQ_FILES -p MPB-MALE-GBS -g /home/kevmu/scratch/GBS_test/MPB-MALE-GBS-TEST/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/DendPond_male_1.0_unplaced.scaf.fa -c 16 -o /home/kevmu/scratch/GBS_test/MPB-MALE-GBS-TEST/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3
