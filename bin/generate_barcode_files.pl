@@ -150,8 +150,8 @@ unless(-d $tassel_barcodes_output_dir){
 foreach my $plate_num (sort keys %GBS_samples){
 
 	# Get the barcode output file path and open the file for writting the barcode entries for each GBS plate.
-	my $plate_name = join("", "plate", $plate_num);
-	my $tassel_barcodes_outfile = join('/', $tassel_barcodes_output_dir, join("_", "tassel_barcodes", $plate_name . ".txt"));
+	my $plate_name = join("_", "plate", $plate_num);
+	my $tassel_barcodes_outfile = join('/', $tassel_barcodes_output_dir, join("-", "tassel-barcodes", $plate_name . ".txt"));
 	open(OUTFILE, ">$tassel_barcodes_outfile") or die "Couldn't open file $tassel_barcodes_outfile for writting, $!";
 	print OUTFILE join("\t", "Flowcell", "Lane", "Barcode", "Sample", "PlateName", "Row", "Column") . "\n";
 	
@@ -187,8 +187,8 @@ unless(-d $stacks_barcodes_output_dir){
 foreach my $plate_num (sort keys %GBS_samples){
 
 	# Get the barcode output file path and open the file for writting the barcode entries for each GBS plate.
-	my $plate_name = join("", "plate", $plate_num);
-	my $barcodes_outfile = join('/', $stacks_barcodes_output_dir, join("_", "stacks_barcodes", $plate_name . ".txt"));
+	my $plate_name = join("_", "plate", $plate_num);
+	my $barcodes_outfile = join('/', $stacks_barcodes_output_dir, join("-", "stacks-barcodes", $plate_name . ".txt"));
 	open(OUTFILE, ">$barcodes_outfile") or die "Couldn't open file $barcodes_outfile for writting, $!";
 	print OUTFILE join("\t", "plate_number", "well_row", "well_column", "run_id", "project_leader_name", "barcode_sequence") . "\n";
 	
