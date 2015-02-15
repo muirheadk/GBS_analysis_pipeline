@@ -821,7 +821,7 @@ sub find_files{
 	my $suffix = shift;
 	die "Error lost file extension suffix directory" unless defined $suffix;
 	
-	if(-d $input_dir){ # Check if $input_dir is a directory.
+	if(-d $infile_dir){ # Check if $infile_dir is a directory.
 		my %files = ();
 		my $file_counter = 0;
 		opendir(DIR, $infile_dir) || die "Error in opening dir $infile_dir\n";
@@ -835,7 +835,7 @@ sub find_files{
 		
 		return (\%files, $file_counter);
 	}else{
-		die "Error $input_dir does not exist!\n";
+		die "Error $infile_dir does not exist!\n";
 	}
 }
 
