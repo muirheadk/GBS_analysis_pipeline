@@ -51,29 +51,30 @@ die <<"USAGE";
 
 Usage: $0 -P stacks_dir -M pop_map_infile -b batch_num -p min_num_pops_locus -r min_percent_indvs_pop -m min_stack_depth -a min_allele_freq -t num_cpu_cores -f outfile_type -o output_dir
 
-DESCRIPTION - 
+DESCRIPTION -
 
 OPTIONS:
-    
--P stacks_dir -
 
--M pop_map_infile -
+-P stacks_dir - The  absolute path to the Stacks output files.
 
--b batch_num -
+-M pop_map_infile - The  absolute path to the population map, a tab separated file describing which individuals belong in which population.
 
--p min_num_pops_locus -
+-b batch_num - The batch ID to examine when exporting from the catalog.
 
--r min_percent_indvs_pop -
+-p min_num_pops_locus - The minimum percentage of individuals in a population required to process a locus for that population.
 
--m min_stack_depth -
+-r min_percent_indvs_pop - The minimum number of populations a locus must be present in to process a locus.
 
--a min_allele_freq -
+-m min_stack_depth - The minimum stack depth required for individuals at a locus.
 
--f outfile_type - 
+-a min_allele_freq - The minimum minor allele frequency required before calculating Fst at a locus (0 < a < 0.5).
 
--t num_cpu_cores -
+-f outfile_type - --fasta — output full sequence for each allele, from each sample locus in FASTA format. --structure — output results in Structure format.
 
--o output_dir - The absolute path to the output directory to contain the Stacks output files and directories.
+-t num_cpu_cores - The number of threads to run in parallel sections of code.
+
+-o output_dir - The absolute path to the output directory to contain the populations stacks output files and directories.
+
 
 USAGE
 }
