@@ -32,7 +32,7 @@ $batch_num = 1 unless defined $batch_num;
 
 $min_num_pops_locus = 1 unless defined $min_num_pops_locus;
 
-$min_percent_indvs_pop = 0 unless defined $min_percent_indvs_pop;
+$min_percent_indvs_pop = 1 unless defined $min_percent_indvs_pop;
 
 $min_stack_depth = 2 unless defined $min_stack_depth;
 
