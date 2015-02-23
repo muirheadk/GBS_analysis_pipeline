@@ -69,7 +69,7 @@ OPTIONS:
 
 -a min_allele_freq - The minimum minor allele frequency required before calculating Fst at a locus (0 < a < 0.5).
 
--f outfile_type - --fasta — output full sequence for each allele, from each sample locus in FASTA format. --structure — output results in Structure format.
+-f outfile_type - fasta - output full sequence for each allele, from each sample locus in FASTA format. structure - output results in Structure format. struct_single_snp write single snp for structure
 
 -t num_cpu_cores - The number of threads to run in parallel sections of code.
 
@@ -133,7 +133,7 @@ if($outfile_type eq 'fasta'){
 		}
 	}
 	
-}elsif($outfile_type eq 'structure'){
+}elsif($outfile_type eq 'struct_single_snp'){
 
 	# Create output directory if it doesn't already exist.
 	my $populations_structure_output_dir = join('/', $output_dir, "POPULATIONS_STRUCTURE_DIR");
@@ -142,6 +142,46 @@ if($outfile_type eq 'fasta'){
 	unless(-s $batch_structure_outfile){
 		warn "Executing populations structure output.....\n\n";
 		my $populationsCmd  = "$populations -P $stacks_dir -M $pop_map_infile -b $batch_num -p $min_num_pops_locus -r $min_percent_indvs_pop -m $min_stack_depth -a $min_allele_freq -t $num_cpu_cores --structure --write_single_snp";
+		warn $populationsCmd . "\n\n";
+		system($populationsCmd) == 0 or die "Error calling $populationsCmd: $?";
+		
+		# Create output directory if it doesn't already exist.
+		unless(-d $populations_structure_output_dir){
+			mkdir($populations_structure_output_dir, 0777) or die "Can't make directory: $!";
+		}
+		
+		my ($batch_hapstats_outfile, $batch_haplotypes_outfile, $batch_populations_log_outfile, $batch_sumstats_outfile, $batch_sumstats_summary_outfile);
+		$batch_hapstats_outfile = join('/', $populations_structure_output_dir, join("_", "batch", $batch_num . ".hapstats.tsv"));
+		$batch_haplotypes_outfile = join('/', $populations_structure_output_dir, join("_", "batch", $batch_num . ".haplotypes.tsv"));
+		$batch_populations_log_outfile = join('/', $populations_structure_output_dir, join("_", "batch", $batch_num . ".populations.log"));
+		$batch_sumstats_outfile = join('/', $populations_structure_output_dir, join("_", "batch", $batch_num . ".sumstats.tsv"));
+		$batch_sumstats_summary_outfile = join('/', $populations_structure_output_dir, join("_", "batch", $batch_num . ".sumstats_summary.tsv"));
+		
+		$batch_files{$batch_structure_infile} = $batch_structure_outfile;
+		$batch_files{$batch_hapstats_infile} = $batch_hapstats_outfile;
+		$batch_files{$batch_haplotypes_infile} = $batch_haplotypes_outfile;
+		$batch_files{$batch_populations_log_infile} = $batch_populations_log_outfile;
+		$batch_files{$batch_sumstats_infile} = $batch_sumstats_outfile;
+		$batch_files{$batch_sumstats_summary_infile} = $batch_sumstats_summary_outfile;
+		
+		foreach my $batch_infile (sort keys %batch_files){
+			my $batch_outfile = $batch_files{$batch_infile};
+			warn "Copying $batch_infile to $batch_outfile.....";
+			copy($batch_infile, $batch_outfile) or die "Copy failed: $!";
+			warn "Unlinking $batch_infile.....";
+	 		unlink($batch_infile) or die "Could not unlink $batch_infile: $!";
+		}
+	}
+	
+}elsif($outfile_type eq 'structure'){
+
+	# Create output directory if it doesn't already exist.
+	my $populations_structure_output_dir = join('/', $output_dir, "POPULATIONS_STRUCTURE_DIR");
+	
+	my $batch_structure_outfile = join('/', $populations_structure_output_dir, join("_", "batch", $batch_num . ".structure.tsv"));
+	unless(-s $batch_structure_outfile){
+		warn "Executing populations structure output.....\n\n";
+		my $populationsCmd  = "$populations -P $stacks_dir -M $pop_map_infile -b $batch_num -p $min_num_pops_locus -r $min_percent_indvs_pop -m $min_stack_depth -a $min_allele_freq -t $num_cpu_cores --structure";
 		warn $populationsCmd . "\n\n";
 		system($populationsCmd) == 0 or die "Error calling $populationsCmd: $?";
 		
