@@ -147,7 +147,8 @@ while(<INFILE>){
 	warn $_ . "\n";
 	if($i ne 0){
 		my @split_row_entry = split(/\t/, $_);
-		my ($fastq_plate_num, $fastq_well_row, $fastq_well_column, $fastq_run_id, $fastq_project_leader, $fastq_barcode_seq) = @split_row_entry;
+		
+		my ($fastq_flowcell_name, $fastq_plate_num, $fastq_well_row, $fastq_well_column, $fastq_run_id, $fastq_project_leader, $fastq_barcode_seq) = @split_row_entry;
 		$project_leader_names{$fastq_run_id} = $fastq_project_leader;
 	}
 	$i++;
@@ -187,7 +188,7 @@ if(defined($single_end_fastq_infile)){
 		my $fastq_project_leader_outfile = join('/', $project_output_dir, join("", $fastq_filename, ".fastq"));
 		warn "Copying $file_name to $fastq_project_leader_outfile.....";
 		copy($split_fastq_infile, $fastq_project_leader_outfile) or die "Copy failed: $!";
-	# 	unlink($split_fastq_infile) or die "Could not unlink $split_fastq_infile: $!";
+		unlink($split_fastq_infile) or die "Could not unlink $split_fastq_infile: $!";
 	}
 	
 }elsif(defined($first_paired_end_fastq_infile) and defined($second_paired_end_fastq_infile)){
@@ -215,7 +216,7 @@ if(defined($single_end_fastq_infile)){
 		my $fastq_project_leader_outfile = join('/', $project_output_dir, join("", $fastq_filename, "$fastq_suffix.fastq"));
 		warn "Copying $file_name to $fastq_project_leader_outfile.....";
 		copy($split_fastq_infile, $fastq_project_leader_outfile) or die "Copy failed: $!";
-	# 	unlink($split_fastq_infile) or die "Could not unlink $split_fastq_infile: $!";
+		unlink($split_fastq_infile) or die "Could not unlink $split_fastq_infile: $!";
 	}
 	
 }else{
@@ -320,8 +321,8 @@ sub process_radtags_single_end{
 	# 		warn $_ . "\n";
 			if($i ne 0){
 				my @split_row_entry = split(/\t/, $_);
-				my ($fastq_plate_num, $fastq_well_row, $fastq_well_column, $fastq_run_id, $fastq_project_leader, $fastq_barcode_seq) = ($split_row_entry[0], $split_row_entry[1], $split_row_entry[2], $split_row_entry[3], $split_row_entry[4], $split_row_entry[5]);
-
+				my ($fastq_flowcell_name, $fastq_plate_num, $fastq_well_row, $fastq_well_column, $fastq_run_id, $fastq_project_leader, $fastq_barcode_seq) = @split_row_entry;
+				
 				my $barcode_seq_length = length($fastq_barcode_seq);
 				my $barcodes_entry = join("\t", $barcode_seq_length, $fastq_barcode_seq, $fastq_run_id);
 	# 			warn $barcodes_entry . "\n";
@@ -467,7 +468,7 @@ sub process_radtags_paired_end{
 	# 		warn $_ . "\n";
 			if($i ne 0){
 				my @split_row_entry = split(/\t/, $_);
-				my ($fastq_plate_num, $fastq_well_row, $fastq_well_column, $fastq_run_id, $fastq_project_leader, $fastq_barcode_seq) = ($split_row_entry[0], $split_row_entry[1], $split_row_entry[2], $split_row_entry[3], $split_row_entry[4], $split_row_entry[5]);
+				my ($fastq_flowcell_name, $fastq_plate_num, $fastq_well_row, $fastq_well_column, $fastq_run_id, $fastq_project_leader, $fastq_barcode_seq) = @split_row_entry;
 
 				my $barcode_seq_length = length($fastq_barcode_seq);
 				my $barcodes_entry = join("\t", $barcode_seq_length, $fastq_barcode_seq, $fastq_run_id);
