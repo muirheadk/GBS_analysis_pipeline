@@ -75,7 +75,7 @@ my $i = 0;
 while(<INFILE>){
 	chomp $_;
 	
-	if($i ne 0){ # Skip the GBS shipment header because we know the positions of the contents within the file.
+	if(($i ne 0) and ($_ =~ m/\t/)){ # Skip the GBS shipment header because we know the positions of the contents within the file. Also make sure the line is tab-delimited.
 		my @split_gbs_shipment_entry = split(/\t/, $_);
 		my ($flowcell_name, $plate_num, $well_num, $run_id, $nandrop, $f260_280, $f260_230, $qubit, $project_leader) = @split_gbs_shipment_entry;
 		
