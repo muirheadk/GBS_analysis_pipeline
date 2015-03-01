@@ -267,7 +267,7 @@ sub ustacks{
 #
 # $stacks_sql_id - The SQL ID to insert into the output to identify this sample.
 #
-# $num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog. Default: 1
+# $num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog.
 #
 # $num_threads - The number of threads to use for sstacks.
 # 
@@ -275,7 +275,7 @@ sub ustacks{
 # 
 # $cstacks_file - The cstacks output file prefix for the tab-delmited catalog alleles, snps, and tags files.
 
-# cstacks -b 1 -o /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES -g -p 7 \
+# cstacks -b 1 -o /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES -n 1 -p 7 \
 # -s /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES/LL-06_MPB-MALE-GBS \
 # -s /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES/M004-13-01-1D-G14-DA01_MPB-MALE-GBS \
 # -s /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES/M004-13-01-2D-G05-DA01_MPB-MALE-GBS \
