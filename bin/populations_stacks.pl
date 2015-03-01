@@ -30,13 +30,13 @@ usage() unless (
 
 $batch_num = 1 unless defined $batch_num;
 
-$min_num_pops_locus = 1 unless defined $min_num_pops_locus;
+$min_num_pops_locus = 2 unless defined $min_num_pops_locus;
 
-$min_percent_indvs_pop = 1 unless defined $min_percent_indvs_pop;
+$min_percent_indvs_pop = 0 unless defined $min_percent_indvs_pop;
 
-$min_stack_depth = 2 unless defined $min_stack_depth;
+$min_stack_depth = 4 unless defined $min_stack_depth;
 
-$min_allele_freq = 0 unless defined $min_allele_freq;
+$min_allele_freq = 0.01 unless defined $min_allele_freq;
 
 $num_cpu_cores = 2 unless defined $num_cpu_cores;
 
@@ -84,9 +84,10 @@ unless(-d $output_dir){
       mkdir($output_dir, 0777) or die "Can't make directory: $!";
 }
 
-my ($batch_fasta_infile, $batch_structure_infile, $batch_hapstats_infile, $batch_haplotypes_infile, $batch_populations_log_infile, $batch_sumstats_infile, $batch_sumstats_summary_infile);
+my ($batch_fasta_infile, $batch_structure_infile, $batch_vcf_infile, $batch_hapstats_infile, $batch_haplotypes_infile, $batch_populations_log_infile, $batch_sumstats_infile, $batch_sumstats_summary_infile);
 $batch_fasta_infile = join('/', $stacks_dir, join("_", "batch", $batch_num . ".fa"));
 $batch_structure_infile = join('/', $stacks_dir, join("_", "batch", $batch_num . ".structure.tsv"));
+$batch_vcf_infile = join('/', $stacks_dir, join("_", "batch", $batch_num . ".vcf"));
 $batch_hapstats_infile = join('/', $stacks_dir, join("_", "batch", $batch_num . ".hapstats.tsv"));
 $batch_haplotypes_infile = join('/', $stacks_dir, join("_", "batch", $batch_num . ".haplotypes.tsv"));
 $batch_populations_log_infile = join('/', $stacks_dir, join("_", "batch", $batch_num . ".populations.log"));
@@ -198,6 +199,46 @@ if($outfile_type eq 'fasta'){
 		$batch_sumstats_summary_outfile = join('/', $populations_structure_output_dir, join("_", "batch", $batch_num . ".sumstats_summary.tsv"));
 		
 		$batch_files{$batch_structure_infile} = $batch_structure_outfile;
+		$batch_files{$batch_hapstats_infile} = $batch_hapstats_outfile;
+		$batch_files{$batch_haplotypes_infile} = $batch_haplotypes_outfile;
+		$batch_files{$batch_populations_log_infile} = $batch_populations_log_outfile;
+		$batch_files{$batch_sumstats_infile} = $batch_sumstats_outfile;
+		$batch_files{$batch_sumstats_summary_infile} = $batch_sumstats_summary_outfile;
+		
+		foreach my $batch_infile (sort keys %batch_files){
+			my $batch_outfile = $batch_files{$batch_infile};
+			warn "Copying $batch_infile to $batch_outfile.....";
+			copy($batch_infile, $batch_outfile) or die "Copy failed: $!";
+			warn "Unlinking $batch_infile.....";
+	 		unlink($batch_infile) or die "Could not unlink $batch_infile: $!";
+		}
+	}
+	
+}elsif($outfile_type eq 'vcf'){
+
+	# Create output directory if it doesn't already exist.
+	my $populations_vcf_output_dir = join('/', $output_dir, "POPULATIONS_VCF_DIR");
+	
+	my $batch_vcf_outfile = join('/', $populations_vcf_output_dir, join("_", "batch", $batch_num . ".vcf"));
+	unless(-s $batch_vcf_outfile){
+		warn "Executing populations vcf output.....\n\n";
+		my $populationsCmd  = "$populations -P $stacks_dir -M $pop_map_infile -b $batch_num -p $min_num_pops_locus -r $min_percent_indvs_pop -m $min_stack_depth -a $min_allele_freq -t $num_cpu_cores --vcf";
+		warn $populationsCmd . "\n\n";
+		system($populationsCmd) == 0 or die "Error calling $populationsCmd: $?";
+		
+		# Create output directory if it doesn't already exist.
+		unless(-d $populations_vcf_output_dir){
+			mkdir($populations_vcf_output_dir, 0777) or die "Can't make directory: $!";
+		}
+		
+		my ($batch_hapstats_outfile, $batch_haplotypes_outfile, $batch_populations_log_outfile, $batch_sumstats_outfile, $batch_sumstats_summary_outfile);
+		$batch_hapstats_outfile = join('/', $populations_vcf_output_dir, join("_", "batch", $batch_num . ".hapstats.tsv"));
+		$batch_haplotypes_outfile = join('/', $populations_vcf_output_dir, join("_", "batch", $batch_num . ".haplotypes.tsv"));
+		$batch_populations_log_outfile = join('/', $populations_vcf_output_dir, join("_", "batch", $batch_num . ".populations.log"));
+		$batch_sumstats_outfile = join('/', $populations_vcf_output_dir, join("_", "batch", $batch_num . ".sumstats.tsv"));
+		$batch_sumstats_summary_outfile = join('/', $populations_vcf_output_dir, join("_", "batch", $batch_num . ".sumstats_summary.tsv"));
+		
+		$batch_files{$batch_vcf_infile} = $batch_vcf_outfile;
 		$batch_files{$batch_hapstats_infile} = $batch_hapstats_outfile;
 		$batch_files{$batch_haplotypes_infile} = $batch_haplotypes_outfile;
 		$batch_files{$batch_populations_log_infile} = $batch_populations_log_outfile;
