@@ -14,7 +14,7 @@ use File::Basename;
 
 #### SAMPLE COMMAND ####
 # perl refgen_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/STEPHEN_TREVOY/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_sequence_data/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/DendPond_male_1.0_unplaced.scaf.fa -c 7 -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3
-my ($gbs_fastq_dir, $gbs_fastq_file_type, $refgen_infile, $gbs_sequence_length, $stacks_sql_id, $min_depth_coverage_pstacks, $alpha_value_pstacks, $num_threads, $output_dir);
+my ($gbs_fastq_dir, $gbs_fastq_file_type, $refgen_infile, $gbs_sequence_length, $stacks_sql_id, $min_depth_coverage_pstacks, $alpha_value_pstacks, $num_mismatches_tag, $num_threads, $output_dir);
 GetOptions(
 	'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (unpadded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 	't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Default: gzfastq
@@ -23,6 +23,7 @@ GetOptions(
 	'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
 	'd=s'    => \$min_depth_coverage_pstacks, # The minimum depth of coverage to report a stack. Default: 1
 	'a=s'    => \$alpha_value_pstacks, # The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
+	's=s'    => \$num_mismatches_tag, # The number of mismatches allowed between sample tags when generating the catalog. Default: 1
 	'c=s'    => \$num_threads, # The number of cpu threads to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
 	'o=s'    => \$output_dir, # The absolute path to the output directory to contain the renumerated reference genome, BWA sam, padded sam, and Stacks output files and directories.
 );
@@ -43,11 +44,14 @@ $gbs_sequence_length = 92 unless defined $gbs_sequence_length;
 # The SQL ID to insert into the output to identify this sample.
 $stacks_sql_id = 1 unless defined $stacks_sql_id;
 
-# The minimum depth of coverage to report a stack. Default: 1
-$min_depth_coverage_pstacks = 1 unless defined $min_depth_coverage_pstacks;
+# The minimum depth of coverage to report a stack. Default: 4
+$min_depth_coverage_pstacks = 4 unless defined $min_depth_coverage_pstacks;
 
 # The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 $alpha_value_pstacks = 0.05 unless defined $alpha_value_pstacks;
+
+# The number of mismatches allowed between sample tags when generating the catalog. Default: 1
+$num_mismatches_tag = 1 unless defined $num_mismatches_tag;
 
 # The number of cpu threads to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
 $num_threads = 2 unless defined $num_threads;
@@ -64,7 +68,7 @@ sub usage {
 
 die <<"USAGE";
 
-Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -g refgen_infile -l gbs_sequence_length -b stacks_sql_id -d min_depth_coverage_pstacks -a alpha_value_pstacks -c num_cpu_cores -o output_dir
+Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -g refgen_infile -l gbs_sequence_length -b stacks_sql_id -d min_depth_coverage_pstacks -a alpha_value_pstacks -s num_mismatches_tag -c num_threads -o output_dir
 
 DESCRIPTION - This program takes the quality filtered, demultiplexed, and adapter trimmed *.fastq input files (unpadded) and reference genome fasta input files as input. Converts the reference genome fasta file to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers. It then performs a BWA alignment to align the GBS fastq sequences to the reference genome. It then executes the pstacks program, which extracts sequence stacks that were aligned to the reference genome using the BWA alignment program and identifies SNPs. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
 
@@ -80,11 +84,13 @@ OPTIONS:
 
 -b stacks_sql_id - The SQL ID to insert into the output to identify this sample.
 
--d min_depth_coverage_pstacks - The minimum depth of coverage to report a stack. Default: 1
+-d min_depth_coverage_pstacks - The minimum depth of coverage to report a stack. Default: 4
 
 -a alpha_value_pstacks - The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 
--c num_cpu_cores - The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+-s num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog. Default: 1
+
+-c num_threads - The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
 
 -o output_dir - The absolute path to the output directory to contain the renumerated reference genome, BWA, and Stacks output files and directories.
 
@@ -182,7 +188,7 @@ foreach my $file_name (sort keys %{$padded_sam_files}){
 }
 
 # Execute the cstacks program to build a catalog from a set of samples processed by the pstacks program. The cstacks program creates a set of consensus loci, merging alleles together.
-my $cstacks_file = cstacks($stacks_output_dir, $stacks_sql_id, $num_threads);
+my $cstacks_file = cstacks($stacks_output_dir, $stacks_sql_id, $num_mismatches_tag, $num_threads);
 
 # Find all pstacks tags output files from the stacks output directory with the extension *.tags.tsv.
 my ($pstacks_tags_files, $pstacks_tags_file_count) = find_files($stacks_output_dir, "tags.tsv");
@@ -603,8 +609,8 @@ sub pstacks{
 		mkdir($stacks_log_output_dir, 0777) or die "Can't make directory: $!";
 	}
 
-	# The standard out file for the pstacks program.
-	my $pstacks_log_outfile = join('/', $stacks_log_output_dir, "pstacks.log");
+	# The standard output file for the pstacks program.
+	my $pstacks_log_outfile = join('/', $stacks_log_output_dir, join("_", $sam_filename, "pstacks.log"));
         
 	# Execute the pstacks program if the pstacks alleles, snps, and tags output files are not already generated.
 	unless(-s $pstacks_alleles_file and -s $pstacks_snps_file and -s $pstacks_tags_file){
@@ -615,7 +621,7 @@ sub pstacks{
 	}
 }
 
-# $cstacks_file = cstacks($stacks_output_dir, $stacks_sql_id, $num_threads) - Executes the cstacks program in the Stacks Software Suite. Build a catalog from a set of samples processed by the ustacks program. Creates a set of consensus loci, merging alleles together.
+# $cstacks_file = cstacks($stacks_output_dir, $stacks_sql_id, $num_mismatches_tag, $num_threads) - Executes the cstacks program in the Stacks Software Suite. Build a catalog from a set of samples processed by the ustacks program. Creates a set of consensus loci, merging alleles together.
 # 
 # Input paramater(s):
 # 
@@ -623,13 +629,15 @@ sub pstacks{
 #
 # $stacks_sql_id - The SQL ID to insert into the output to identify this sample.
 #
+# $num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog.
+#
 # $num_threads - The number of threads to use for sstacks.
 # 
 # Output paramater(s):
 # 
 # $cstacks_file - The cstacks output file prefix for the tab-delmited catalog alleles, snps, and tags files.
 
-# cstacks -b 1 -o /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES -g -p 7 \
+# cstacks -b 1 -o /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES -g -n 1 -p 7 \
 # -s /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES/LL-06_MPB-MALE-GBS \
 # -s /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES/M004-13-01-1D-G14-DA01_MPB-MALE-GBS \
 # -s /home/cookeadmin/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES/M004-13-01-2D-G05-DA01_MPB-MALE-GBS \
@@ -651,6 +659,10 @@ sub cstacks{
 	# The SQL ID to insert into the output to identify this sample.
 	my $stacks_sql_id = shift;
 	die "Error lost the SQL ID to insert into the output to identify this sample" unless defined $stacks_sql_id;
+	
+	# The number of mismatches allowed between sample tags when generating the catalog.
+	my $num_mismatches_tag = shift;
+	die "Error lost the number of mismatches allowed between sample tags when generating the catalog" unless defined $num_mismatches_tag;
 	
 	# The number of threads to use for cstacks.
 	my $num_threads = shift;
@@ -698,11 +710,11 @@ sub cstacks{
 		# o — output path to write results.
 		# s — TSV file from which to load radtags.
 		# g — base catalog matching on genomic location, not sequence identity.
+		# n — number of mismatches allowed between sample tags when generating the catalog.
 		# p — enable parallel execution with num_threads threads.
 
 		#### UNUSED PARAMETERS ####
 		# m — include tags in the catalog that match to more than one entry.
-		# n — number of mismatches allowed between sample tags when generating the catalog.
 		# h — display this help messsage.
 
 		# Catalog editing:
@@ -713,7 +725,7 @@ sub cstacks{
 
 		warn "Executing cstacks.....\n\n";
 		my $cstacks_joined_soptions = join("\\\n", @cstacks_soptions);
-		my $cstacksCmd  = "$cstacks -b $stacks_sql_id -o $stacks_output_dir -g -p $num_threads \\\n $cstacks_joined_soptions 2> $cstacks_log_outfile";
+		my $cstacksCmd  = "$cstacks -b $stacks_sql_id -o $stacks_output_dir -g -n $num_mismatches_tag -p $num_threads \\\n $cstacks_joined_soptions 2> $cstacks_log_outfile";
 		warn $cstacksCmd . "\n\n";
 		system($cstacksCmd) == 0 or die "Error calling $cstacksCmd: $?";
 	}
@@ -769,7 +781,7 @@ sub sstacks{
 		mkdir($stacks_log_output_dir, 0777) or die "Can't make directory: $!";
 	}
 
-	# The standard out log file for the cstacks program.
+	# The standard out log file for the sstacks program.
 	my $sstacks_log_outfile = join('/', $stacks_log_output_dir, join("_", $stacks_sample_filename, "sstacks.log"));
         
 	#### USED PARAMETERS ####
