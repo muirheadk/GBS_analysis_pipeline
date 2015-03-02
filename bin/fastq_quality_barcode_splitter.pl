@@ -37,7 +37,7 @@ GetOptions(
 	't=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 	'b=s'    => \$barcode_infile, # The absolute path to the barcodes input file used to split sequences into individual fastq output files.
 	'c=s'    => \$barcode_option, # The barcode option for whether or not single-end or paired-end barcodes are within the FASTQ header or inline with sequence. Default: inline_null
-	'n=s'    => \$num_mismatches, # The number of mismatches allowed within the barcode sequences.
+	'n=s'    => \$num_mismatches, # The number of mismatches allowed within the barcode sequences. Default: 0
 	'o=s'    => \$output_dir, # The absolute path to the output directory to contain the split *.fastq output files.
 );
 
@@ -115,7 +115,7 @@ OPTIONS:
 	inline_index: barcode is inline with sequence on single-end read, occurs in FASTQ header for paired-end read.
 	index_inline: barcode occurs in FASTQ header for single-end read, is inline with sequence on paired-end read.
 
--n num_mismatches - The number of mismatches allowed within the barcode sequences.
+-n num_mismatches - The number of mismatches allowed within the barcode sequences. Default: 0
 
 -o output_dir - The absolute path to the output directory to contain the split *.fastq output files.
 
