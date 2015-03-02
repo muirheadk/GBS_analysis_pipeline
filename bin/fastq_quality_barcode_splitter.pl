@@ -290,9 +290,12 @@ sub process_radtags_single_end{
 	# The absolute path to the output directory to contain the split *.fastq output files.
 	my $output_dir = shift;
 	die "Error lost output directory" unless defined $output_dir;
-
+	
+	# Get the flowcell name so that we can further demultiplex the fastq files.
+	my $flowcell_name = fileparse($barcode_infile, qr/-barcodes\.\w+/);
+	
 	# Create output directory if it doesn't already exist.
-	my $split_fastq_output_dir = join('/', $output_dir, "SPLIT_FASTQ_OUTFILES");
+	my $split_fastq_output_dir = join('/', $output_dir, join("_", "SPLIT", $flowcell_name, "FASTQ_FILES"));
 	unless(-d $split_fastq_output_dir){
 		mkdir($split_fastq_output_dir, 0777) or die "Can't make directory: $!";
 	}
@@ -438,8 +441,11 @@ sub process_radtags_paired_end{
 	my $output_dir = shift;
 	die "Error lost output directory" unless defined $output_dir;
 
+	# Get the flowcell name so that we can further demultiplex the fastq files.
+	my $flowcell_name = fileparse($barcode_infile, qr/-barcodes\.\w+/);
+	
 	# Create output directory if it doesn't already exist.
-	my $split_fastq_output_dir = join('/', $output_dir, "SPLIT_FASTQ_OUTFILES");
+	my $split_fastq_output_dir = join('/', $output_dir, join("_", "SPLIT", $flowcell_name, "FASTQ_FILES"));
 	unless(-d $split_fastq_output_dir){
 		mkdir($split_fastq_output_dir, 0777) or die "Can't make directory: $!";
 	}
