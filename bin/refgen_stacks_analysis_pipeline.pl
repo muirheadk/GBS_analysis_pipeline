@@ -3,6 +3,7 @@ use warnings;
 use strict;
 use Getopt::Long;
 
+use IPC::Open2;
 use Bio::SeqIO;
 use File::Basename;
 
@@ -14,25 +15,26 @@ use File::Basename;
 
 #### SAMPLE COMMAND ####
 # perl refgen_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/STEPHEN_TREVOY/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_sequence_data/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/DendPond_male_1.0_unplaced.scaf.fa -c 7 -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3
-my ($gbs_fastq_dir, $gbs_fastq_file_type, $refgen_infile, $gbs_sequence_length, $stacks_sql_id, $min_depth_coverage_pstacks, $alpha_value_pstacks, $num_mismatches_tag, $num_threads, $output_dir);
+my ($gbs_fastq_dir, $gbs_fastq_file_type, $refgen_infile, $gbs_sequence_length, $stacks_sql_id, $min_depth_coverage_pstacks, $alpha_value_pstacks, $num_mismatches_tag, $sam_mapq_threshold, $num_threads, $output_dir);
 GetOptions(
-	'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (unpadded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
-	't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Default: gzfastq
-	'g=s'    => \$refgen_infile, # The absolute path to the reference genome input fasta file to align GBS fastq sequences.
-	'l=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
-	'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
-	'd=s'    => \$min_depth_coverage_pstacks, # The minimum depth of coverage to report a stack. Default: 1
-	'a=s'    => \$alpha_value_pstacks, # The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
-	's=s'    => \$num_mismatches_tag, # The number of mismatches allowed between sample tags when generating the catalog. Default: 1
-	'c=s'    => \$num_threads, # The number of cpu threads to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
-	'o=s'    => \$output_dir, # The absolute path to the output directory to contain the renumerated reference genome, BWA sam, padded sam, and Stacks output files and directories.
+    'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (unpadded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+    't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Default: gzfastq
+    'g=s'    => \$refgen_infile, # The absolute path to the reference genome input fasta file to align GBS fastq sequences.
+    'l=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
+    'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
+    'd=s'    => \$min_depth_coverage_pstacks, # The minimum depth of coverage to report a stack. Default: 1
+    'a=s'    => \$alpha_value_pstacks, # The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
+    's=s'    => \$num_mismatches_tag, # The number of mismatches allowed between sample tags when generating the catalog. Default: 1
+    'm=s'    => \$sam_mapq_threshold, # The mapping quality score threshold filter for sam alignments. Any mapping quality score below this value is filtered out of the sam alignment files. Default: 20
+    'c=s'    => \$num_threads, # The number of cpu threads to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+    'o=s'    => \$output_dir, # The absolute path to the output directory to contain the renumerated reference genome, BWA sam, padded sam, and Stacks output files and directories.
 );
 
 # Print usage message if the following input parameters are not specified.
 usage() unless (
-	defined $gbs_fastq_dir
-	and defined $refgen_infile
-	and defined $output_dir
+    defined $gbs_fastq_dir
+    and defined $refgen_infile
+    and defined $output_dir
 );
 
 # The fastq input file type. Default: gzfastq
@@ -53,6 +55,9 @@ $alpha_value_pstacks = 0.05 unless defined $alpha_value_pstacks;
 # The number of mismatches allowed between sample tags when generating the catalog. Default: 1
 $num_mismatches_tag = 1 unless defined $num_mismatches_tag;
 
+# The mapping quality score threshold filter for sam alignments. Any mapq score below this value is filtered out of the sam alignment files. Default: 20
+$sam_mapq_threshold = 20 unless defined $sam_mapq_threshold;
+
 # The number of cpu threads to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
 $num_threads = 2 unless defined $num_threads;
 
@@ -65,15 +70,15 @@ $cstacks			= '/usr/local/bin/cstacks';
 $sstacks			= '/usr/local/bin/sstacks';
 
 sub usage {
-
+    
 die <<"USAGE";
-
-Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -g refgen_infile -l gbs_sequence_length -b stacks_sql_id -d min_depth_coverage_pstacks -a alpha_value_pstacks -s num_mismatches_tag -c num_threads -o output_dir
-
+    
+Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -g refgen_infile -l gbs_sequence_length -b stacks_sql_id -d min_depth_coverage_pstacks -a alpha_value_pstacks -s num_mismatches_tag -m sam_mapq_threshold -c num_threads -o output_dir
+    
 DESCRIPTION - This program takes the quality filtered, demultiplexed, and adapter trimmed *.fastq input files (unpadded) and reference genome fasta input files as input. Converts the reference genome fasta file to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers. It then performs a BWA alignment to align the GBS fastq sequences to the reference genome. It then executes the pstacks program, which extracts sequence stacks that were aligned to the reference genome using the BWA alignment program and identifies SNPs. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
-
+    
 OPTIONS:
-
+    
 -i gbs_fastq_dir - The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (unpadded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 
 -t gbs_fastq_file_type - The fastq input file type. Default: gzfastq
@@ -89,6 +94,8 @@ OPTIONS:
 -a alpha_value_pstacks - The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 
 -s num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog. Default: 1
+
+-m sam_mapq_threshold - The mapping quality score threshold filter for sam alignments. Any mapq score below this value is filtered out of the sam alignment files. Default: 20
 
 -c num_threads - The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
 
@@ -137,7 +144,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	warn "Processing " . $file_name . ".....\n";
 	my $gbs_fastq_infile = $gbs_fastq_files->{$file_name};
     
-	# If the bulk fastq file is compressed, uncompress the file and set the resulting fastq filename to be the fastq infile.
+	# If the fastq file is compressed, uncompress the file and set the resulting fastq filename to be the fastq infile.
 	if($gbs_fastq_file_type eq "gzfastq"){
 		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
@@ -145,9 +152,12 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 
 	# Creates the BWA alignment file using the GBS fastq input file to align the fastq sequence reads to the reference genome.
 	my $bwa_alignment_outfile = bwa_aln($refgen_fasta_outfile, $gbs_fastq_infile, $num_threads, $bwa_output_dir);
-
+	
 	# Creates the BWA single-ended alignment file in sam format using the GBS fastq input file to align the fastq sequence reads to the reference genome and the BWA aln format file.
-	my $bwa_aligned_master_outfile = bwa_samse($refgen_fasta_outfile, $gbs_fastq_infile, $bwa_alignment_outfile, $bwa_output_dir);
+	my $bwa_aligned_master_outfile = bwa_samse($refgen_fasta_outfile, $gbs_fastq_infile, $bwa_alignment_outfile, $sam_mapq_threshold, $bwa_output_dir);
+	
+	# Remove the uncompressed fastq file to save space as we do not need file after this point.
+	unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if(($gbs_fastq_file_type eq "gzfastq") and ($gbs_fastq_infile =~ m/\.fastq$/));
 }
 
 # Create the padded sam alignment file output directory if it doesn't already exist.
@@ -163,7 +173,10 @@ my ($bwa_align_files, $bwa_align_file_count) = find_files($bwa_output_dir, "sam"
 foreach my $file_name (sort keys %{$bwa_align_files}){
 	warn "Processing " . $file_name . ".....\n";
 	my $bwa_align_infile = $bwa_align_files->{$file_name};
-	bwa_pad_sam_files($bwa_align_infile, $gbs_sequence_length, $padded_sam_output_dir);
+	bwa_pad_sam_files($bwa_align_infile, $gbs_sequence_length, $sam_mapq_threshold, $padded_sam_output_dir);
+	
+	# Remove the BWA sam file to save space as we do not need the file after this point.
+	unlink($bwa_align_infile) or die "Could not unlink $bwa_align_infile: $!";
 }
 
 # Create the stacks output directory if it doesn't already exist.
@@ -378,7 +391,7 @@ sub bwa_aln{
 	return $bwa_alignment_outfile;
 }
 
-# $bwa_aligned_master_outfile = bwa_samse($renum_refgen_fasta_infile, $gbs_fastq_infile, $bwa_alignment_infile, $bwa_output_dir) - Executes the BWA alignment program using the samse option to generate sam alignment files from a renumerated reference genome, BWA sai, and quality filtered and trimmed adapter GBS fastq input files.
+# $bwa_aligned_master_outfile = bwa_samse($renum_refgen_fasta_infile, $gbs_fastq_infile, $bwa_alignment_infile, $sam_mapq_threshold, $bwa_output_dir) - Executes the BWA alignment program using the samse option to generate sam alignment files from a renumerated reference genome, BWA sai, and quality filtered and trimmed adapter GBS fastq input files.
 # 
 # Input paramater(s):
 # 
@@ -387,7 +400,9 @@ sub bwa_aln{
 # $gbs_fastq_infile - The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
 # 
 # $bwa_alignment_infile - The BWA alignment index input file.
-# 
+#
+# $sam_mapq_threshold - The sam alignment file mapping quality score threshold.
+#
 # $bwa_output_dir - The BWA alignment output directory that contains the sam alignment files.
 # 
 # Output paramater(s):
@@ -409,6 +424,10 @@ sub bwa_samse{
 	my $bwa_alignment_infile = shift;
 	die "Error lost the BWA SAI formatted alignment (.sai) file" unless defined $bwa_alignment_infile;
 
+    # The sam alignment file mapping quality score threshold.
+	my $sam_mapq_threshold = shift;
+	die "Error lost the sam alignment file mapping quality score threshold" unless defined $sam_mapq_threshold;
+    
 	# The BWA alignment output directory that contains the sam alignment files.
 	my $bwa_output_dir = shift;
 	die "Error lost the bwa output directory" unless defined $bwa_output_dir;
@@ -424,9 +443,46 @@ sub bwa_samse{
 	my $bwa_aligned_master_outfile = join('/', $bwa_output_dir, $individual_id . ".sam");
 	unless(-s $bwa_aligned_master_outfile){
 		warn "Generating the bwa sam file.....\n\n";
-		my $bwaSamseCmd  = "$bwa samse $renum_refgen_fasta_infile $bwa_alignment_infile $gbs_fastq_infile > $bwa_aligned_master_outfile";
+        my $bwaSamseCmd  = "$bwa samse $renum_refgen_fasta_infile $bwa_alignment_infile $gbs_fastq_infile";
 		warn $bwaSamseCmd . "\n\n";
-		system($bwaSamseCmd) == 0 or die "Error calling $bwaSamseCmd: $?";
+        
+        open(SAM_OUTFILE, ">$bwa_aligned_master_outfile") or die "Couldn't open file $bwa_aligned_master_outfile for writting, $!";
+        local (*BWA_OUT, *BWA_IN);
+        my $pid = open2(\*BWA_OUT,\*BWA_IN, $bwaSamseCmd) or die "Error calling open2: $!";
+        close BWA_IN or die "Error closing STDIN to bwa process: $!";
+        while(<BWA_OUT>){
+            chomp $_;
+            if($_ =~ m/^\@HD|^\@SQ|^\@RG|^\@PG|^\@CO/){ # Parse header lines starting with @HD, @SQ, @RG, @PG, or @CO.
+				print SAM_OUTFILE $_ . "\n";
+			}else{ #8_1308_8038_19954_1LL-06_TTCTG_5_A3length=66    16      7376    784845  37      66M     *       0       0       AATAATGCGCCAGCCAAGAGCTGTTTGGTAGCATTCTGCTGACGCTCGCACTCCCGTACACCTGCA      DDCB@>>>AFEFFFHC@GHGGGEGEGGIGCDEHBGGCIGIGGIIHGHEFCE:F<GIGIHFHHDFDD       XT:A:U  NM:i:0  X0:i:1  X1:i:0  XM:i:0  XO:i:0  XG:i:0  MD:Z:66
+                
+				my @split_sam_entry = split(/\t/, $_);
+				my ($fastq_header, $bam_bitwise_flag, $rname, $r_pos, $mapq, $cigar, $rnext,
+                $pnext, $tlen, $fastq_sequence, $fastq_quality_scores, @optional_fields) = @split_sam_entry;
+				
+				my $optional_fields = join("\t", @optional_fields);
+				
+                # die join("\t", $fastq_header, $bam_bitwise_flag, $rname, $r_pos, $mapq, $cigar, $rnext, $pnext, $tlen, $fastq_sequence, $fastq_quality_scores, $optional_fields);
+                
+				# Filter alignment entry if the read is unmapped in the sense and antisense orientation.
+				next if(($bam_bitwise_flag eq 4) or ($bam_bitwise_flag eq 20));
+				
+				# Filter alignment entry if the mapping quality of the read is below this threshold.
+				next if($mapq < $sam_mapq_threshold);
+				
+				# Filter alignment entry if the cigar string contains an insertion/deletion in the alignment.
+				next if($cigar !~ m/^\d+M$/);
+				
+				# Filter alignment entry if the read is not uniquely mapped to the reference.
+				next if($optional_fields !~ m/XT:A:U/);
+				
+				print SAM_OUTFILE $_ . "\n";
+            }
+
+        }
+        close BWA_OUT or die "Error closing STDOUT from bwa process: $!";
+        wait;
+        close(SAM_OUTFILE) or die "Couldn't close file $bwa_aligned_master_outfile";
 	}
     
 	# The BWA sam alignment output file.
@@ -434,13 +490,15 @@ sub bwa_samse{
 }
 
 
-# bwa_pad_sam_files($sam_infile, $gbs_sequence_length, $padded_sam_output_dir) - Pads the BWA sam alignment files with poly-Ns so that all sequences are of uniform length.
-# 
+# bwa_pad_sam_files($sam_infile, $gbs_sequence_length, $sam_mapq_threshold, $padded_sam_output_dir) - Pads the BWA sam alignment files with poly-Ns so that all sequences are of uniform length.
+#
 # Input paramater(s):
-# 
+#
 # $sam_infile - The unpadded BWA sam alignment input file.
 #
 # $gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences.
+#
+# $sam_mapq_threshold - The sam alignment file mapping quality score threshold.
 #
 # $padded_sam_output_dir - The output directory that contains all the BWA sam alignment files.
 sub bwa_pad_sam_files{
@@ -453,6 +511,10 @@ sub bwa_pad_sam_files{
 	my $gbs_sequence_length = shift;
 	die "Error lost the GBS fastq sequence length in base pairs (bps)" unless defined $gbs_sequence_length;
 
+    # The sam alignment file mapping quality score threshold.
+	my $sam_mapq_threshold = shift;
+	die "Error lost the sam alignment file mapping quality score threshold" unless defined $sam_mapq_threshold;
+    
 	# The output directory that contains all the BWA sam alignment files.
 	my $padded_sam_output_dir = shift;
 	die "Error lost the padded sam output file directory" unless defined $padded_sam_output_dir;
@@ -473,25 +535,41 @@ sub bwa_pad_sam_files{
 			}else{ #8_1308_8038_19954_1LL-06_TTCTG_5_A3length=66    16      7376    784845  37      66M     *       0       0       AATAATGCGCCAGCCAAGAGCTGTTTGGTAGCATTCTGCTGACGCTCGCACTCCCGTACACCTGCA      DDCB@>>>AFEFFFHC@GHGGGEGEGGIGCDEHBGGCIGIGGIIHGHEFCE:F<GIGIHFHHDFDD       XT:A:U  NM:i:0  X0:i:1  X1:i:0  XM:i:0  XO:i:0  XG:i:0  MD:Z:66
 
 				my @split_sam_entry = split(/\t/, $_);
-				my ($fastq_header, $bam_bitwise_flag, $fastq_sequence, $fastq_quality_scores) = ($split_sam_entry[0], $split_sam_entry[1], $split_sam_entry[9], $split_sam_entry[10]);
+				my ($fastq_header, $bam_bitwise_flag, $rname, $r_pos, $mapq, $cigar, $rnext, 
+					$pnext, $tlen, $fastq_sequence, $fastq_quality_scores, @optional_fields) = @split_sam_entry;
+				
+				my $optional_fields = join("\t", @optional_fields);
 				
 				my $fastq_sequence_length = length($fastq_sequence);
 				my $fastq_quality_scores_length = length($fastq_quality_scores);
-# 				die join("\t", $fastq_sequence_length, $fastq_header, $bam_bitwise_flag, $fastq_sequence, $fastq_quality_scores);
+# 				die join("\t", $fastq_header, $bam_bitwise_flag, $rname, $r_pos, $mapq, $cigar, $rnext, $pnext, $tlen, $fastq_sequence, $fastq_quality_scores, $optional_fields);
+
+				# Filter alignment entry if the read is unmapped in the sense and antisense orientation.
+				next if(($bam_bitwise_flag eq 4) or ($bam_bitwise_flag eq 20));
+				
+				# Filter alignment entry if the mapping quality of the read is below this threshold.
+				next if($mapq < $sam_mapq_threshold);
+				
+				# Filter alignment entry if the cigar string contains an insertion/deletion in the alignment.
+				next if($cigar !~ m/^\d+M$/);
+				
+				# Filter alignment entry if the read is not uniquely mapped to the reference.
+				next if($optional_fields !~ m/XT:A:U/);
+				
 				if(($fastq_sequence_length ne $gbs_sequence_length) and ($fastq_quality_scores_length ne $gbs_sequence_length)){
                     
 					# Get the number of poly-Ns to pad.
-					my $padded_nucleotide_length =  ($gbs_sequence_length - $fastq_sequence_length);
+					my $padded_nucleotide_length = ($gbs_sequence_length - $fastq_sequence_length);
 					my $padded_nucleotide_seq = 'N' x $padded_nucleotide_length;
 					
 					# Pad sequence based on alignment type.
 					my $padded_fastq_sequence = "";
 					
-					# Pad sequence if aligned to sense strand or unmatched sequence.
-					$padded_fastq_sequence = join("", $fastq_sequence, $padded_nucleotide_seq) if(($bam_bitwise_flag eq 0) or ($bam_bitwise_flag eq 4));
+					# Pad sequence if aligned to sense strand.
+					$padded_fastq_sequence = join("", $fastq_sequence, $padded_nucleotide_seq) if($bam_bitwise_flag eq 0);
 					
 					# Pad sequence if aligned to antisense strand.
-					$padded_fastq_sequence = join("", $padded_nucleotide_seq, $fastq_sequence) if(($bam_bitwise_flag eq 16) or ($bam_bitwise_flag eq 20));
+					$padded_fastq_sequence = join("", $padded_nucleotide_seq, $fastq_sequence) if($bam_bitwise_flag eq 16);
 					
 					# Get the number of quality scores to pad.
 					my $padded_score_length =  ($gbs_sequence_length - $fastq_quality_scores_length);
@@ -500,11 +578,11 @@ sub bwa_pad_sam_files{
 					# Pad quality scores based on alignment type.
 					my $padded_fastq_quality_scores = "";
 					
-					# Pad quality scores if aligned to sense strand or unmatched sequence in sense orientation.
-					$padded_fastq_quality_scores = join("", $fastq_quality_scores, $padded_score_seq) if(($bam_bitwise_flag eq 0) or ($bam_bitwise_flag eq 4));
+					# Pad quality scores if aligned to sense strand sequence in sense orientation.
+					$padded_fastq_quality_scores = join("", $fastq_quality_scores, $padded_score_seq) if($bam_bitwise_flag eq 0);
 					
-					# Pad quality scores if aligned to antisense strand or unmatched sequence in antisense orientation.
-					$padded_fastq_quality_scores = join("", $padded_score_seq, $fastq_quality_scores) if(($bam_bitwise_flag eq 16) or ($bam_bitwise_flag eq 20));
+					# Pad quality scores if aligned to antisense strand in antisense orientation.
+					$padded_fastq_quality_scores = join("", $padded_score_seq, $fastq_quality_scores) if($bam_bitwise_flag eq 16);
 					
 					my $padded_fastq_sequence_length = length($padded_fastq_sequence);
 					my $padded_fastq_quality_scores_length = length($padded_fastq_quality_scores);
