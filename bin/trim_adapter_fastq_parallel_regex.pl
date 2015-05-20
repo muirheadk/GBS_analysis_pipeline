@@ -49,7 +49,7 @@ $adapter_length_min_threshold = 16 unless defined $adapter_length_min_threshold;
 $adapter_trim_offset = 5 unless defined $adapter_trim_offset;
 
 # The minimum trimmed fastq sequence length in base pairs (bps) to retain after trimming. Keep in mind that this is the minimum trimmed fastq sequence length used before we add the length of the barcode 
-# used for splitting each individual fastq file. Tassel requires sequences at least 32 base pairs (bps) plus the length of a particular barcode that can be in the range of 4-8 base pairs (bps) in length. Default: 32
+# used for splitting each individual fastq file. Tassel required sequences at least 32 base pairs (bps) plus the length of a particular barcode that can be in the range of 4-8 base pairs (bps) in length. Default: 32
 $min_trimmed_fastq_sequence_length = 32  unless defined $min_trimmed_fastq_sequence_length;
 
 # The padded sequence controller. Specify true for padded trimmed sequences or false for unpadded trimmed sequences. Default: false
@@ -86,7 +86,7 @@ OPTIONS:
 -t adapter_trim_offset - The trimming offset length in base pairs (bps) to trim upstream of the start of the GBS common adapter sequence found in the adapter regex searches. Default: 5
 
 -q min_trimmed_fastq_sequence_length - The minimum trimmed fastq sequence length in base pairs (bps) to retain after trimming. Keep in mind that this is the minimum trimmed fastq sequence length used before we add the 
-length of the barcode used for splitting each individual fastq file. Tassel requires sequences at least 32 base pairs (bps) plus the length of a particular barcode that can be in the range of 4-8 base pairs (bps) in 
+length of the barcode used for splitting each individual fastq file. Tassel required sequences at least 32 base pairs (bps) plus the length of a particular barcode that can be in the range of 4-8 base pairs (bps) in 
 length. Default: 32
 
 -n pad_sequences - The padded sequence controller. Specify true for padded trimmed sequences or false for unpadded trimmed sequences. Default: false
