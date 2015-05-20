@@ -34,9 +34,9 @@ $min_num_pops_locus = 2 unless defined $min_num_pops_locus;
 
 $min_percent_indvs_pop = 0 unless defined $min_percent_indvs_pop;
 
-$min_stack_depth = 4 unless defined $min_stack_depth;
+$min_stack_depth = 10 unless defined $min_stack_depth;
 
-$min_allele_freq = 0.01 unless defined $min_allele_freq;
+$min_allele_freq = 0.05 unless defined $min_allele_freq;
 
 $num_cpu_cores = 2 unless defined $num_cpu_cores;
 
