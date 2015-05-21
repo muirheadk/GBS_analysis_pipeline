@@ -22,9 +22,9 @@ GetOptions(
     'g=s'    => \$refgen_infile, # The absolute path to the reference genome input fasta file to align GBS fastq sequences.
     'l=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
     'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
-    'd=s'    => \$min_depth_coverage_pstacks, # The minimum depth of coverage to report a stack. Default: 1
+    'd=s'    => \$min_depth_coverage_pstacks, # The minimum depth of coverage to report a stack. Default: 5
     'a=s'    => \$alpha_value_pstacks, # The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
-    's=s'    => \$num_mismatches_tag, # The number of mismatches allowed between sample tags when generating the catalog. Default: 1
+    's=s'    => \$num_mismatches_tag, # The number of mismatches allowed between sample tags when generating the catalog. Default: 0
     'm=s'    => \$sam_mapq_threshold, # The mapping quality score threshold filter for sam alignments. Any mapping quality score below this value is filtered out of the sam alignment files. Default: 20
     'c=s'    => \$num_threads, # The number of cpu threads to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
     'o=s'    => \$output_dir, # The absolute path to the output directory to contain the renumerated reference genome, BWA sam, padded sam, and Stacks output files and directories.
@@ -43,17 +43,17 @@ $gbs_fastq_file_type = 'gzfastq' unless defined $gbs_fastq_file_type;
 # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 $gbs_sequence_length = 92 unless defined $gbs_sequence_length;
 
-# The SQL ID to insert into the output to identify this sample.
+# The SQL ID to insert into the output to identify this sample. Default: 1
 $stacks_sql_id = 1 unless defined $stacks_sql_id;
 
-# The minimum depth of coverage to report a stack. Default: 4
-$min_depth_coverage_pstacks = 4 unless defined $min_depth_coverage_pstacks;
+# The minimum depth of coverage to report a stack. Default: 5
+$min_depth_coverage_pstacks = 5 unless defined $min_depth_coverage_pstacks;
 
 # The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 $alpha_value_pstacks = 0.05 unless defined $alpha_value_pstacks;
 
-# The number of mismatches allowed between sample tags when generating the catalog. Default: 1
-$num_mismatches_tag = 1 unless defined $num_mismatches_tag;
+# The number of mismatches allowed between sample tags when generating the catalog. Default: 0
+$num_mismatches_tag = 0 unless defined $num_mismatches_tag;
 
 # The mapping quality score threshold filter for sam alignments. Any mapq score below this value is filtered out of the sam alignment files. Default: 20
 $sam_mapq_threshold = 20 unless defined $sam_mapq_threshold;
@@ -87,13 +87,13 @@ OPTIONS:
 
 -l gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 
--b stacks_sql_id - The SQL ID to insert into the output to identify this sample.
+-b stacks_sql_id - The SQL ID to insert into the output to identify this sample. Default: 1
 
--d min_depth_coverage_pstacks - The minimum depth of coverage to report a stack. Default: 4
+-d min_depth_coverage_pstacks - The minimum depth of coverage to report a stack. Default: 5
 
 -a alpha_value_pstacks - The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 
--s num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog. Default: 1
+-s num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog. Default: 0
 
 -m sam_mapq_threshold - The mapping quality score threshold filter for sam alignments. Any mapq score below this value is filtered out of the sam alignment files. Default: 20
 
