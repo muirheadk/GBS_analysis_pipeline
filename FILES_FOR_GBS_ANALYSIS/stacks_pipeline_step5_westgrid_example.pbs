@@ -1,0 +1,11 @@
+#!/bin/bash
+#PBS -l walltime=72:00:00
+#PBS -M jrdupuis@ualberta.ca
+#PBS -l mem=4gb
+#PBS -m bea
+#PBS -l procs=16
+cd $PBS_O_WORKDIR
+
+perl population_stacks.pl -P ./step4_output/STACKS_OUTFILES -M ./Polygonia_popmap.txt -a 0.01 -f struct_single_snp -t 16 -o step5_output
+perl population_stacks.pl -P ./step4_output/STACKS_OUTFILES -M ./Polygonia_popmap.txt -a 0.01 -f fasta -t 16 -o step5_output
+perl population_stacks.pl -P ./step4_output/STACKS_OUTFILES -M ./Polygonia_popmap.txt -a 0.01 -f vcf -t 16 -o step5_output
