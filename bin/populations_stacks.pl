@@ -134,6 +134,45 @@ if($outfile_type eq 'fasta'){
 		}
 	}
 	
+}if($outfile_type eq 'fasta_single_snp'){
+	# Create output directory if it doesn't already exist.
+	my $populations_fasta_output_dir = join('/', $output_dir, "POPULATIONS_FASTA_DIR");
+	
+	my $batch_fasta_outfile = join('/', $populations_fasta_output_dir, join("_", "batch", $batch_num . ".fa"));
+	unless(-s $batch_fasta_outfile){
+		warn "Executing populations fasta output.....\n\n";
+		my $populationsCmd  = "$populations -P $stacks_dir -M $pop_map_infile -b $batch_num -p $min_num_pops_locus -r $min_percent_indvs_pop -m $min_stack_depth -a $min_allele_freq -t $num_cpu_cores --fasta --write_single_snp";
+		warn $populationsCmd . "\n\n";
+		system($populationsCmd) == 0 or die "Error calling $populationsCmd: $?";
+		
+		# Create output directory if it doesn't already exist.
+		unless(-d $populations_fasta_output_dir){
+			mkdir($populations_fasta_output_dir, 0777) or die "Can't make directory: $!";
+		}
+			
+		my ($batch_hapstats_outfile, $batch_haplotypes_outfile, $batch_populations_log_outfile, $batch_sumstats_outfile, $batch_sumstats_summary_outfile);
+		$batch_hapstats_outfile = join('/', $populations_fasta_output_dir, join("_", "batch", $batch_num . ".hapstats.tsv"));
+		$batch_haplotypes_outfile = join('/', $populations_fasta_output_dir, join("_", "batch", $batch_num . ".haplotypes.tsv"));
+		$batch_populations_log_outfile = join('/', $populations_fasta_output_dir, join("_", "batch", $batch_num . ".populations.log"));
+		$batch_sumstats_outfile = join('/', $populations_fasta_output_dir, join("_", "batch", $batch_num . ".sumstats.tsv"));
+		$batch_sumstats_summary_outfile = join('/', $populations_fasta_output_dir, join("_", "batch", $batch_num . ".sumstats_summary.tsv"));
+		
+		$batch_files{$batch_fasta_infile} = $batch_fasta_outfile;
+		$batch_files{$batch_hapstats_infile} = $batch_hapstats_outfile;
+		$batch_files{$batch_haplotypes_infile} = $batch_haplotypes_outfile;
+		$batch_files{$batch_populations_log_infile} = $batch_populations_log_outfile;
+		$batch_files{$batch_sumstats_infile} = $batch_sumstats_outfile;
+		$batch_files{$batch_sumstats_summary_infile} = $batch_sumstats_summary_outfile;
+		
+		foreach my $batch_infile (sort keys %batch_files){
+			my $batch_outfile = $batch_files{$batch_infile};
+			warn "Copying $batch_infile to $batch_outfile.....";
+			copy($batch_infile, $batch_outfile) or die "Copy failed: $!";
+			warn "Unlinking $batch_infile.....";
+	 		unlink($batch_infile) or die "Could not unlink $batch_infile: $!";
+		}
+	}
+	
 }elsif($outfile_type eq 'struct_single_snp'){
 
 	# Create output directory if it doesn't already exist.
