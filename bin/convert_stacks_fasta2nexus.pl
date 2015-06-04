@@ -6,20 +6,20 @@ use Getopt::Long;
 use File::Basename;
 
 #### PROGRAM NAME ####
-# generate_locus_catalog.pl - Program that generates locus catalog files from a Stacks fasta formatted file from population stacks.
+# generate_locus_catalog.pl - Program that generates a file in NEXUS file format from a Stacks fasta formatted file from population stacks.
 
 #### DESCRIPTION ####
-# This program generates generates locus catalog files from a Stacks fasta formatted file.
+# This program generates a file in NEXUS file format from a Stacks fasta formatted file from population stacks.
 
 #### SAMPLE COMMAND ####
-# perl generate_locus_catalog.pl -i ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES -f ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/STACKS_OUTFILES/batch_1.fa -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3/NEXUS_STACKS_OUTFILES
+# perl convert_stacks_fasta2nexus.pl -m ~/Desktop/sbwphylo_popmap.txt -i ~/SBWPHYLO_TRIMMED_OFFSET_5_POPULATIONS/POPULATIONS_FASTA_DIR/batch_1.fa -l 92 -p 0.75 -o ~/SBWPHYLO_TRIMMED_OFFSET_5_NEXUS
 my ($stacks_fasta_infile, $stacks_popmap_infile, $gbs_sequence_length, $percent_present_data, $output_dir);
 GetOptions(
-	'i=s'    => \$stacks_fasta_infile, # The Stacks fasta formatted input file.
+	'i=s'    => \$stacks_fasta_infile, # The Population Stacks write_single_snp fasta formatted input file.
     'm=s'    => \$stacks_popmap_infile, # The Stacks population map formatted input file.
 	'l=s'    => \$gbs_sequence_length, # The GBS fasta sequence length in base pairs (bps) common to all GBS fasta sequences. Default: 92
     'p=s'    => \$percent_present_data, # The percent of present data at a locus. percent_present_data = (present_data/total_data) Default: 0.75
-	'o=s'    => \$output_dir, # The directory to contain all locus catalog output files.
+	'o=s'    => \$output_dir, # The directory to contain all the output files.
 );
 
 # Print usage message if the following input parameters are not specified.
@@ -32,7 +32,7 @@ usage() unless (
 # The GBS fasta sequence length in base pairs (bps) common to all GBS fasta sequences. Default: 92
 $gbs_sequence_length = 92 unless defined $gbs_sequence_length;
 
-# The percent of present data at a locus. percent_present_data = (present_data/total_data) Default: 0.75
+# The percent of present data at a locus. percent_present_data = (present_data/(present_data + missing_data)) Default: 0.75
 $percent_present_data = 0.75 unless defined $percent_present_data;
 
 sub usage {
@@ -42,11 +42,11 @@ die <<"USAGE";
 
 Usage: $0 -i stacks_input_dir -f stacks_fasta_infile -l gbs_sequence_length -p percent_present_data -o output_dir
 
-DESCRIPTION - This program generates files in NEXUS format from a Stacks fasta formatted file.
+DESCRIPTION - This program generates a file in NEXUS file format from a Stacks fasta formatted file from population stacks.
 
 OPTIONS:
 
--i stacks_fasta_infile - The Stacks fasta formatted input file.
+-i stacks_fasta_infile - The Population Stacks write_single_snp fasta formatted input file.
 
 -m stacks_popmap_infile - The Stacks population map formatted input file.
 
@@ -54,7 +54,7 @@ OPTIONS:
 
 -p percent_present_data - The percent of present data at a locus. percent_present_data = (present_data/total_data) Default: 0.75
     
--o output_dir - The directory to contain all the nexus output files.
+-o output_dir - The directory to contain all the output files.
 
 USAGE
 }
@@ -80,7 +80,7 @@ while(<INFILE>){
 }
 close(INFILE) or die "Couldn't close file $stacks_popmap_infile";
 
-
+# If the nexus locus catolog is already generated then skip, otherwise generate the nexus locus catalog.
 my $locus_catalog_outfile = join('/', $output_dir, "nexus_locus_catalog.txt");
 unless(-s $locus_catalog_outfile){
     
@@ -166,6 +166,10 @@ unless(-s $locus_catalog_outfile){
                             }
                             my @unique_snp_nuc_chars = do { my %seen; grep { !$seen{$_}++ } sort {$a cmp $b} @snp_nuc_chars };
                             my $unique_concat_snps = join(",", @unique_snp_nuc_chars);
+                            warn "complex SNP $unique_concat_snps at locus $locus_id and individual $individual_id" if($unique_concat_snps eq "C,G,T");
+                            warn "complex SNP $unique_concat_snps at locus $locus_id and individual $individual_id" if($unique_concat_snps eq "A,G,T");
+                            warn "complex SNP $unique_concat_snps at locus $locus_id and individual $individual_id" if($unique_concat_snps eq "A,C,T");
+                            warn "complex SNP $unique_concat_snps at locus $locus_id and individual $individual_id" if($unique_concat_snps eq "A,C,G");
                             
                             my $iupac_code = get_iupac_code($unique_concat_snps);
                             die "Error: iupac_code is undefined" if(!defined($iupac_code));
@@ -185,7 +189,7 @@ unless(-s $locus_catalog_outfile){
         
     }
 
-    # Print out the locus metadata contents in nexus file format.
+    # Print out the locus metadata contents to the nexus locus catalog.
     open(OUTFILE, ">$locus_catalog_outfile") or die "Couldn't open file $locus_catalog_outfile for writting, $!";
     print OUTFILE join("\t", "locus_id", "refgen_seq_id", "refgen_seq_start", "strand", "individual_id", "snp_position", "sequence") . "\n";
     foreach my $locus_id (sort {$a <=> $b} keys %locus_metadata){
@@ -256,13 +260,14 @@ foreach my $locus_id (sort {$a <=> $b} keys %locus_catalog_counts){
     my $perc_present_data = ($present_data_count/$total_data_count);
     $percent_missing_data{$locus_id} = $present_data_count;
     warn "$locus_id ($present_data_count/$total_data_count) * 100" . " " . ($present_data_count/$total_data_count) . " " . $percent_missing_data{$locus_id};
-    #
+
+    # Grab the locus ids that pass the present data filter test.
     if($perc_present_data >= $percent_present_data){
         push(@nexus_loci_list, $locus_id);
         $present_loci_count++;
     }
 }
-die;
+
 # Adding locus sequences in a hash array in order to concatenate the sequences.
 my %nexus_seqs = ();
 foreach my $locus_id (sort {$a <=> $b} @nexus_loci_list){
@@ -312,35 +317,6 @@ close(OUTFILE) or die "Couldn't close file $nexus_outfile";
 # value => absolue filepath ( e.g. /path/to/filename.suffix )
 # 
 # $file_count - The number of files stored with file extension *.suffix.
-sub find_files{
-    
-	# The input file directory.
-	my $infile_dir = shift;
-	die "Error lost input file directory" unless defined $infile_dir;
-	
-	# The file extension suffix.
-	my $suffix = shift;
-	die "Error lost file extension suffix directory" unless defined $suffix;
-	
-	if(-d $infile_dir){ # Check if $infile_dir is a directory.
-		my %files = ();
-		my $file_counter = 0;
-		opendir(DIR, $infile_dir) || die "Error in opening dir $infile_dir\n";
-		while( my $file_name = readdir(DIR)){
-			my $infile_name = join('/', $infile_dir, $file_name) if ($file_name =~ m/\.$suffix$/);
-			warn "$infile_name\n" if ($file_name =~ m/\.$suffix$/);
-			$files{$file_name} = $infile_name if ($file_name =~ m/\.$suffix$/);
-			$file_counter++ if ($file_name =~ m/\.$suffix$/);
-		}
-		closedir(DIR);
-		
-		return (\%files, $file_counter);
-        
-	}else{
-		die "Error $infile_dir does not exist!\n";
-	}
-}
-
 sub get_iupac_code{
     
     # The input nucleotide list.
@@ -354,10 +330,10 @@ sub get_iupac_code{
         "A,T" => "W",
         "G,T" => "K",
         "A,C" => "M",
-#        "C,G,T" => "B",
-#        "A,G,T" => "D",
-#        "A,C,T" => "H",
-#        "A,C,G" => "V",
+        "C,G,T" => "B",
+        "A,G,T" => "D",
+        "A,C,T" => "H",
+        "A,C,G" => "V",
     );
  
     return $iupac_codes{$nuc_list};
