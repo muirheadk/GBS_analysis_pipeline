@@ -33,7 +33,7 @@ GetOptions(
 	'r=s'    => \$restriction_enzymes, # The restriction enzyme(s) used to digest the genomic sequences. Default: PstI/MspI
 	'e=s'    => \$encoded_phred_offset, # The fastq quality score encoding used in the Illumina sequencing run.  Use phred33 for Illumina 1.8+ and Sanger or phred64 for Illumina 1.3 to 1.5. Default: phred33
 	'w=s'    => \$sliding_window_size, # The size of the sliding window as a fraction of the read length between 0 and 1. Default: 0.15
-	's=s'    => \$quality_score_limit, # The quality score limit. If the average score within the sliding window drops below this value, the read is discarded. Default: 10
+	's=s'    => \$quality_score_limit, # The quality score limit. If the average score within the sliding window drops below this value, the read is discarded. Default: 20
 	't=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 	'b=s'    => \$barcode_infile, # The absolute path to the barcodes input file used to split sequences into individual fastq output files.
 	'c=s'    => \$barcode_option, # The barcode option for whether or not single-end or paired-end barcodes are within the FASTQ header or inline with sequence. Default: inline_null
@@ -56,8 +56,8 @@ $encoded_phred_offset = 'phred33' unless defined $encoded_phred_offset;
 # The size of the sliding window as a fraction of the read length between 0 and 1. Default: 0.15
 $sliding_window_size = 0.15 unless defined $sliding_window_size;
 
-# The quality score limit. If the average score within the sliding window drops below this value, the read is discarded. Default: 10
-$quality_score_limit = 10 unless defined $quality_score_limit;
+# The quality score limit. If the average score within the sliding window drops below this value, the read is discarded. Default: 20
+$quality_score_limit = 20 unless defined $quality_score_limit;
 
 # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 $gbs_sequence_length = 92 unless defined $gbs_sequence_length;
@@ -98,7 +98,7 @@ OPTIONS:
 
 -w sliding_window_size - The size of the sliding window as a fraction of the read length between 0 and 1. Default: 0.15
 
--s quality_score_limit - The quality score limit. If the average score within the sliding window drops below this value, the read is discarded. Default: 10
+-s quality_score_limit - The quality score limit. If the average score within the sliding window drops below this value, the read is discarded. Default: 20
 
 -t gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 
@@ -340,7 +340,7 @@ sub process_radtags_single_end{
 		# Generate the barcodes input file for the process_radtags program.
 		my $restriction_enzyme_names = $restriction_enzymes;
 		$restriction_enzyme_names =~ s/\//_/g;
-		my $barcode_outfile = join('/', $output_dir, join("_", $restriction_enzyme_names, "single-end", "process_radtags_barcodes.txt"));
+		my $barcode_outfile = join('/', $output_dir, join("_", $flowcell_name, $restriction_enzyme_names, "single-end", "process-radtags-barcodes.txt"));
 		open(OUTFILE, ">$barcode_outfile") or die "Couldn't open file $barcode_outfile for writting, $!";
 		foreach my $barcodes_entry (sort {$b->[0] <=> $a->[0] || $a->[1] cmp $b->[1]} @barcode_entries){
 			my ($fastq_barcode_seq, $fastq_run_id) = (@$barcodes_entry[1], @$barcodes_entry[2]);
@@ -490,7 +490,8 @@ sub process_radtags_paired_end{
 		# Generate the barcodes input file for the process_radtags program.
 		my $restriction_enzyme_names = $restriction_enzymes;
 		$restriction_enzyme_names =~ s/\//-/g;
-		my $barcode_outfile = join('/', $output_dir, join("_", $restriction_enzyme_names, "paired-end", "process_radtags_barcodes.txt"));
+        
+		my $barcode_outfile = join('/', $output_dir, join("_", $flowcell_name, $restriction_enzyme_names, "paired-end", "process-radtags-barcodes.txt"));
 		open(OUTFILE, ">$barcode_outfile") or die "Couldn't open file $barcode_outfile for writting, $!";
 		foreach my $barcodes_entry (sort {$b->[0] <=> $a->[0] || $a->[1] cmp $b->[1]} @barcode_entries){
 			my ($fastq_barcode_seq, $fastq_run_id) = (@$barcodes_entry[1], @$barcodes_entry[2]);

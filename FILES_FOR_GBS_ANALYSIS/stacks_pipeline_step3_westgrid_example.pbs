@@ -1,9 +1,0 @@
-#!/bin/bash
-#PBS -l walltime=72:00:00
-#PBS -M jrdupuis@ualberta.ca
-#PBS -l mem=4gb
-#PBS -m bea
-#PBS -l procs=16
-cd $PBS_O_WORKDIR
-
-perl trim_adapter_fastq_parallel_regex.pl -i ./step2_combined_fastq -n false -c 16 -o ./step3_output
