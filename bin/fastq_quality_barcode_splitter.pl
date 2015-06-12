@@ -340,7 +340,7 @@ sub process_radtags_single_end{
 		# Generate the barcodes input file for the process_radtags program.
 		my $restriction_enzyme_names = $restriction_enzymes;
 		$restriction_enzyme_names =~ s/\//_/g;
-		my $barcode_outfile = join('/', $output_dir, join("_", $flowcell_name, $restriction_enzyme_names, "single-end", "process-radtags-barcodes.txt"));
+		my $barcode_outfile = join('/', $split_fastq_output_dir, join("_", $flowcell_name, $restriction_enzyme_names, "single-end", "process-radtags-barcodes.txt"));
 		open(OUTFILE, ">$barcode_outfile") or die "Couldn't open file $barcode_outfile for writting, $!";
 		foreach my $barcodes_entry (sort {$b->[0] <=> $a->[0] || $a->[1] cmp $b->[1]} @barcode_entries){
 			my ($fastq_barcode_seq, $fastq_run_id) = (@$barcodes_entry[1], @$barcodes_entry[2]);
@@ -491,7 +491,7 @@ sub process_radtags_paired_end{
 		my $restriction_enzyme_names = $restriction_enzymes;
 		$restriction_enzyme_names =~ s/\//-/g;
         
-		my $barcode_outfile = join('/', $output_dir, join("_", $flowcell_name, $restriction_enzyme_names, "paired-end", "process-radtags-barcodes.txt"));
+		my $barcode_outfile = join('/', $split_fastq_output_dir, join("_", $flowcell_name, $restriction_enzyme_names, "paired-end", "process-radtags-barcodes.txt"));
 		open(OUTFILE, ">$barcode_outfile") or die "Couldn't open file $barcode_outfile for writting, $!";
 		foreach my $barcodes_entry (sort {$b->[0] <=> $a->[0] || $a->[1] cmp $b->[1]} @barcode_entries){
 			my ($fastq_barcode_seq, $fastq_run_id) = (@$barcodes_entry[1], @$barcodes_entry[2]);
