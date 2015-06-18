@@ -13,10 +13,11 @@ use File::Basename;
 
 #### SAMPLE COMMAND ####
 # perl convert_stacks_fasta2nexus.pl -m ~/Desktop/sbwphylo_popmap.txt -i ~/SBWPHYLO_TRIMMED_OFFSET_5_POPULATIONS/POPULATIONS_FASTA_DIR/batch_1.fa -l 92 -p 0.75 -o ~/SBWPHYLO_TRIMMED_OFFSET_5_NEXUS
-my ($stacks_fasta_infile, $stacks_popmap_infile, $gbs_sequence_length, $percent_present_data, $output_dir);
+my ($stacks_fasta_infile, $stacks_popmap_infile, $whitelist_infile,$gbs_sequence_length, $percent_present_data, $output_dir);
 GetOptions(
 	'i=s'    => \$stacks_fasta_infile, # The Population Stacks write_single_snp fasta formatted input file.
     'm=s'    => \$stacks_popmap_infile, # The Stacks population map formatted input file.
+    'w=s'    => \$whitelist_infile, # The whitelist input file containing the locus ids to keep after passing the present data filter. If not specified all locus ids that passed the present data filter will be used to generate the nexus file.
 	'l=s'    => \$gbs_sequence_length, # The GBS fasta sequence length in base pairs (bps) common to all GBS fasta sequences. Default: 92
     'p=s'    => \$percent_present_data, # The percent of present data at a locus. percent_present_data = (present_data/total_data) Default: 0.75
 	'o=s'    => \$output_dir, # The directory to contain all the output files.
@@ -29,6 +30,9 @@ usage() unless (
 	and defined $output_dir
 );
 
+# The whitelist input file containing the locus ids to keep after passing the present data filter. If not specified all locus ids that passed the present data filter will be used to generate the nexus file.
+$whitelist_infile = "" unless defined $whitelist_infile;
+
 # The GBS fasta sequence length in base pairs (bps) common to all GBS fasta sequences. Default: 92
 $gbs_sequence_length = 92 unless defined $gbs_sequence_length;
 
@@ -40,7 +44,7 @@ sub usage {
 die <<"USAGE";
 
 
-Usage: $0 -i stacks_input_dir -f stacks_fasta_infile -l gbs_sequence_length -p percent_present_data -o output_dir
+Usage: $0 -i stacks_input_dir -f stacks_fasta_infile -w whitelist_infile -l gbs_sequence_length -p percent_present_data -o output_dir
 
 DESCRIPTION - This program generates a file in NEXUS file format from a Stacks fasta formatted file from population stacks.
 
@@ -50,6 +54,8 @@ OPTIONS:
 
 -m stacks_popmap_infile - The Stacks population map formatted input file.
 
+-w whitelist_infile - The whitelist input file containing the locus ids to keep after passing the present data filter. If not specified all locus ids that passed the present data filter will be used to generate the nexus file.
+    
 -l gbs_sequence_length - The GBS fasta sequence length in base pairs (bps) common to all GBS fasta sequences. Default: 92
 
 -p percent_present_data - The percent of present data at a locus. percent_present_data = (present_data/total_data) Default: 0.75
@@ -243,6 +249,8 @@ close(INFILE) or die "Couldn't close file $locus_catalog_outfile";
 my %percent_missing_data = ();
 my @nexus_loci_list = ();
 my $present_loci_count = 0;
+my $locus_list_outfile = join('/', $output_dir, "filtered_locus_list.txt");
+open(OUTFILE, ">$locus_list_outfile") or die "Couldn't open file $locus_list_outfile for writting, $!";
 foreach my $locus_id (sort {$a <=> $b} keys %locus_catalog_counts){
     
     my $present_data_count = 0;
@@ -263,19 +271,43 @@ foreach my $locus_id (sort {$a <=> $b} keys %locus_catalog_counts){
 
     # Grab the locus ids that pass the present data filter test.
     if($perc_present_data >= $percent_present_data){
+        print OUTFILE $locus_id . "\n";
         push(@nexus_loci_list, $locus_id);
         $present_loci_count++;
     }
 }
+close(OUTFILE) or die "Couldn't close file $locus_list_outfile";
 
 # Adding locus sequences in a hash array in order to concatenate the sequences.
 my %nexus_seqs = ();
-foreach my $locus_id (sort {$a <=> $b} @nexus_loci_list){
-    foreach my $individual_id (sort {$a cmp $b} keys %sample_names){
-        push(@{$nexus_seqs{$individual_id}}, $locus_catalog_data{$locus_id}{$individual_id});
+if($whitelist_infile eq ""){
+    foreach my $locus_id (sort {$a <=> $b} @nexus_loci_list){
+        foreach my $individual_id (sort {$a cmp $b} keys %sample_names){
+            push(@{$nexus_seqs{$individual_id}}, $locus_catalog_data{$locus_id}{$individual_id});
+        }
     }
+}elsif(-s $whitelist_infile){
+    
+    open(INFILE, "<$whitelist_infile") or die "Couldn't open file $whitelist_infile for reading, $!";
+    my @nexus_loci_list = ();
+    $present_loci_count = 0;
+    while(<INFILE>){
+        chomp $_;
+        push(@nexus_loci_list, $_);
+        $present_loci_count++;
+    }
+    close(INFILE) or die "Couldn't close file $whitelist_infile";
+    
+    
+    foreach my $locus_id (sort {$a <=> $b} @nexus_loci_list){
+        
+        foreach my $individual_id (sort {$a cmp $b} keys %sample_names){
+            push(@{$nexus_seqs{$individual_id}}, $locus_catalog_data{$locus_id}{$individual_id});
+        }
+    }
+}else{
+    die "$whitelist_infile does not exist";
 }
-
 
 # Print out the locus metadata contents in nexus file format.
 my $nexus_nchar_length = ($present_loci_count * $gbs_sequence_length);
