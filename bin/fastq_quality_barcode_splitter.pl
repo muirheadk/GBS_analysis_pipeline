@@ -357,7 +357,7 @@ sub process_radtags_single_end{
 		}
 		
 		# Execute the process_radtags command using system.
-		my $process_radtagsCmd = "$process_radtags -f $single_end_fastq_infile -i $infile_type -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E $encoded_phred_offset -D -w $sliding_window_size -s $quality_score_limit -t $gbs_sequence_length --$barcode_option -e $renzyme_option --filter_illumina --barcode_dist $num_mismatches";
+		my $process_radtagsCmd = "$process_radtags -f $single_end_fastq_infile -i $infile_type -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E $encoded_phred_offset -D -w $sliding_window_size -s $quality_score_limit -t $gbs_sequence_length --$barcode_option -e $renzyme_option --filter_illumina --barcode_dist_1 $num_mismatches";
 		warn $process_radtagsCmd . "\n\n";
 		my $status = system($process_radtagsCmd) == 0 or die "Error calling $process_radtags: $?";
 	}
@@ -508,7 +508,7 @@ sub process_radtags_paired_end{
 		}
 		
 		# Execute the process_radtags command using system.
-		my $process_radtagsCmd = "$process_radtags -1 $first_paired_end_fastq_infile -2 $second_paired_end_fastq_infile -i $infile_type -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E $encoded_phred_offset -D -w $sliding_window_size -s $quality_score_limit -t $gbs_sequence_length --$barcode_option -e $renzyme_option --filter_illumina --barcode_dist $num_mismatches";
+		my $process_radtagsCmd = "$process_radtags -1 $first_paired_end_fastq_infile -2 $second_paired_end_fastq_infile -i $infile_type -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E $encoded_phred_offset -D -w $sliding_window_size -s $quality_score_limit -t $gbs_sequence_length --$barcode_option -e $renzyme_option --filter_illumina --barcode_dist_1 $num_mismatches";
 		warn $process_radtagsCmd . "\n\n";
 		my $status = system($process_radtagsCmd) == 0 or die "Error calling $process_radtags: $?";
 	}
