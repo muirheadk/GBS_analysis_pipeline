@@ -85,7 +85,7 @@ my $filtered_refgen_filename = fileparse($stacks_refgen_infile, qr/\.fna|\.fasta
 my $filtered_refgen_outfile = join('/', $output_dir, "$filtered_refgen_filename-filtered.fasta");
 # Print out the filtered sequence to the new reference genome filtered outfile.
 open(OUTFILE, ">$filtered_refgen_outfile") or die "Couldn't open file $filtered_refgen_outfile for writting, $!";
-my $refgen_header = "";
+$refgen_seq_id = "";
 while(<INFILE>){
     chomp $_;
     
