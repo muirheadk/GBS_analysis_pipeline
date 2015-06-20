@@ -1,0 +1,11 @@
+#!/bin/bash
+#PBS -l walltime=10:00:00
+#PBS -M jrdupuis@ualberta.ca
+#PBS -l mem=12gb
+#PBS -m bea
+cd $PBS_O_WORKDIR
+
+perl fastq_quality_barcode_splitter.pl -i ../raw_fastq/HI.0803.006.GQ25032013-6_R1.fastq.gz -b ../barcode_files/GQ25032013_6-barcodes.txt -n 0 -o ./step2_output_GQ25032013_6
+perl fastq_quality_barcode_splitter.pl -i ../raw_fastq/HI.1405.007.GQ03122013-4_R1.fastq.gz -b ../barcode_files/GQ03122013_4-barcodes.txt -n 0 -o ./step2_output_GQ03122013_4
+perl fastq_quality_barcode_splitter.pl -i ../raw_fastq/HI.1405.008.GQ03122013-5_R1.fastq.gz -b ../barcode_files/GQ03122013_5-barcodes.txt -n 0 -o ./step2_output_GQ03122013_5
+perl fastq_quality_barcode_splitter.pl -i ../raw_fastq/HI.1406.001.GQ03122013-6_R1.fastq.gz -b ../barcode_files/GQ03122013_6-barcodes.txt -n 0 -o ./step2_output_GQ03122013_6
