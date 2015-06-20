@@ -30,7 +30,7 @@ GetOptions(
 	'i=s'    => \$single_end_fastq_infile, # The absolute path to the bulk fastq input file to split sequences based on barcode sequences if processing single-end seqeunces. Can either be *.fastq or *.fastq.gz extension.
 	'1=s'    => \$first_paired_end_fastq_infile, # The absolute path to the first bulk fastq input file in a set of paired-end sequences to split sequences based on barcode sequences. Can either be *.fastq or *.fastq.gz extension.
 	'2=s'    => \$second_paired_end_fastq_infile, # The absolute path to the second bulk fastq input file in a set of paired-end sequences to split sequences based on barcode sequences. Can either be *.fastq or *.fastq.gz extension.
-	'r=s'    => \$restriction_enzymes, # The restriction enzyme(s) used to digest the genomic sequences. Default: PstI/MspI
+	'r=s'    => \$restriction_enzymes, # The restriction enzyme(s) used to digest the genomic sequences. Can be ApeKI, PstI/MspI, or SbfI/MspI. Default: PstI/MspI
 	'e=s'    => \$encoded_phred_offset, # The fastq quality score encoding used in the Illumina sequencing run.  Use phred33 for Illumina 1.8+ and Sanger or phred64 for Illumina 1.3 to 1.5. Default: phred33
 	'w=s'    => \$sliding_window_size, # The size of the sliding window as a fraction of the read length between 0 and 1. Default: 0.15
 	's=s'    => \$quality_score_limit, # The quality score limit. If the average score within the sliding window drops below this value, the read is discarded. Default: 20
@@ -47,7 +47,7 @@ usage() unless (
       and defined $output_dir
 );
 
-# The restriction enzyme(s) used to digest the genomic sequences. Default: PstI/MspI
+# The restriction enzyme(s) used to digest the genomic sequences. Can be ApeKI, PstI/MspI, or SbfI/MspI. Default: PstI/MspI
 $restriction_enzymes = 'PstI/MspI' unless defined $restriction_enzymes;
 
 # The fastq quality score encoding used in the Illumina sequencing run.  Use phred33 for Illumina 1.8+ and Sanger or phred64 for Illumina 1.3 to 1.5. Default: phred33
@@ -87,12 +87,7 @@ OPTIONS:
 
 -2 second_paired_end_fastq_infile - The absolute path to the second bulk fastq input file in a set of paired-end sequences to split sequences based on barcode sequences. Can either be *.fastq or *.fastq.gz extension.
 
--r restriction_enzymes - The restriction enzyme(s) used to digest the genomic sequences. Default: PstI/MspI
-
-	Can be one of the following;
-
-	PstI/MspI
-	ApeKI
+-r restriction_enzymes - The restriction enzyme(s) used to digest the genomic sequences. Can be ApeKI, PstI/MspI, or SbfI/MspI. Default: PstI/MspI
 
 -e encoded_phred_offset - The fastq quality score encoding used in the Illumina sequencing run.  Use phred33 for Illumina 1.8+ and Sanger or phred64 for Illumina 1.3 to 1.5. Default: phred33
 
@@ -125,12 +120,14 @@ USAGE
 # Choose the restriction enzyme option based on the restriction enzyme(s) used.
 my $renzyme_option = "";
 if($restriction_enzymes eq 'ApeKI'){ # ApeKI
-	$renzyme_option = 'apeKI';
+	$renzyme_option = '-e apeKI';
 }elsif($restriction_enzymes eq 'PstI/MspI'){ # PstI/MspI
-	$renzyme_option = 'pstI';
+	$renzyme_option = '--renz_1 pstI --renz_2 mspI';
+}elsif($restriction_enzymes eq 'SbfI/MspI'){ # SbfI/MspI
+	$renzyme_option = '--renz_1 sbfI --renz_2 mspI';
 }
 else{ 
-	die "Input $restriction_enzymes is not one of the recognized restriction enzyme(s)! Please specify either ApeKI or PstI/MspI on the command line."
+	die "Input $restriction_enzymes is not one of the recognized restriction enzyme(s)! Please specify either ApeKI, PstI/MspI, or SbfI/MspI on the command line."
 }
 
 # Create output directory if it doesn't already exist.
@@ -357,7 +354,7 @@ sub process_radtags_single_end{
 		}
 		
 		# Execute the process_radtags command using system.
-		my $process_radtagsCmd = "$process_radtags -f $single_end_fastq_infile -i $infile_type -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E $encoded_phred_offset -D -w $sliding_window_size -s $quality_score_limit -t $gbs_sequence_length --$barcode_option -e $renzyme_option --filter_illumina --barcode_dist_1 $num_mismatches";
+		my $process_radtagsCmd = "$process_radtags -f $single_end_fastq_infile -i $infile_type -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E $encoded_phred_offset -D -w $sliding_window_size -s $quality_score_limit -t $gbs_sequence_length --$barcode_option $renzyme_option --filter_illumina --barcode_dist_1 $num_mismatches";
 		warn $process_radtagsCmd . "\n\n";
 		my $status = system($process_radtagsCmd) == 0 or die "Error calling $process_radtags: $?";
 	}
@@ -508,7 +505,7 @@ sub process_radtags_paired_end{
 		}
 		
 		# Execute the process_radtags command using system.
-		my $process_radtagsCmd = "$process_radtags -1 $first_paired_end_fastq_infile -2 $second_paired_end_fastq_infile -i $infile_type -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E $encoded_phred_offset -D -w $sliding_window_size -s $quality_score_limit -t $gbs_sequence_length --$barcode_option -e $renzyme_option --filter_illumina --barcode_dist_1 $num_mismatches";
+		my $process_radtagsCmd = "$process_radtags -1 $first_paired_end_fastq_infile -2 $second_paired_end_fastq_infile -i $infile_type -b $barcode_outfile -o $split_fastq_output_dir -y fastq -c -q -r -E $encoded_phred_offset -D -w $sliding_window_size -s $quality_score_limit -t $gbs_sequence_length --$barcode_option $renzyme_option --filter_illumina --barcode_dist_1 $num_mismatches";
 		warn $process_radtagsCmd . "\n\n";
 		my $status = system($process_radtagsCmd) == 0 or die "Error calling $process_radtags: $?";
 	}
