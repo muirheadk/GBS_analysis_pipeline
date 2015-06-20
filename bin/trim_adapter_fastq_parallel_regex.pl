@@ -13,7 +13,7 @@ use File::Basename;
 
 #### SAMPLE COMMAND ####
 # perl trim_adapter_fastq_parallel_regex.pl -i ~/workspace/GBS_data-08-10-2013/PstI_MspI_GBS_Data/PstI_MspI_PROCESSED_RADTAGS/PROJECT_LEADER_DIR_NO_MISMATCHES/CHRISTIANNE_MCDONALD -p CHRISTIANNE_MCDONALD -t 3 -q 32 -m 16 -l 92 -r PstI/MspI -c 16 -n true -o ~/workspace/GBS_data-08-10-2013/PstI_MspI_GBS_Data/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR
-my ($fastq_file_dir, $project_name, $restriction_enzymes, $gbs_sequence_length, $adapter_length_min_threshold, $adapter_trim_offset, $min_trimmed_fastq_sequence_length, $regex_num_cpu, $pad_sequences, $output_dir);
+my ($fastq_file_dir, $project_name, $restriction_enzymes, $gbs_sequence_length, $adapter_length_min_threshold, $adapter_trim_offset, $min_trimmed_fastq_sequence_length, $regex_num_cpu, $pad_sequences, $gzip_files_switch, $output_dir);
 GetOptions(
 	'i=s'    => \$fastq_file_dir, # The *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 	'p=s'    => \$project_name, # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
@@ -23,7 +23,8 @@ GetOptions(
 	't=s'    => \$adapter_trim_offset, # The trimming offset length in base pairs (bps) to trim upstream of the start of the GBS common adapter sequence found in the adapter regex searches. Default: 5
 	'q=s'    => \$min_trimmed_fastq_sequence_length, # The minimum trimmed fastq sequence length in base pairs (bps) to retain after trimming. Default: 32
 	'n=s'    => \$pad_sequences, # The padded sequence controller. Specify true for padded trimmed sequences or false for unpadded trimmed sequences. Default: false
-	'c=s'    => \$regex_num_cpu, # The number of cpu cores to use for the adapter regex searches. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+	'c=s'    => \$regex_num_cpu, # The number of cpu cores to use for the adapter regex searches. Default: 1
+	's=s'    => \$gzip_files_switch, # The gzip compression switch. Specify true for compressing file or false for not compressing files (saves time). Default: false
 	'o=s'    => \$output_dir, # The absolute path to the output directory to contain the trimmed adapter sequence fastq output files.
 );
 
@@ -53,8 +54,11 @@ $min_trimmed_fastq_sequence_length = 32  unless defined $min_trimmed_fastq_seque
 # The padded sequence controller. Specify true for padded trimmed sequences or false for unpadded trimmed sequences. Default: false
 $pad_sequences = 'false' unless defined $pad_sequences;
 
-# The number of cpu cores to use for the adapter regex searches. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
-$regex_num_cpu = 2 unless defined $regex_num_cpu;
+# The gzip compression switch. Specify true for compressing file or false for not compressing files (saves time). Default: false
+$gzip_files_switch = 'false' unless defined $gzip_files_switch;
+
+# The number of cpu cores to use for the adapter regex searches. Default: 1
+$regex_num_cpu = 1 unless defined $regex_num_cpu;
 
 # Program dependencies - The absolute paths to gzip to compress all project leader *.fastq input files.
 my $gzip 				= '/bin/gzip';
@@ -63,7 +67,7 @@ sub usage {
 
 die <<"USAGE";
 
-Usage: $0 -i fastq_file_dir -p project_name -r restriction_enzymes -l gbs_sequence_length -m adapter_length_min_threshold -t adapter_trim_offset -q min_trimmed_fastq_sequence_length -c regex_num_cpu -o output_dir
+Usage: $0 -i fastq_file_dir -p project_name -r restriction_enzymes -l gbs_sequence_length -m adapter_length_min_threshold -t adapter_trim_offset -q min_trimmed_fastq_sequence_length -s gzip_files_switch -c regex_num_cpu -o output_dir
 
 DESCRIPTION - This program trims the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
 
@@ -88,8 +92,10 @@ length of the barcode used for splitting each individual fastq file. Tassel requ
 length. Default: 32
 
 -n pad_sequences - The padded sequence controller. Specify true for padded trimmed sequences or false for unpadded trimmed sequences. Default: false
-
--c regex_num_cpu - The number of cpu cores to use for the adapter regex searches. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+    
+-s gzip_files_switch - The gzip compression switch. Specify true for compressing file or false for not compressing files (saves time). Default: false
+    
+-c regex_num_cpu - The number of cpu cores to use for the adapter regex searches. Default: 1
 
 -o output_dir - The absolute path to the output directory to contain the trimmed adapter sequence fastq output files.
 
@@ -913,14 +919,16 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 
 # Compress the trimmed fastq files using gzip.
 # Find all files in the specified directory with the extension *.fastq.
-my ($trimmed_fastq_files, $trimmed_fastq_file_count) = find_files($trimmed_fastq_output_dir, "fastq");
-foreach my $trimmed_fastq_filename (sort keys %{$trimmed_fastq_files}){
-	
-	# Get the full path to the trimmed fastq file.
-	my $trimmed_fastq_infile = $trimmed_fastq_files->{$trimmed_fastq_filename};
+if($gzip_files_switch eq "true"){
+    my ($trimmed_fastq_files, $trimmed_fastq_file_count) = find_files($trimmed_fastq_output_dir, "fastq");
+    foreach my $trimmed_fastq_filename (sort keys %{$trimmed_fastq_files}){
+        
+        # Get the full path to the trimmed fastq file.
+        my $trimmed_fastq_infile = $trimmed_fastq_files->{$trimmed_fastq_filename};
 
-	# Compress the trimmed fastq file using gzip.
-	gzip_file($trimmed_fastq_infile);
+        # Compress the trimmed fastq file using gzip.
+        gzip_file($trimmed_fastq_infile);
+    }
 }
 
 # The $trimmed_seqs_layout_bulk_outfile contains all the trimmed coordinates layout for each sequence trimmed of the GBS common adapter sequence.
@@ -954,8 +962,8 @@ foreach my $trimmed_seqs_layout_filename (sort keys %{$trimmed_seqs_layout_files
 	}
 	close(INFILE) or die "Couldn't close file $trimmed_seqs_layout_infile";
 	
-	# Compress the trimmed sequence layout file using gzip.
-	gzip_file($trimmed_seqs_layout_infile);
+	# Compress the trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
+	gzip_file($trimmed_seqs_layout_infile) if($gzip_files_switch eq "true");
 }
 close(TRIMMED_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_layout_outfile";
 
@@ -984,20 +992,20 @@ foreach my $removed_seqs_layout_filename (sort keys %{$removed_seqs_layout_files
 	}
 	close(INFILE) or die "Couldn't close file $removed_seqs_layout_infile";
 	
-	# Compress the trimmed sequence layout file using gzip.
-	gzip_file($removed_seqs_layout_infile);
+	# Compress the trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
+	gzip_file($removed_seqs_layout_infile) if($gzip_files_switch eq "true");
 }
 close(REMOVED_LAYOUT_OUTFILE) or die "Couldn't close file $removed_seqs_layout_outfile";
 close(TRIMMED_BULK_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_layout_bulk_outfile";
 
-# Compress the trimmed sequence layout file using gzip.
-gzip_file($trimmed_seqs_layout_outfile);
+# Compress the trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
+gzip_file($trimmed_seqs_layout_outfile) if($gzip_files_switch eq "true");
 
-# Compress the trimmed sequence layout file using gzip.
-gzip_file($removed_seqs_layout_outfile);
+# Compress the trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
+gzip_file($removed_seqs_layout_outfile) if($gzip_files_switch eq "true");
 
-# Compress the bulk trimmed sequence layout file using gzip.
-gzip_file($trimmed_seqs_layout_bulk_outfile);
+# Compress the bulk trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
+gzip_file($trimmed_seqs_layout_bulk_outfile) if($gzip_files_switch eq "true");
 
 # Generate a fastq sequence counts file so that we can see the percentages of untrimmed, trimmed, and removed fastq sequences each fastq input file.
 my $fastq_seq_counts_outfile = join("/", $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adapter_trim_offset, "fastq_seq_counts") . ".txt");
