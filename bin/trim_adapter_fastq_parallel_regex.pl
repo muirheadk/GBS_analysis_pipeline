@@ -3,9 +3,7 @@ use warnings;
 use strict;
 use Getopt::Long;
 
-use Parallel::Loops;
 use File::Basename;
-use IPC::Open2;
 
 #### PROGRAM NAME ####
 # trim_adapter_fastq_parallel_regex.pl - Program to trim the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
@@ -19,7 +17,7 @@ my ($fastq_file_dir, $project_name, $restriction_enzymes, $gbs_sequence_length, 
 GetOptions(
 	'i=s'    => \$fastq_file_dir, # The *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 	'p=s'    => \$project_name, # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-	'r=s'    => \$restriction_enzymes, # The restriction enzyme(s) used to digest the genomic sequences. Default: PstI/MspI
+	'r=s'    => \$restriction_enzymes, # The restriction enzyme(s) used to digest the genomic sequences. Can be ApeKI, PstI/MspI, or SbfI/MspI. Default: PstI/MspI
 	'l=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 	'm=s'    => \$adapter_length_min_threshold, # The minimum GBS common adapter sequence length cut-off in base pairs (bps) to retain for trimming if found in a given GBS fastq sequence hit found in the adapter regex searches. Default: 16
 	't=s'    => \$adapter_trim_offset, # The trimming offset length in base pairs (bps) to trim upstream of the start of the GBS common adapter sequence found in the adapter regex searches. Default: 5
@@ -36,7 +34,7 @@ usage() unless (
 	and defined $output_dir
 );
 
-# The restriction enzyme(s) used to digest the genomic sequences. Default: PstI/MspI
+# The restriction enzyme(s) used to digest the genomic sequences. Can be ApeKI, PstI/MspI, or SbfI/MspI. Default: PstI/MspI
 $restriction_enzymes = 'PstI/MspI' unless defined $restriction_enzymes;
 
 # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
@@ -75,9 +73,9 @@ OPTIONS:
 	e.g. /path/to/fastq_file_dir
 	
 -p project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
-	e.g. MPB-MALE-GBS
+	e.g. SBW_TUTORIAL
 	
--r restriction_enzymes - The restriction enzyme(s) used to digest the genomic sequences. Default: PstI/MspI
+-r restriction_enzymes - The restriction enzyme(s) used to digest the genomic sequences. Can be ApeKI, PstI/MspI, or SbfI/MspI. Default: PstI/MspI
 
 -l gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 
@@ -105,8 +103,10 @@ if($restriction_enzymes eq 'ApeKI'){ # ApeKI
 	$fastq_adapter_sequence = 'CWGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAG';
 }elsif($restriction_enzymes eq 'PstI/MspI'){ # PstI/MspI
 	$fastq_adapter_sequence = 'CCGAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATCTCGTATGCCGTCTTCTGCTTG';
+}elsif($restriction_enzymes eq 'SbfI/MspI'){ # SbfI/MspI
+	$fastq_adapter_sequence = 'CCGAGATCGGAAGAGCGGG';
 }else{
-	die "Input $restriction_enzymes is not one of the recognized restriction enzyme(s)! Please specify either ApeKI or PstI/MspI on the command line.";
+	die "Input $restriction_enzymes is not one of the recognized restriction enzyme(s)! Please specify either ApeKI, PstI/MspI, or SbfI/MspI on the command line.";
 }
 
 # Create output directory if it doesn't already exist.
@@ -197,15 +197,15 @@ for(my $align_length = $adapter_sequence_length; $align_length >= $adapter_lengt
 my (%original_fastq_sequence_counter, %trimmed_fastq_sequence_counter) = ();
 if ((require Parallel::Loops) and ($regex_num_cpu)){
 
-        # Perform the adapter regex searches in parallel.
-        my $parallel = Parallel::Loops->new($regex_num_cpu);
-	my %original_fastq_seq_counter = ();
-        my %trimmed_fastq_seq_counter = ();
-	my %adapter_length_counter = ();
-        $parallel->share(\%original_fastq_seq_counter, \%trimmed_fastq_seq_counter); # make sure that these are visible in the children.
+    # Perform the adapter regex searches in parallel.
+    my $parallel = Parallel::Loops->new($regex_num_cpu);
+    my %original_fastq_seq_counter = ();
+    my %trimmed_fastq_seq_counter = ();
+    my %adapter_length_counter = ();
+    $parallel->share(\%original_fastq_seq_counter, \%trimmed_fastq_seq_counter); # make sure that these are visible in the children.
 
-        # Find all files in the specified directory with the extension *.fastq.
-	my ($fastq_files, $fastq_file_count) = find_files($fastq_file_dir, "fastq");
+    # Find all files in the specified directory with the extension *.fastq.
+    my ($fastq_files, $fastq_file_count) = find_files($fastq_file_dir, "fastq");
 
 	# Iterate through the files with the extension *.fastq.
 	my @jobs = sort {$a cmp $b} values %{$fastq_files};
@@ -247,8 +247,13 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 		
 		# Print out trimmed fastq sequences that did not pass the filtering critera so that we can see what was trimmed and removed.
 		my $removed_fastq_outfile = join("/", $removed_fastq_output_dir, join("_", $fasta_filename, "trimmed_offset", $adapter_trim_offset, "removed_sequences") . ".fastq");
-		open(REMOVED_FASTQ_OUTFILE, ">$removed_fastq_outfile") or die "Couldn't open file $trimmed_fastq_outfile for writting, $!";
+		open(REMOVED_FASTQ_OUTFILE, ">$removed_fastq_outfile") or die "Couldn't open file $removed_fastq_outfile for writting, $!";
 		
+        # Print out trimmed fastq sequences that have the potential to have erroneous SNPs after Unique Stacks (ustacks) program.
+        my $flagged_fastq_seqs_outfile = join("/", $trimmed_regex_output_dir, "flagged_fastq_sequences.txt");
+        open(FLAGGED_FASTQ_SEQS_OUTFILE, ">$flagged_fastq_seqs_outfile") or die "Couldn't open file $flagged_fastq_seqs_outfile for writting, $!";
+        print FLAGGED_FASTQ_SEQS_OUTFILE join("\t", "sequence_id", "position", "nucleotide") . "\n";
+        
 		# Open the fastq input file for parsing.
 		open(FASTQ_INFILE, "<$fastq_infile") or die "Couldn't open file $fastq_infile for reading, $!";
 		# Parse the fastq files for the fastq header, sequence, plus, and quality scores and reformat to *.fasta format so that we can use adapter regex.
@@ -304,8 +309,11 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 							$common_adapter_sequence_ApeKI =~ s/W/\[AT\]/g;
 							$common_adapter_regex = qr($common_adapter_sequence_ApeKI);
 						}elsif($restriction_enzymes eq 'PstI/MspI'){
-							my $common_adapter_sequence_Pstl_MspI = $common_adapter_sequence;
-							$common_adapter_regex = qr($common_adapter_sequence_Pstl_MspI);
+							my $common_adapter_sequence_PstI_MspI = $common_adapter_sequence;
+							$common_adapter_regex = qr($common_adapter_sequence_PstI_MspI);
+						}elsif($restriction_enzymes eq 'SbfI/MspI'){
+							my $common_adapter_sequence_SbfI_MspI = $common_adapter_sequence;
+							$common_adapter_regex = qr($common_adapter_sequence_SbfI_MspI);
 						}
 						
 						if($fastq_sequence =~ /$common_adapter_regex/g){
@@ -330,8 +338,11 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 							$common_adapter_sequence_ApeKI =~ s/W/\[AT\]/g;
 							$common_adapter_regex = qr($common_adapter_sequence_ApeKI);
 						}elsif($restriction_enzymes eq 'PstI/MspI'){
-							my $common_adapter_sequence_Pstl_MspI = $common_adapter_sequence;
-							$common_adapter_regex = qr($common_adapter_sequence_Pstl_MspI);
+							my $common_adapter_sequence_PstI_MspI = $common_adapter_sequence;
+							$common_adapter_regex = qr($common_adapter_sequence_PstI_MspI);
+						}elsif($restriction_enzymes eq 'SbfI/MspI'){
+							my $common_adapter_sequence_SbfI_MspI = $common_adapter_sequence;
+							$common_adapter_regex = qr($common_adapter_sequence_SbfI_MspI);
 						}
 						
 						while($fastq_sequence =~ /$common_adapter_regex/g){
@@ -414,7 +425,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 							my $trimmed_fastq_regex = join("\t", join("_", "trimmed_fastq_sequence_offset", $adapter_trim_offset), $target_name, $trimmed_fastq_sequence_length, 1, (($target_start - $adapter_trim_offset) - 1), 1, (($target_start - $adapter_trim_offset) - 1));
 							my $trimmed_adapter_regex = join("\t", join("_", "trimmed_adapter_sequence_offset", $adapter_trim_offset), $target_name, $trimmed_adapter_sequence_length, ($target_start - $adapter_trim_offset), $fastq_sequence_length, ($target_start - $adapter_trim_offset), $fastq_sequence_length);
 							my $original_adapter_regex = join("\t", $query_name, $target_name, $align_length, $query_start, $query_end, $target_start, $target_end);
-								
+                            
 							print TRIMMED_ADAPTER_REGEX_OUTFILE $trimmed_fastq_regex . "\n";
 							print TRIMMED_ADAPTER_REGEX_OUTFILE $original_adapter_regex . "\n";
 							print TRIMMED_ADAPTER_REGEX_OUTFILE $trimmed_adapter_regex . "\n";
@@ -436,7 +447,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 								
 								die "Error: $new_fastq_header: padded_fastq_sequence_length=$padded_fastq_sequence_length bp ne gbs_sequence_length=$gbs_sequence_length bp" if($padded_fastq_sequence_length ne $gbs_sequence_length);
 								die "Error: $new_fastq_header: padded_fastq_sequence_length=$padded_fastq_sequence_length ne padded_fastq_quality_scores_length=$padded_fastq_quality_scores_length" if($padded_fastq_sequence_length ne $padded_fastq_quality_scores_length);
-					
+                                
 								print TRIMMED_FASTQ_OUTFILE  $new_fastq_header . "\n";
 								print TRIMMED_FASTQ_OUTFILE  $padded_fastq_sequence . "\n";
 								print TRIMMED_FASTQ_OUTFILE  $fastq_plus . "\n";
@@ -450,6 +461,12 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 							
 							}
 							
+                            # Evaluate whether or not there is an "A" at the end of the sequence. If "true", flag fastq sequence so that we can figure out if it has the potential to generate erroneous SNPS.
+                            my @split_trimmed_fastq_seq = split('', $trimmed_fastq_sequence);
+                            my $last_nuc_base = $split_trimmed_fastq_seq[-1];
+                            if($last_nuc_base eq "A"){
+                                print FLAGGED_FASTQ_SEQS_OUTFILE join("\t", $new_fastq_header, $fastq_sequence_length, $last_nuc_base) . "\n";
+                            }
 							$trimmed_fastq_seq_counter{$fasta_filename}{'TRIMMED'}++;
 							
 							$adapter_length_counter{$align_length}++;
@@ -460,6 +477,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 
 							my $new_fastq_header = join("\001", $fastq_header, $fasta_filename, join("=", "length", $trimmed_fastq_sequence_length));
 							if($pad_sequences eq "true"){
+                                
 								my $padded_N_length =  ($gbs_sequence_length - $trimmed_fastq_sequence_length);
 								my $padded_N_seq = 'N' x $padded_N_length;
 								my $padded_fastq_sequence = join("", $trimmed_fastq_sequence, $padded_N_seq);
@@ -505,6 +523,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 		close(TRIMMED_FASTQ_OUTFILE) or die "Couldn't close file $trimmed_fastq_outfile";
 		close(REMOVED_LAYOUT_OUTFILE) or die "Couldn't close file $removed_seqs_layout_outfile";
 		close(REMOVED_FASTQ_OUTFILE) or die "Couldn't close file $removed_fastq_outfile";
+		close(FLAGGED_FASTQ_SEQS_OUTFILE) or die "Couldn't close file $flagged_fastq_seqs_outfile";
 		
 		# Get original fastq sequences counts for each file.
 		$original_fastq_seq_counter{$fasta_filename} = $num_fastq_seqs;
@@ -536,35 +555,373 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 	
 	# close parallel loops to free the memory contained in the shared hash variables.
 	undef $parallel;
+}else{
+    # Hashes to count fastq sequences and adapter sequences.
+    my %original_fastq_seq_counter = ();
+    my %trimmed_fastq_seq_counter = ();
+    my %adapter_length_counter = ();
+    
+    # Find all files in the specified directory with the extension *.fastq.
+    my ($fastq_files, $fastq_file_count) = find_files($fastq_file_dir, "fastq");
+    
+	# Iterate through the files with the extension *.fastq.
+    foreach my $fastq_filename (sort keys %{$fastq_files}){
+        
+		# Get the full path to the GBS common adapter length counts file.
+		my $fastq_infile = $fastq_files->{$fastq_filename};
+		
+		warn "Processing " . $fastq_infile . ".....\n";
+		
+		# Get the basename of the fastq filename without the .fastq extension.
+		my $fasta_filename = fileparse($fastq_infile, qr/\.fastq/);
+		
+		# Open the adapter regex output file.
+		my $adapter_regex_outfile = join('/', $regex_output_dir, join("_", $fasta_filename, "gbs_adapter_regex.tsv"));
+		open(ADAPTER_REGEX_OUTFILE, ">$adapter_regex_outfile") or die "Couldn't open file $adapter_regex_outfile for writting, $!";
+		print ADAPTER_REGEX_OUTFILE join("\t", "query_name", "target_name", "align_length", "query_start", "query_end", "target_start", "target_end") . "\n";
+		
+		# Generate the trimmed adapter regex files filtered for further processing.
+		my $trimmed_adapter_regex_outfile = join('/', $trimmed_regex_output_dir, join("_", $fasta_filename, "gbs_adapter_regex.tsv"));
+		open(TRIMMED_ADAPTER_REGEX_OUTFILE, ">$trimmed_adapter_regex_outfile") or die "Couldn't open file $trimmed_adapter_regex_outfile for writting, $!";
+		print TRIMMED_ADAPTER_REGEX_OUTFILE join("\t", "query_name", "target_name", "align_length", "query_start", "query_end", "target_start", "target_end") . "\n";
+		
+		# The $trimmed_seqs_layout_outfile contains the trimmed coordinates layout for each sequence trimmed of the GBS common adapter sequence that passed the retaining criteria.
+		my $trimmed_seqs_layout_outfile = join('/', $trimmed_layout_output_dir, join("_", $fasta_filename, "trimmed_offset", $adapter_trim_offset, "trimmed_seqs_layout") . ".txt");
+		open(TRIMMED_LAYOUT_OUTFILE, ">$trimmed_seqs_layout_outfile") or die "Couldn't open file $trimmed_seqs_layout_outfile for writting, $!";
+		print TRIMMED_LAYOUT_OUTFILE join("\t", "sequence_id", "trimmed_fastq_start", "trimmed_fastq_end", "trimmed_fastq_length", "trimmed_adapter_start", "trimmed_adapter_end",
+		"trimmed_adapter_length", "adapter_seq_start", "adapter_seq_end", "adapter_seq_length") . "\n";
+        
+		# Print out trimmed fastq sequences first so that we can see what was trimmed.
+		my $trimmed_fastq_outfile = join("/", $trimmed_fastq_output_dir, join("_", $fasta_filename, "trimmed_offset", $adapter_trim_offset) . ".fastq");
+		open(TRIMMED_FASTQ_OUTFILE, ">$trimmed_fastq_outfile") or die "Couldn't open file $trimmed_fastq_outfile for writting, $!";
+		
+		# The $removed_seqs_layout_outfile contains the trimmed coordinates layout for each sequence trimmed of the GBS common adapter sequence that failed the retaining criteria and was therefore removed.
+		my $removed_seqs_layout_outfile = join('/', $removed_layout_output_dir, join("_", $fasta_filename, "trimmed_offset", $adapter_trim_offset, "removed_seqs_layout") . ".txt");
+		open(REMOVED_LAYOUT_OUTFILE, ">$removed_seqs_layout_outfile") or die "Couldn't open file $removed_seqs_layout_outfile for writting, $!";
+		print REMOVED_LAYOUT_OUTFILE join("\t", "sequence_id", "trimmed_fastq_start", "trimmed_fastq_end", "trimmed_fastq_length", "trimmed_adapter_start", "trimmed_adapter_end",
+		"trimmed_adapter_length", "adapter_seq_start", "adapter_seq_end", "adapter_seq_length") . "\n";
+		
+		# Print out trimmed fastq sequences that did not pass the filtering critera so that we can see what was trimmed and removed.
+		my $removed_fastq_outfile = join("/", $removed_fastq_output_dir, join("_", $fasta_filename, "trimmed_offset", $adapter_trim_offset, "removed_sequences") . ".fastq");
+		open(REMOVED_FASTQ_OUTFILE, ">$removed_fastq_outfile") or die "Couldn't open file $removed_fastq_outfile for writting, $!";
+		
+        # Print out trimmed fastq sequences that have the potential to have erroneous SNPs after Unique Stacks (ustacks) program.
+        my $flagged_fastq_seqs_outfile = join("/", $trimmed_regex_output_dir, "flagged_fastq_sequences.txt");
+        open(FLAGGED_FASTQ_SEQS_OUTFILE, ">$flagged_fastq_seqs_outfile") or die "Couldn't open file $flagged_fastq_seqs_outfile for writting, $!";
+        print FLAGGED_FASTQ_SEQS_OUTFILE join("\t", "sequence_id", "position", "nucleotide") . "\n";
+        
+		# Open the fastq input file for parsing.
+		open(FASTQ_INFILE, "<$fastq_infile") or die "Couldn't open file $fastq_infile for reading, $!";
+		# Parse the fastq files for the fastq header, sequence, plus, and quality scores and reformat to *.fasta format so that we can use adapter regex.
+		my ($fastq_header, $fastq_sequence, $fastq_plus, $fastq_quality_scores);
+		my $i = 1;
+		my $num_fastq_seqs = 0;
+		while(<FASTQ_INFILE>){
+			chomp $_;
+			#warn $_ . "\n";
+			if(($_ =~ m/^\@[A-Za-z0-9-_]+:\d+:[A-Za-z0-9]+:\d+:\d+:\d+:\d+ \d:[A-Z]:\d:[ACGTRYKMSWBDHVN]*$/)
+				or ($_ =~ m/^\@[A-Za-z0-9-_]+\_[A-Za-z0-9-_]+\_[A-Za-z0-9-_]+\_[A-Za-z0-9-_]+\_[A-Za-z0-9-_]+$/)
+				and ($i eq 1)){ # The fastq sequence header is on the first line. i.e. @HWI-ST767:215:C30VBACXX:8:1101:1801:1484 1:N:0:
+                    $fastq_header = $_;
+                    
+                }elsif(($_ =~ m/^[ACGTRYKMSWBDHVN]+$/i) and ($i eq 2)){ # The fastq sequence is on the second line.
+                    $fastq_sequence = $_;
+                    
+                }elsif(($_ =~ m/^\+$/) and ($i eq 3)){ # The fastq plus character is on the third line.
+                    $fastq_plus = $_;
+                    
+                }elsif(($_ =~ m/^.+$/) and (($i % 4) eq 0)){ # the fastq quality scores are on the fourth line.
+                    $fastq_quality_scores = $_;
+                    
+                }
+			
+			if(($i % 4) eq 0){ # Once we are finished parsing a fastq sequence entry we check to make sure it was parsed correctly and that the lengths of the sequence and quality scores match.
+				
+				die "Error: fastq_header is undefined" unless(defined($fastq_header));
+				die "Error: fastq_sequence is undefined" unless(defined($fastq_sequence));
+				die "Error: fastq_plus is undefined" unless(defined($fastq_plus));
+				die "Error: fastq_quality_scores is undefined" unless(defined($fastq_quality_scores));
+				
+				my $fastq_sequence_length = length($fastq_sequence);
+				my $fastq_quality_scores_length = length($fastq_quality_scores);
+				
+				die "Error: $fastq_header: fastq_sequence_length=$fastq_sequence_length bp ne gbs_sequence_length=$gbs_sequence_length bp" if($fastq_sequence_length ne $gbs_sequence_length);
+				die "Error: $fastq_header: fastq_sequence_length=$fastq_sequence_length ne fastq_quality_scores_length=$fastq_quality_scores_length" if($fastq_sequence_length ne $fastq_quality_scores_length);
+				
+				# Execute the adapter regex search using the GBS common adapter sequence as the query and the fastq sequences as the target.
+				# Keep a maximum of target sequences equal to the number of sequences in the fastq file. Retain adapter regex hits based on the minimum adapter length threshold.
+				# Keep adapter regex hits that begin at position 1 of the full GBS common adapter sequence up to the minimum adapter length threshold.
+				my ($align_length, $query_start, $query_end, $target_start, $target_end, $regex_alignment);
+				my $adapter_length_count = 1;
+				my $common_adapter_sequence = $fastq_adapter_sequence;
+				my $alignment_found = "false";
+				for(my $i = $adapter_sequence_length; $i >= $adapter_length_min_threshold; $i--){
+                    
+                    # 					warn "$i eq $adapter_sequence_length\n";
+					if($i eq $adapter_sequence_length){
+						my $common_adapter_regex;
+						if($restriction_enzymes eq 'ApeKI'){
+							my $common_adapter_sequence_ApeKI = $common_adapter_sequence;
+							$common_adapter_sequence_ApeKI =~ s/W/\[AT\]/g;
+							$common_adapter_regex = qr($common_adapter_sequence_ApeKI);
+						}elsif($restriction_enzymes eq 'PstI/MspI'){
+							my $common_adapter_sequence_PstI_MspI = $common_adapter_sequence;
+							$common_adapter_regex = qr($common_adapter_sequence_PstI_MspI);
+						}elsif($restriction_enzymes eq 'SbfI/MspI'){
+							my $common_adapter_sequence_SbfI_MspI = $common_adapter_sequence;
+							$common_adapter_regex = qr($common_adapter_sequence_SbfI_MspI);
+						}
+						
+						if($fastq_sequence =~ /$common_adapter_regex/g){
+							$target_start = ($-[0] + 1);
+							$target_end = $+[0];
+							$align_length = ($+[0] - $-[0]);
+                            # 							warn join("\t", $align_length, $query_start, $query_end, $target_start, $target_end) . "\n";
+							
+							$query_start = 1;
+							$query_end = $adapter_sequence_length;
+                            # 							warn join("\t", $adapter_sequence_length, $common_adapter_sequence) . "\n";
+							$regex_alignment = join("\t", join("_", "GBS_adapter_sequence", $fastq_adapter_sequence), $fastq_header, $align_length, $query_start, $query_end, $target_start, $target_end);
+							print ADAPTER_REGEX_OUTFILE $regex_alignment . "\n";
+							$alignment_found = "true";
+							last;
+						}
+						
+					}elsif($i < $adapter_sequence_length){
+						my $common_adapter_regex;
+						if($restriction_enzymes eq 'ApeKI'){
+							my $common_adapter_sequence_ApeKI = $common_adapter_sequence;
+							$common_adapter_sequence_ApeKI =~ s/W/\[AT\]/g;
+							$common_adapter_regex = qr($common_adapter_sequence_ApeKI);
+						}elsif($restriction_enzymes eq 'PstI/MspI'){
+							my $common_adapter_sequence_PstI_MspI = $common_adapter_sequence;
+							$common_adapter_regex = qr($common_adapter_sequence_PstI_MspI);
+						}elsif($restriction_enzymes eq 'SbfI/MspI'){
+							my $common_adapter_sequence_SbfI_MspI = $common_adapter_sequence;
+							$common_adapter_regex = qr($common_adapter_sequence_SbfI_MspI);
+						}
+						
+						while($fastq_sequence =~ /$common_adapter_regex/g){
+							if($+[0] eq $gbs_sequence_length){
+								$target_start = ($-[0] + 1);
+								$target_end = $+[0];
+								$align_length = ($+[0] - $-[0]);
+                                # 								warn join("\t", $align_length, $query_start, $query_end, $target_start, $target_end) . "\n";
+								
+								$regex_alignment = join("\t", join("_", "GBS_adapter_sequence", $fastq_adapter_sequence), $fastq_header, $align_length, $query_start, $query_end, $target_start, $target_end);
+								print ADAPTER_REGEX_OUTFILE $regex_alignment . "\n";
+								$alignment_found = "true";
+								last;
+							}
+						}
+						last if($alignment_found eq "true");
+					}
+					
+					$query_start = 1;
+					$query_end = ($adapter_sequence_length - $adapter_length_count);
+					
+					$common_adapter_sequence = get_subseq($common_adapter_sequence, $query_start, $query_end);
+                    # 					warn join("\t", ($adapter_sequence_length - $adapter_length_count), $common_adapter_sequence) . "\n";
+					$adapter_length_count++;
+				}
+				
+				if($alignment_found eq "false"){ # If a regex alignment was not found.
+                    
+					# Print out the rest of the sequences that were not trimmed because they either did not have an alignment or a significant alignment that passed the trimming threshold.
+					my $new_fastq_header = join("\001", $fastq_header, $fasta_filename, join("=", "length", $fastq_sequence_length));
+					print TRIMMED_FASTQ_OUTFILE  $new_fastq_header . "\n";
+					print TRIMMED_FASTQ_OUTFILE  $fastq_sequence . "\n";
+					print TRIMMED_FASTQ_OUTFILE  $fastq_plus . "\n";
+					print TRIMMED_FASTQ_OUTFILE  $fastq_quality_scores . "\n";
+					
+					$trimmed_fastq_seq_counter{$fasta_filename}{'UNTRIMMED'}++;
+					
+				}elsif($alignment_found eq "true"){ # If a regex alignment was found.
+                    
+					# Parse the tab-delimited adapter regex output so that we can trimm the fastq sequences that contain the GBS adapter sequence.
+					# Create new adapter regex files so that we can visualize where we trimmed the sequence.
+					my @split_adapter_regex_hit =  split(/\t/, $regex_alignment);
+					my ($query_name, $target_name, $align_length, $query_start, $query_end, $target_start, $target_end) = @split_adapter_regex_hit;
+                    
+					die "Error: query_name is undefined" unless(defined($query_name));
+					die "Error: target_name is undefined" unless(defined($target_name));
+					die "Error: align_length is undefined" unless(defined($align_length));
+					die "Error: query_start is undefined" unless(defined($query_start));
+					die "Error: query_end is undefined" unless(defined($query_end));
+					die "Error: target_start is undefined" unless(defined($target_start));
+					die "Error: target_end is undefined" unless(defined($target_end));
+					
+					die "Error: fastq_sequence is undefined" unless(defined($fastq_sequence));
+					die "Error: fastq_plus is undefined" unless(defined($fastq_plus));
+					die "Error: fastq_quality_scores is undefined" unless(defined($fastq_quality_scores));
+					
+					my $fastq_sequence_length = length($fastq_sequence);
+					
+					my ($trimmed_fastq_sequence, $trimmed_fastq_quality_scores, $trimmed_adapter_sequence);
+					# If the adapter alignment length is equal to the length of the full GBS common adapter then trim where that GBS common adapter sequence is found subtracting the trimmed offset from the target start.
+					# If the adapter alignment length is less than the length of the full GBS common adapter then trim only if the target end of the aligned adapter sequence is equal the the common GBS sequence length.
+					if(($align_length eq $adapter_sequence_length)
+						or ((($align_length >= $adapter_length_min_threshold) and ($align_length < $adapter_sequence_length)) and ($query_start eq 1) and ($target_end eq $gbs_sequence_length))){
+                            
+                            # Get the trimmed fastq sequence trimmed of the GBS common adapter sequence and trimmed offset.
+                            $trimmed_fastq_sequence = get_subseq($fastq_sequence, 1, (($target_start - $adapter_trim_offset) - 1));
+                            # Get the trimmed fastq quality scores trimmed of the GBS common adapter sequence and trimmed offset.
+                            $trimmed_fastq_quality_scores = get_subseq($fastq_quality_scores, 1, (($target_start - $adapter_trim_offset) - 1));
+                            # Get the trimmed adapter sequence and trimmed offset that was trimmed off the GBS fastq sequence.
+                            $trimmed_adapter_sequence = get_subseq($fastq_sequence, ($target_start - $adapter_trim_offset), $fastq_sequence_length);
+                            
+                            # Get the length of the trimmed GBS common adapter sequence and trimmed offset.
+                            my $trimmed_adapter_sequence_length = length($trimmed_adapter_sequence);
+                            my $trimmed_fastq_sequence_length = length($trimmed_fastq_sequence);
+                            my $trimmed_fastq_quality_scores_length = length($trimmed_fastq_quality_scores);
+                            
+                            # If the trimmed sequence length is greater than or equal to the minimum trimmed fastq sequence length plus the length of the barcode then the trimmed and sequence count files.
+                            if($trimmed_fastq_sequence_length >= $min_trimmed_fastq_sequence_length){
+                                
+                                my $trimmed_fastq_regex = join("\t", join("_", "trimmed_fastq_sequence_offset", $adapter_trim_offset), $target_name, $trimmed_fastq_sequence_length, 1, (($target_start - $adapter_trim_offset) - 1), 1, (($target_start - $adapter_trim_offset) - 1));
+                                my $trimmed_adapter_regex = join("\t", join("_", "trimmed_adapter_sequence_offset", $adapter_trim_offset), $target_name, $trimmed_adapter_sequence_length, ($target_start - $adapter_trim_offset), $fastq_sequence_length, ($target_start - $adapter_trim_offset), $fastq_sequence_length);
+                                my $original_adapter_regex = join("\t", $query_name, $target_name, $align_length, $query_start, $query_end, $target_start, $target_end);
+                                
+                                print TRIMMED_ADAPTER_REGEX_OUTFILE $trimmed_fastq_regex . "\n";
+                                print TRIMMED_ADAPTER_REGEX_OUTFILE $original_adapter_regex . "\n";
+                                print TRIMMED_ADAPTER_REGEX_OUTFILE $trimmed_adapter_regex . "\n";
+                                
+                                print TRIMMED_LAYOUT_OUTFILE join("\t", join("_", $fasta_filename, $fastq_header), 1, (($target_start - $adapter_trim_offset) - 1), $trimmed_fastq_sequence_length, ($target_start - $adapter_trim_offset), $fastq_sequence_length, $trimmed_adapter_sequence_length, $target_start, $target_end, $align_length) . "\n";
+                                
+                                my $new_fastq_header = join("\001", $fastq_header, $fasta_filename, join("=", "length", $trimmed_fastq_sequence_length));
+                                if($pad_sequences eq "true"){ # Pad sequences with poly-Ns up to the common GBS sequence length.
+                                    my $padded_N_length =  ($gbs_sequence_length - $trimmed_fastq_sequence_length);
+                                    my $padded_N_seq = 'N' x $padded_N_length;
+                                    my $padded_fastq_sequence = join("", $trimmed_fastq_sequence, $padded_N_seq);
+                                    
+                                    my $padded_score_length =  ($gbs_sequence_length - $trimmed_fastq_quality_scores_length);
+                                    my $padded_score_seq = '#' x $padded_score_length;
+                                    my $padded_fastq_quality_scores = join("", $trimmed_fastq_quality_scores, $padded_score_seq);
+                                    
+                                    my $padded_fastq_sequence_length = length($padded_fastq_sequence);
+                                    my $padded_fastq_quality_scores_length = length($padded_fastq_quality_scores);
+                                    
+                                    die "Error: $new_fastq_header: padded_fastq_sequence_length=$padded_fastq_sequence_length bp ne gbs_sequence_length=$gbs_sequence_length bp" if($padded_fastq_sequence_length ne $gbs_sequence_length);
+                                    die "Error: $new_fastq_header: padded_fastq_sequence_length=$padded_fastq_sequence_length ne padded_fastq_quality_scores_length=$padded_fastq_quality_scores_length" if($padded_fastq_sequence_length ne $padded_fastq_quality_scores_length);
+                                    
+                                    print TRIMMED_FASTQ_OUTFILE  $new_fastq_header . "\n";
+                                    print TRIMMED_FASTQ_OUTFILE  $padded_fastq_sequence . "\n";
+                                    print TRIMMED_FASTQ_OUTFILE  $fastq_plus . "\n";
+                                    print TRIMMED_FASTQ_OUTFILE  $padded_fastq_quality_scores . "\n";
+                                }else{
+                                    
+                                    print TRIMMED_FASTQ_OUTFILE  $new_fastq_header . "\n";
+                                    print TRIMMED_FASTQ_OUTFILE  $trimmed_fastq_sequence . "\n";
+                                    print TRIMMED_FASTQ_OUTFILE  $fastq_plus . "\n";
+                                    print TRIMMED_FASTQ_OUTFILE  $trimmed_fastq_quality_scores . "\n";
+                                    
+                                }
+                                
+                                # Evaluate whether or not there is an "A" at the end of the sequence. If "true", flag fastq sequence so that we can figure out if it has the potential to generate erroneous SNPS.
+                                my @split_trimmed_fastq_seq = split('', $trimmed_fastq_sequence);
+                                my $last_nuc_base = $split_trimmed_fastq_seq[-1];
+                                if($last_nuc_base eq "A"){
+                                    print FLAGGED_FASTQ_SEQS_OUTFILE join("\t", $new_fastq_header, $fastq_sequence_length, $last_nuc_base) . "\n";
+                                }
+                                $trimmed_fastq_seq_counter{$fasta_filename}{'TRIMMED'}++;
+                                
+                                $adapter_length_counter{$align_length}++;
+                                
+                            }elsif($trimmed_fastq_sequence_length < $min_trimmed_fastq_sequence_length){ #If this alignment doesn't meet our filtering criteria separate fastq sequence from trimmed fastq sequence data.
+                                
+                                print REMOVED_LAYOUT_OUTFILE join("\t", join("_", $fasta_filename, $fastq_header), 1, (($target_start - $adapter_trim_offset) - 1), $trimmed_fastq_sequence_length, ($target_start - $adapter_trim_offset), $fastq_sequence_length, $trimmed_adapter_sequence_length, $target_start, $target_end, $align_length) . "\n";
+                                
+                                my $new_fastq_header = join("\001", $fastq_header, $fasta_filename, join("=", "length", $trimmed_fastq_sequence_length));
+                                if($pad_sequences eq "true"){
+                                    
+                                    my $padded_N_length =  ($gbs_sequence_length - $trimmed_fastq_sequence_length);
+                                    my $padded_N_seq = 'N' x $padded_N_length;
+                                    my $padded_fastq_sequence = join("", $trimmed_fastq_sequence, $padded_N_seq);
+                                    
+                                    my $padded_score_length =  ($gbs_sequence_length - $trimmed_fastq_quality_scores_length);
+                                    my $padded_score_seq = '#' x $padded_score_length;
+                                    my $padded_fastq_quality_scores = join("", $trimmed_fastq_quality_scores, $padded_score_seq);
+                                    
+                                    my $padded_fastq_sequence_length = length($padded_fastq_sequence);
+                                    my $padded_fastq_quality_scores_length = length($padded_fastq_quality_scores);
+                                    
+                                    die "Error: $new_fastq_header: padded_fastq_sequence_length=$padded_fastq_sequence_length bp ne gbs_sequence_length=$gbs_sequence_length bp" if($padded_fastq_sequence_length ne $gbs_sequence_length);
+                                    die "Error: $new_fastq_header: padded_fastq_sequence_length=$padded_fastq_sequence_length ne padded_fastq_quality_scores_length=$padded_fastq_quality_scores_length" if($padded_fastq_sequence_length ne $padded_fastq_quality_scores_length);
+                                    
+                                    print REMOVED_FASTQ_OUTFILE  $new_fastq_header . "\n";
+                                    print REMOVED_FASTQ_OUTFILE  $padded_fastq_sequence . "\n";
+                                    print REMOVED_FASTQ_OUTFILE  $fastq_plus . "\n";
+                                    print REMOVED_FASTQ_OUTFILE  $padded_fastq_quality_scores . "\n";
+                                }else{
+                                    
+                                    print REMOVED_FASTQ_OUTFILE  $new_fastq_header . "\n";
+                                    print REMOVED_FASTQ_OUTFILE  $trimmed_fastq_sequence . "\n";
+                                    print REMOVED_FASTQ_OUTFILE  $fastq_plus . "\n";
+                                    print REMOVED_FASTQ_OUTFILE  $trimmed_fastq_quality_scores . "\n";
+                                    
+                                }
+                                
+                                $trimmed_fastq_seq_counter{$fasta_filename}{'REMOVED'}++;
+                            }
+                        }
+				}
+				$i = 1;
+				$num_fastq_seqs++;
+				
+			}else{
+				$i++;
+			}
+		}
+		close(FASTQ_INFILE) or die "Couldn't close file $fastq_infile";
+		close(ADAPTER_REGEX_OUTFILE) or die "Couldn't close file $adapter_regex_outfile";
+		close(TRIMMED_ADAPTER_REGEX_OUTFILE) or die "Couldn't close file $trimmed_adapter_regex_outfile";
+		close(TRIMMED_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_layout_outfile";
+		close(TRIMMED_FASTQ_OUTFILE) or die "Couldn't close file $trimmed_fastq_outfile";
+		close(REMOVED_LAYOUT_OUTFILE) or die "Couldn't close file $removed_seqs_layout_outfile";
+		close(REMOVED_FASTQ_OUTFILE) or die "Couldn't close file $removed_fastq_outfile";
+		close(FLAGGED_FASTQ_SEQS_OUTFILE) or die "Couldn't close file $flagged_fastq_seqs_outfile";
+		
+		# Get original fastq sequences counts for each file.
+		$original_fastq_seq_counter{$fasta_filename} = $num_fastq_seqs;
+		
+		# Print the GBS common adapter length counts.
+		my $trimmed_adapter_counts_outfile = join("/", $trimmed_adapter_counts_output_dir, join("_", $fasta_filename, "trimmed_offset", $adapter_trim_offset, "adapter_length_counts") . ".txt");
+		open(TRIMMED_ADAPTER_COUNTS_OUTFILE, ">$trimmed_adapter_counts_outfile") or die "Couldn't open file $trimmed_adapter_counts_outfile for writting, $!";
+		print TRIMMED_ADAPTER_COUNTS_OUTFILE join("\t", "adapter_sequence_id", "adapter_length", "adapter_sequence_count") . "\n";
+		foreach my $adapter_length (sort {$b <=> $a} keys %adapter_length_counter){
+			my $adapter_sequence_count = $adapter_length_counter{$adapter_length};
+			my $adapter_concatenated_sequence = $adapter_concatenated_sequences{$adapter_length};
+			print TRIMMED_ADAPTER_COUNTS_OUTFILE join("\t", $adapter_concatenated_sequence, $adapter_length, $adapter_sequence_count) . "\n";
+		}
+		close(TRIMMED_ADAPTER_COUNTS_OUTFILE) or die "Couldn't close file $trimmed_adapter_counts_outfile";
+        
+	}
+    
+	# Get the fastq untrimmed, trimmed, and removed counts.
+	foreach my $fasta_filename (sort keys %trimmed_fastq_seq_counter){
+		$trimmed_fastq_sequence_counter{$fasta_filename}{'UNTRIMMED'} = $trimmed_fastq_seq_counter{$fasta_filename}{'UNTRIMMED'};
+		$trimmed_fastq_sequence_counter{$fasta_filename}{'TRIMMED'} = $trimmed_fastq_seq_counter{$fasta_filename}{'TRIMMED'};
+		$trimmed_fastq_sequence_counter{$fasta_filename}{'REMOVED'} = $trimmed_fastq_seq_counter{$fasta_filename}{'REMOVED'};
+	}
+	
+	# Get the original fastq sequence counts for each fastq file so that we can use them to make sure we have the correct proportions of untrimmed, trimmed, and removed counts.
+	foreach my $fasta_filename (sort keys %original_fastq_seq_counter){
+		$original_fastq_sequence_counter{$fasta_filename} = $original_fastq_seq_counter{$fasta_filename};
+	}
+    
 }
 
-# Generate bulk trimmed fastq file for this Genotyping by Sequencing (GBS) project. 
-# $trimmed_fastq_bulk_outfile contains the trimmed GBS sequences in fastq format.
+# Compress the trimmed fastq files using gzip.
 # Find all files in the specified directory with the extension *.fastq.
 my ($trimmed_fastq_files, $trimmed_fastq_file_count) = find_files($trimmed_fastq_output_dir, "fastq");
-# my $trimmed_fastq_bulk_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adapter_trim_offset) . ".fastq");
-# open(TRIMMED_BULK_OUTFILE, ">$trimmed_fastq_bulk_outfile") or die "Couldn't open file $trimmed_fastq_bulk_outfile for writting, $!";
-# Iterate through the files with extension *.fastq.
 foreach my $trimmed_fastq_filename (sort keys %{$trimmed_fastq_files}){
 	
 	# Get the full path to the trimmed fastq file.
 	my $trimmed_fastq_infile = $trimmed_fastq_files->{$trimmed_fastq_filename};
-	
-# 	# Parse trimmed fastq file and concatenate to the bulk fastq output file for this project.
-# 	open(INFILE, "<$trimmed_fastq_infile") or die "Couldn't open file $trimmed_fastq_infile for reading, $!";
-# 	while(<INFILE>){
-# 		chomp $_;
-# 		print TRIMMED_BULK_OUTFILE $_ . "\n";
-# 	}
-# 	close(INFILE) or die "Couldn't close file $trimmed_fastq_infile";
-	
+
 	# Compress the trimmed fastq file using gzip.
 	gzip_file($trimmed_fastq_infile);
 }
-# close(TRIMMED_BULK_OUTFILE) or die "Couldn't close file $trimmed_fastq_bulk_outfile";
-
-# Compress the bulk trimmed fastq file using gzip.
-# gzip_file($trimmed_fastq_bulk_outfile);
 
 # The $trimmed_seqs_layout_bulk_outfile contains all the trimmed coordinates layout for each sequence trimmed of the GBS common adapter sequence.
 my $trimmed_seqs_layout_bulk_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adapter_trim_offset, "all_trimmed_seqs_layout") . ".txt");
