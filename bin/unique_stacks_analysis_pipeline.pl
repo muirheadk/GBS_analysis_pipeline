@@ -20,13 +20,13 @@ GetOptions(
 	'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (padded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 	't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Default: gzfastq
 	'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
-	'd=s'    => \$min_depth_coverage_ustacks, # The minimum depth of coverage to report a stack. Default: 2
+	'd=s'    => \$min_depth_coverage_ustacks, # The minimum depth of coverage to report a stack. Default: 5
 	'm=s'    => \$max_nuc_distance_ustacks, # The maximum distance (in nucleotides) allowed between stacks. Default: 2
-	'n=s'    => \$max_align_distance_ustacks, # The maximum distance allowed to align secondary reads to primary stacks. Default: ($max_nuc_distance_ustacks + 2)
+	'n=s'    => \$max_align_distance_ustacks, # The maximum distance allowed to align secondary reads to primary stacks. Default: 3
 	'a=s'    => \$alpha_value_ustacks, # The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
-	'l=s'    => \$max_locus_stacks, # The maximum number of stacks at a single de novo locus. Default: 3
+	'l=s'    => \$max_locus_stacks, # The maximum number of stacks at a single de novo locus. Default: 6
 	's=s'    => \$num_mismatches_tag, # The number of mismatches allowed between sample tags when generating the catalog. Default: 1
-	'c=s'    => \$num_threads, # The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+	'c=s'    => \$num_threads, # The number of cpu cores to use for the stacks programs. Default: 2
 	'o=s'    => \$output_dir, # The absolute path to the output directory to contain the Stacks output files and directories.
 );
 
@@ -42,25 +42,25 @@ $gbs_fastq_file_type = 'gzfastq' unless defined $gbs_fastq_file_type;
 # The SQL ID to insert into the output to identify this sample.
 $stacks_sql_id = 1 unless defined $stacks_sql_id;
 
-# The minimum depth of coverage to report a stack. Default: 2
-$min_depth_coverage_ustacks = 2 unless defined $min_depth_coverage_ustacks;
+# The minimum depth of coverage to report a stack. Default: 5
+$min_depth_coverage_ustacks = 5 unless defined $min_depth_coverage_ustacks;
 
 # The maximum distance (in nucleotides) allowed between stacks. Default: 2
 $max_nuc_distance_ustacks = 2 unless defined $max_nuc_distance_ustacks;
 
-# The maximum distance allowed to align secondary reads to primary stacks. Default: ($max_nuc_distance_ustacks + 2)
-$max_align_distance_ustacks = ($max_nuc_distance_ustacks + 2) unless defined $max_align_distance_ustacks;
+# The maximum distance allowed to align secondary reads to primary stacks. Default: 3
+$max_align_distance_ustacks = 3 unless defined $max_align_distance_ustacks;
 
 # The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 $alpha_value_ustacks = 0.05 unless defined $alpha_value_ustacks;
 
-# The maximum number of stacks at a single de novo locus. Default: 3
-$max_locus_stacks = 3 unless defined $max_locus_stacks;
+# The maximum number of stacks at a single de novo locus. Default: 6
+$max_locus_stacks = 6 unless defined $max_locus_stacks;
 
 # The number of mismatches allowed between sample tags when generating the catalog. Default: 1
 $num_mismatches_tag = 1 unless defined $num_mismatches_tag;
 
-# The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+# The number of cpu cores to use for the stacks programs. Default: 2
 $num_threads = 2 unless defined $num_threads;
 
 # Program dependencies - The absolute paths to gunzip to uncompress bulk compressed fastq.gz input file if present and stacks related programs.
@@ -86,19 +86,19 @@ OPTIONS:
 
 -b stacks_sql_id - The SQL ID to insert into the output to identify this sample.
 
--d min_depth_coverage_pstacks - The minimum depth of coverage to report a stack. Default: 2
+-d min_depth_coverage_pstacks - The minimum depth of coverage to report a stack. Default: 5
 
 -m max_nuc_distance_ustacks - Maximum distance (in nucleotides) allowed between stacks. Default: 2
     
--n max_align_distance_ustacks - The maximum distance allowed to align secondary reads to primary stacks. Default: (max_nuc_distance_ustacks + 2)
+-n max_align_distance_ustacks - The maximum distance allowed to align secondary reads to primary stacks. Default: 3
     
 -a alpha_value_ustacks - The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 
--l max_locus_stacks - The maximum number of stacks at a single de novo locus. Default: 3
+-l max_locus_stacks - The maximum number of stacks at a single de novo locus. Default: 6
 
 -s num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog. Default: 1
 
--c num_threads - The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+-c num_threads - The number of cpu cores to use for the stacks programs. Default: 2
 
 -o output_dir - The absolute path to the output directory to contain the Stacks output files and directories.
     
@@ -145,7 +145,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 		$num_threads, $alpha_value_ustacks, $max_locus_stacks, $stacks_output_dir);
 	
 	# Remove the uncompressed fastq file to save space as we do not need file after this point.
-	unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if(($gbs_fastq_file_type eq "gzfastq") and ($gbs_fastq_infile =~ m/\.fastq$/));;
+	unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if(($gbs_fastq_file_type eq "gzfastq") and ($gbs_fastq_infile =~ m/\.fastq$/));
 	
 	$sql_id++;
 }
