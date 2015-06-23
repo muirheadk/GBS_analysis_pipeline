@@ -131,9 +131,11 @@ unless(-d $process_radtags_output_dir){
 }
 
 # Run fastq_quality_barcode_splitter.pl script in parallel if Parallel loops is available and if num_threads is defined. Otherwise,
-if((require Parallel::Loops) and ($num_threads >= 2)){
+if($num_threads >= 2){
     
     # Run these jobs in parallel.
+    require Parallel::Loops;
+    
     my $parallel = Parallel::Loops->new($num_threads);
 	my @jobs = keys %GBS_fastq_index;
     $parallel->foreach(\@jobs,sub {
