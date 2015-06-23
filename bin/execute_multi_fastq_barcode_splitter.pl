@@ -14,7 +14,7 @@ use File::Basename;
 
 #### SAMPLE COMMAND ####
 # PstI/MspI single-end reads command using phred33 encoding
-my ($GBS_barcode_sample_index_file, $restriction_enzymes, $encoded_phred_offset, $sliding_window_size, $quality_score_limit, $gbs_sequence_length, $barcode_infile, $barcode_option, $num_mismatches,$num_threads, $output_dir);
+my ($GBS_barcode_sample_index_file, $restriction_enzymes, $encoded_phred_offset, $sliding_window_size, $quality_score_limit, $gbs_sequence_length, $barcode_option, $num_mismatches,$num_threads, $output_dir);
 GetOptions(
 	'i=s'    => \$GBS_barcode_sample_index_file, # The GBS barcode sample index input file.
     'r=s'    => \$restriction_enzymes, # The restriction enzyme(s) used to digest the genomic sequences. Can be ApeKI, PstI/MspI, or SbfI/MspI. Default: PstI/MspI
@@ -22,7 +22,6 @@ GetOptions(
     'w=s'    => \$sliding_window_size, # The size of the sliding window as a fraction of the read length between 0 and 1. Default: 0.15
     's=s'    => \$quality_score_limit, # The quality score limit. If the average score within the sliding window drops below this value, the read is discarded. Default: 20
     't=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
-    'b=s'    => \$barcode_infile, # The absolute path to the barcodes input file used to split sequences into individual fastq output files.
     'c=s'    => \$barcode_option, # The barcode option for whether or not single-end or paired-end barcodes are within the FASTQ header or inline with sequence. Default: inline_null
     'n=s'    => \$num_mismatches, # The number of mismatches allowed within the barcode sequences. Default: 0
     'h=s'    => \$num_threads, # The number of cpu threads to use for the stacks programs. Default: 1
@@ -85,8 +84,6 @@ DESCRIPTION - This program performs a quality assessment and quality control fil
 
 -t gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 
--b barcode_infile - The absolute path to the barcodes input file used to split sequences into individual fastq output files.
-
 -c barcode_option - The barcode option for whether or not single-end or paired-end barcodes are within the FASTQ header or inline with sequence. Default: inline_null
 
 Can be one of the following;
@@ -134,7 +131,7 @@ unless(-d $process_radtags_output_dir){
 }
 
 # Run fastq_quality_barcode_splitter.pl script in parallel if Parallel loops is available and if num_threads is defined. Otherwise,
-if ((require Parallel::Loops)and($num_threads)){
+if((require Parallel::Loops) and ($num_threads >= 2)){
     
     # Run these jobs in parallel.
     my $parallel = Parallel::Loops->new($num_threads);
@@ -162,7 +159,7 @@ if ((require Parallel::Loops)and($num_threads)){
         my $status = system($fastq_quality_barcode_splitterCmd) == 0 or die "Error calling $fastq_quality_barcode_splitter: $?";
     });
     undef $parallel;
-}else{
+}elsif($num_threads eq 1){
     # Iterate through each flowcell name.
     foreach my $flowcell_name (sort keys %GBS_fastq_index){
 
