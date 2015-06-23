@@ -154,9 +154,10 @@ if($num_threads >= 2){
         my $fastq_infile = $split_index_entry[0];
         my $barcode_infile = $split_index_entry[1];
         
+        
         # Create a process_radtags log file of everything verbose.
         my $process_radtags_fastq_logfile = join('/', $split_fastq_output_dir, join("-", $flowcell_name, "process_radtags_log.txt"));
-        my $fastq_quality_barcode_splitterCmd = "$fastq_quality_barcode_splitter -i $fastq_infile -b $barcode_infile -r PstI/MspI -e $encoded_phred_offset -w $sliding_window_size -s $quality_score_limit -t $gbs_sequence_length -c -n $num_mismatches -c inline_null -o $process_radtags_output_dir 2> $process_radtags_fastq_logfile";
+        my $fastq_quality_barcode_splitterCmd = "$fastq_quality_barcode_splitter -i $fastq_infile -b $barcode_infile -r PstI/MspI -e $encoded_phred_offset -w $sliding_window_size -s $quality_score_limit -t $gbs_sequence_length -n $num_mismatches -c inline_null -o $process_radtags_output_dir 2> $process_radtags_fastq_logfile";
         warn $fastq_quality_barcode_splitterCmd . "\n\n";
         my $status = system($fastq_quality_barcode_splitterCmd) == 0 or die "Error calling $fastq_quality_barcode_splitter: $?";
     });
