@@ -201,9 +201,11 @@ for(my $align_length = $adapter_sequence_length; $align_length >= $adapter_lengt
 }
 
 my (%original_fastq_sequence_counter, %trimmed_fastq_sequence_counter) = ();
-if ((require Parallel::Loops) and ($regex_num_cpu)){
+if($regex_num_cpu >= 2){
 
     # Perform the adapter regex searches in parallel.
+    require Parallel::Loops
+    
     my $parallel = Parallel::Loops->new($regex_num_cpu);
     my %original_fastq_seq_counter = ();
     my %trimmed_fastq_seq_counter = ();
@@ -561,7 +563,7 @@ if ((require Parallel::Loops) and ($regex_num_cpu)){
 	
 	# close parallel loops to free the memory contained in the shared hash variables.
 	undef $parallel;
-}else{
+}elsif($regex_num_cpu eq 1){
     # Hashes to count fastq sequences and adapter sequences.
     my %original_fastq_seq_counter = ();
     my %trimmed_fastq_seq_counter = ();
