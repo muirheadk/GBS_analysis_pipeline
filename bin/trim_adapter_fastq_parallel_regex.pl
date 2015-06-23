@@ -204,12 +204,13 @@ my (%original_fastq_sequence_counter, %trimmed_fastq_sequence_counter) = ();
 if($regex_num_cpu >= 2){
 
     # Perform the adapter regex searches in parallel.
-    require Parallel::Loops
+    require Parallel::Loops;
     
     my $parallel = Parallel::Loops->new($regex_num_cpu);
     my %original_fastq_seq_counter = ();
     my %trimmed_fastq_seq_counter = ();
     my %adapter_length_counter = ();
+    
     $parallel->share(\%original_fastq_seq_counter, \%trimmed_fastq_seq_counter); # make sure that these are visible in the children.
 
     # Find all files in the specified directory with the extension *.fastq.
