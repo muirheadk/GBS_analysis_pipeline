@@ -4,7 +4,6 @@ use strict;
 use Getopt::Long;
 
 use IPC::Open2;
-use Bio::SeqIO;
 use File::Basename;
 
 #### PROGRAM NAME ####
@@ -26,7 +25,7 @@ GetOptions(
     'a=s'    => \$alpha_value_pstacks, # The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
     's=s'    => \$num_mismatches_tag, # The number of mismatches allowed between sample tags when generating the catalog. Default: 0
     'm=s'    => \$sam_mapq_threshold, # The mapping quality score threshold filter for sam alignments. Any mapping quality score below this value is filtered out of the sam alignment files. Default: 20
-    'c=s'    => \$num_threads, # The number of cpu threads to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+    'c=s'    => \$num_threads, # The number of cpu threads to use for the stacks programs. Default: 2
     'o=s'    => \$output_dir, # The absolute path to the output directory to contain the renumerated reference genome, BWA sam, padded sam, and Stacks output files and directories.
 );
 
@@ -58,7 +57,7 @@ $num_mismatches_tag = 0 unless defined $num_mismatches_tag;
 # The mapping quality score threshold filter for sam alignments. Any mapq score below this value is filtered out of the sam alignment files. Default: 20
 $sam_mapq_threshold = 20 unless defined $sam_mapq_threshold;
 
-# The number of cpu threads to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+# The number of cpu threads to use for the stacks programs. Default: 2
 $num_threads = 2 unless defined $num_threads;
 
 # Program dependencies - The absolute paths to gunzip to uncompress fastq.gz input files, BWA alignment program, and Stacks related programs.
@@ -97,7 +96,7 @@ OPTIONS:
 
 -m sam_mapq_threshold - The mapping quality score threshold filter for sam alignments. Any mapq score below this value is filtered out of the sam alignment files. Default: 20
 
--c num_threads - The number of cpu cores to use for the stacks programs. You should choose a number so that this parameter is at most the total number of cpu cores on your system minus 1. Default: 2
+-c num_threads - The number of cpu cores to use for the stacks programs. Default: 2
 
 -o output_dir - The absolute path to the output directory to contain the renumerated reference genome, BWA, and Stacks output files and directories.
 
@@ -229,7 +228,7 @@ foreach my $file_name (sort keys %{$pstacks_tags_files}){
 #
 # $refgen_output_dir - The reference genome output directory.
 sub convert_refgen_bwa_input_format{
-
+    
 	# The reference genome input fasta file.
 	my $refgen_fasta_infile = shift;
 	die "Error lost the reference genome input fasta file." unless defined $refgen_fasta_infile;
@@ -237,7 +236,7 @@ sub convert_refgen_bwa_input_format{
 	# The reference genome output directory.
 	my $refgen_output_dir = shift;
 	die "Error lost reference genome output directory" unless defined $refgen_output_dir;
-
+    
 	# Format the renumerated fasta and table of contents .toc files.
 	my $refgen_fasta_filename = fileparse($refgen_fasta_infile);
 	my $refgen_fasta_outfile = join('/', $refgen_output_dir, $refgen_fasta_filename . ".fasta");
@@ -246,40 +245,58 @@ sub convert_refgen_bwa_input_format{
 	# Generate the renumerated fasta and table of contents .toc files if the files are not already generated.
 	unless(-s $refgen_fasta_outfile and -s $refgen_toc_outfile){
 		warn "Converting $refgen_fasta_filename to BWA input format....\n\n";
-		my $seqio = Bio::SeqIO->new(-file => $refgen_fasta_infile, '-format' => 'Fasta');
-		my $seq_counter = 1;
+		my $seq_counter = 0;
+        my %fasta_header = ();
 		my %fasta_seqs = ();
-		while(my $seq_entry = $seqio->next_seq) {
-
-			my $seq_id = $seq_entry->id;
-			my $sequence = $seq_entry->seq;
-			my $seq_desc = $seq_entry->desc;
-		
-			my $fasta_header = join(" ", $seq_id, $seq_desc);
-			$fasta_seqs{$seq_counter} = join("\t", $fasta_header, $sequence);
-			$seq_counter++;
-		
-		}
-		
+        
+        # Parse the contents of the reference genome fasta file to filter.
+        open(INFILE, "<$refgen_fasta_infile") or die "Couldn't open file $refgen_fasta_infile for reading, $!";
+        while(<INFILE>){
+            chomp $_;
+            
+            if($_ !~ /^$/){
+                if($_ =~ /^>/){
+                    # Parse stacks reference genome fasta input file for the reference genome.
+                    if($_ =~ m/^>([\w\s\d]+)/){
+                        $seq_counter++;
+                        my $fasta_header = $_;
+                        # warn $fasta_header . "\n";
+                        my $refgen_seq_id = $1;
+                        $fasta_header{$seq_counter}{"HEADER"} = $refgen_seq_id;
+                        print $fasta_header{$seq_counter}{"HEADER"} . "\n";
+                    }else{
+                        die "Error: $_ is not in the correct format!";
+                    }
+                }elsif($_ =~ m/^[ACGTNRYSWKM]+/){
+                    my $sequence = $_;
+                    push(@{$fasta_seqs{$seq_counter}{"SEQUENCE"}}, $sequence);
+                }else{
+                    die "Error: $refgen_fasta_infile is not in the correct format!\n$_";
+                }
+            }
+        }
+        close(INFILE) or die "Couldn't close file $refgen_fasta_infile";
+        
  		my $num_digits = length($seq_counter - 1);
 		open(REFGEN_FASTA_OUTFILE, ">$refgen_fasta_outfile") or die "Couldn't open file $refgen_fasta_outfile for writting, $!";
-		open(REFGEN_TOC_OUTFILE, ">$refgen_toc_outfile") or die "Couldn't open file $refgen_toc_outfile for writting, $!"; 
+		open(REFGEN_TOC_OUTFILE, ">$refgen_toc_outfile") or die "Couldn't open file $refgen_toc_outfile for writting, $!";
 		print REFGEN_TOC_OUTFILE join("\t", "bwa_input_fasta_header", "original_fasta_header") . "\n";
 		foreach my $seq_num (sort {$a <=> $b} keys %fasta_seqs){
- 			my ($fasta_header, $sequence) = split(/\t/, $fasta_seqs{$seq_num});
+            #warn "Printing $seq_num";
+ 			my $fasta_header = $fasta_header{$seq_num}{"HEADER"};
+            
+ 			my $sequence = join("", @{$fasta_seqs{$seq_num}{"SEQUENCE"}});
  			my $padded_zeros_length = ($num_digits - length($seq_num));
  			my $padded_seq_num = '0' x $padded_zeros_length . $seq_num;
 			
-# 			warn join("\t", $padded_seq_num, $fasta_header) . "\n";
+            # 			warn join("\t", $padded_seq_num, $fasta_header) . "\n";
 			print REFGEN_FASTA_OUTFILE join("\n", ">$padded_seq_num", $sequence) . "\n";
 			print REFGEN_TOC_OUTFILE join("\t", $padded_seq_num, $fasta_header) . "\n";
-
+            
 		}
 		close(REFGEN_FASTA_OUTFILE) or die "Couldn't close file $refgen_fasta_outfile";
 		close(REFGEN_TOC_OUTFILE) or die "Couldn't close file $refgen_toc_outfile";
-
-		# Clean out the sequence I/O object.
-		$seqio = ();
+        
 	}
 	
 	# Need to get the actual number of chromosomes or scaffolds for the -eC ($num_chromosomes option).
@@ -288,7 +305,7 @@ sub convert_refgen_bwa_input_format{
 	my $num_chromosomes = 0;
 	while(<REFGEN_TOC_INFILE>){
 		chomp $_;
-# 		warn $_ . "\n";
+        # 		warn $_ . "\n";
 		if($i ne 0){
 			$num_chromosomes++;
 		}
