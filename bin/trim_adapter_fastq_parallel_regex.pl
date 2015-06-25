@@ -474,7 +474,7 @@ if($regex_num_cpu >= 2){
                             my @split_trimmed_fastq_seq = split('', $trimmed_fastq_sequence);
                             my $last_nuc_base = $split_trimmed_fastq_seq[-1];
                             if($last_nuc_base eq "A"){
-                                print FLAGGED_FASTQ_SEQS_OUTFILE join("\t", $new_fastq_header, $fastq_sequence_length, $last_nuc_base) . "\n";
+                                print FLAGGED_FASTQ_SEQS_OUTFILE join("\t", $new_fastq_header, $trimmed_fastq_sequence, $last_nuc_base) . "\n";
                             }
 							$trimmed_fastq_seq_counter{$fasta_filename}{'TRIMMED'}++;
 							
@@ -830,7 +830,7 @@ if($regex_num_cpu >= 2){
                                 my @split_trimmed_fastq_seq = split('', $trimmed_fastq_sequence);
                                 my $last_nuc_base = $split_trimmed_fastq_seq[-1];
                                 if($last_nuc_base eq "A"){
-                                    print FLAGGED_FASTQ_SEQS_OUTFILE join("\t", $new_fastq_header, $fastq_sequence_length, $last_nuc_base) . "\n";
+                                    print FLAGGED_FASTQ_SEQS_OUTFILE join("\t", $new_fastq_header, $trimmed_fastq_sequence, $last_nuc_base) . "\n";
                                 }
                                 $trimmed_fastq_seq_counter{$fasta_filename}{'TRIMMED'}++;
                                 
