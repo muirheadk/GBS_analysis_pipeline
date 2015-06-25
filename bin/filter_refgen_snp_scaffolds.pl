@@ -100,7 +100,7 @@ while(<INFILE>){
         }else{
             die "Error: $fasta_header is not in the correct format!";
         }
-    }elsif($_ =~ m/[ACGTN]+/){
+    }elsif($_ =~ m/[ACGTNRYSWKM]+/){
         my $sequence = $_;
         print OUTFILE join("\n", ">$refgen_seq_id", $sequence) . "\n" if(defined($fasta_refgen_ids{$refgen_seq_id}));
         $refgen_seq_id = "";
