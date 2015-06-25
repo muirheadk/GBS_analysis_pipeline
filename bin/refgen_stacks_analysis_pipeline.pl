@@ -5,6 +5,7 @@ use Getopt::Long;
 
 use IPC::Open2;
 use File::Basename;
+use File::Copy;
 
 #### PROGRAM NAME ####
 # refgen_stacks_analysis_pipeline.pl - Program that aligns quality filtered, demultiplexed, and adapter trimmed GBS data sequences (unpadded) against a reference genome using the BWA alignment program. It then runs the Stacks reference genome pipeline using the pstacks, cstacks, and sstacks programs of the Stacks Software Suite.
@@ -17,7 +18,7 @@ use File::Basename;
 my ($gbs_fastq_dir, $gbs_fastq_file_type, $refgen_infile, $gbs_sequence_length, $stacks_sql_id, $min_depth_coverage_pstacks, $alpha_value_pstacks, $num_mismatches_tag, $sam_mapq_threshold, $num_threads, $output_dir);
 GetOptions(
     'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (unpadded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
-    't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Default: gzfastq
+    't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
     'g=s'    => \$refgen_infile, # The absolute path to the reference genome input fasta file to align GBS fastq sequences.
     'l=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
     'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
@@ -36,7 +37,7 @@ usage() unless (
     and defined $output_dir
 );
 
-# The fastq input file type. Default: gzfastq
+# The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
 $gbs_fastq_file_type = 'gzfastq' unless defined $gbs_fastq_file_type;
 
 # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
@@ -80,7 +81,7 @@ OPTIONS:
     
 -i gbs_fastq_dir - The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (unpadded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 
--t gbs_fastq_file_type - The fastq input file type. Default: gzfastq
+-t gbs_fastq_file_type - The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
 
 -g refgen_infile - The absolute path to the reference genome input fasta file to align GBS fastq sequences using the BWA alignment program.
 
@@ -147,7 +148,18 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	if($gbs_fastq_file_type eq "gzfastq"){
 		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
-	}
+	}elsif($gbs_fastq_file_type eq "fastq"){ # If the fastq file is not compressed set the resulting fastq filename to be the fastq infile.
+        my ($fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/\.fastq.gz/);
+        
+        # Split the fastq filename so that we can get the individual id.
+        my @split_fastq_filename = split(/_/, $fastq_filename);
+        my $individual_id = $split_fastq_filename[0];
+        
+        my $fastq_infile = join('/', $fastq_dir, $individual_id . ".fastq");
+        warn "Copying $gbs_fastq_infile to $fastq_infile.....";
+		copy($gbs_fastq_infile, $fastq_infile) or die "Copy failed: $!";
+        $gbs_fastq_infile = $fastq_infile;
+    }
 
 	# Creates the BWA alignment file using the GBS fastq input file to align the fastq sequence reads to the reference genome.
 	my $bwa_alignment_outfile = bwa_aln($refgen_fasta_outfile, $gbs_fastq_infile, $num_threads, $bwa_output_dir);
@@ -257,7 +269,7 @@ sub convert_refgen_bwa_input_format{
             if($_ !~ /^$/){
                 if($_ =~ /^>/){
                     # Parse stacks reference genome fasta input file for the reference genome.
-                    if($_ =~ m/^>([\w\s\d]+)/){
+                    if($_ =~ m/^>([\w\s\d\-\_\[\]\(\)]+)/){
                         $seq_counter++;
                         my $fasta_header = $_;
                         # warn $fasta_header . "\n";
