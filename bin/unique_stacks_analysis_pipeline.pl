@@ -4,6 +4,7 @@ use strict;
 use Getopt::Long;
 
 use File::Basename;
+use File::Copy;
 
 #### PROGRAM NAME ####
 # unique_stacks_analysis_pipeline.pl - Program that aligns quality filtered, demultiplexed, and adapter trimmed GBS data sequences (padded) into exactly-matching stacks. Comparing the stacks it will form a set of loci and detect SNPs at each locus using a maximum likelihood framework. Runs the Stacks unique pipeline using the ustacks, cstacks, and sstacks programs of the Stacks Software Suite.
@@ -18,7 +19,7 @@ my ($gbs_fastq_dir, $gbs_fastq_file_type, $stacks_sql_id, $min_depth_coverage_us
 
 GetOptions(
 	'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (padded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
-	't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Default: gzfastq
+	't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
 	'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
 	'd=s'    => \$min_depth_coverage_ustacks, # The minimum depth of coverage to report a stack. Default: 5
 	'm=s'    => \$max_nuc_distance_ustacks, # The maximum distance (in nucleotides) allowed between stacks. Default: 2
@@ -36,7 +37,7 @@ usage() unless (
 	and defined $output_dir
 );
 
-# The fastq input file type. Default: gzfastq
+# The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
 $gbs_fastq_file_type = 'gzfastq' unless defined $gbs_fastq_file_type;
 
 # The SQL ID to insert into the output to identify this sample.
@@ -82,7 +83,7 @@ OPTIONS:
 
 -i gbs_fastq_dir - The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (padded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 
--t gbs_fastq_file_type - The fastq input file type. Default: gzfastq
+-t gbs_fastq_file_type - The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
 
 -b stacks_sql_id - The SQL ID to insert into the output to identify this sample.
 
@@ -134,11 +135,22 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	warn "Processing " . $file_name . ".....\n";
 	my $gbs_fastq_infile = $gbs_fastq_files->{$file_name};
     
-	# If the bulk fastq file is compressed, uncompress the file and set the resulting fastq filename to be the fastq infile.
+	# If the fastq file is compressed, uncompress the file and set the resulting fastq filename to be the fastq infile.
 	if($gbs_fastq_file_type eq "gzfastq"){
 		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
-	}
+	}elsif($gbs_fastq_file_type eq "fastq"){ # If the fastq file is not compressed set the resulting fastq filename to be the fastq infile.
+        my ($fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/\.fastq.gz/);
+        
+        # Split the fastq filename so that we can get the individual id.
+        my @split_fastq_filename = split(/_/, $fastq_filename);
+        my $individual_id = $split_fastq_filename[0];
+        
+        my $fastq_infile = join('/', $fastq_dir, $individual_id . ".fastq");
+        warn "Copying $gbs_fastq_infile to $fastq_infile.....";
+		copy($gbs_fastq_infile, $fastq_infile) or die "Copy failed: $!";
+        $gbs_fastq_infile = $fastq_infile;
+    }
 	
 	# Execute the ustacks program, which extracts exact-matching stacks and detects SNPs at each locus using a maximum likelihood framework.
 	ustacks($gbs_fastq_infile, $sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, 
@@ -146,6 +158,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	
 	# Remove the uncompressed fastq file to save space as we do not need file after this point.
 	unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if(($gbs_fastq_file_type eq "gzfastq") and ($gbs_fastq_infile =~ m/\.fastq$/));
+    unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if($gbs_fastq_file_type eq "fastq");
 	
 	$sql_id++;
 }
