@@ -3,7 +3,6 @@ use warnings;
 use strict;
 use Getopt::Long;
 
-use Bio::SeqIO;
 use File::Basename;
 
 #### PROGRAM NAME ####
@@ -14,6 +13,7 @@ use File::Basename;
 
 #### SAMPLE COMMAND ####
 # perl unique_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/GBS_TRIMMED_ADAPTER_DIR/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR/CHRISTIANNE_MCDONALD/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -c 7 -o ~/workspace/GBS_data-08-10-2013/CHRISTIANNE_MCDONALD_POLYGONIA
+
 my ($gbs_fastq_dir, $gbs_fastq_file_type, $stacks_sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $alpha_value_ustacks, $max_locus_stacks, $num_mismatches_tag, $num_threads, $output_dir);
 
 GetOptions(
