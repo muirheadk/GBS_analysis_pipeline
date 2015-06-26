@@ -151,8 +151,8 @@ my $filtered_pop_fasta_filename = fileparse($stacks_fasta_infile, qr/\.fa|\.fna|
 my $filtered_pop_fasta_outfile = join('/', $output_dir, join("-", $filtered_pop_fasta_filename, "filtered.fasta"));
 open(OUTFILE, ">$filtered_pop_fasta_outfile") or die "Couldn't open file $filtered_pop_fasta_outfile for writting, $!";
 foreach my $locus_id (sort {$a <=> $b} @locus_id_list){
-    foreach my $individual_id (sort {$a cmp $b} keys $filtered_fasta_seqs{$locus_id}){
-        foreach my $allele_id (sort {$a <=> $b} keys $filtered_fasta_seqs{$locus_id}{$individual_id}){
+    foreach my $individual_id (sort {$a cmp $b} keys %{$filtered_fasta_seqs{$locus_id}}){
+        foreach my $allele_id (sort {$a <=> $b} keys %{$filtered_fasta_seqs{$locus_id}{$individual_id}}){
             print OUTFILE join("\n", @{$filtered_fasta_seqs{$locus_id}{$individual_id}{$allele_id}}) . "\n";
         }
     }
