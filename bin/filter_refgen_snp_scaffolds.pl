@@ -131,11 +131,11 @@ while(<INFILE>){
     if($_ =~ /^>/){
         # Get the header line without the ">" character.
         my $header_length = length($_);
-        $refgen_id = substr($_, 0, $header_length);
+        $refgen_id = substr($_, 1, $header_length);
 
     }elsif($_ =~ m/[ACGTNRYSWKM]+/){
         my $sequence = $_;
-        print OUTFILE join("\n", ">$refgen_seq_id", $sequence) . "\n" if(defined($filtered_refgen_ids{$refgen_id}));
+        print OUTFILE join("\n", ">$refgen_id", $sequence) . "\n" if(defined($filtered_refgen_ids{$refgen_id}));
         $refgen_seq_id = "";
     }else{
         die "Error: $stacks_refgen_infile is not in the correct format! $_";
