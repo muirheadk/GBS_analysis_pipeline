@@ -91,6 +91,7 @@ close(INFILE) or die "Couldn't close file $stacks_fasta_infile";
 
 # Adding locus sequences in a hash array in order to concatenate the sequences.
 my %filtered_refgen_ids = ();
+my @locus_id_list = ();
 if($whitelist_infile eq ""){
     foreach my $locus_id (sort {$a <=> $b} keys %fasta_refgen_ids){
         my $refgen_seq_id = $fasta_refgen_ids{$locus_id};
@@ -108,6 +109,7 @@ if($whitelist_infile eq ""){
         if(defined($fasta_refgen_ids{$locus_id})){
             my $refgen_seq_id = $fasta_refgen_ids{$locus_id};
             $filtered_refgen_ids{$refgen_seq_id} = $refgen_seq_id;
+            push(@locus_id_list, $locus_id);
         }
         
     }
@@ -148,7 +150,7 @@ close(OUTFILE) or die "Couldn't close file $filtered_refgen_outfile";
 my $filtered_pop_fasta_filename = fileparse($stacks_fasta_infile, qr/\.fa|\.fna|\.fasta|\.fna\.fasta/);
 my $filtered_pop_fasta_outfile = join('/', $output_dir, join("-", $filtered_pop_fasta_filename, "filtered.fasta"));
 open(OUTFILE, ">$filtered_pop_fasta_outfile") or die "Couldn't open file $filtered_pop_fasta_outfile for writting, $!";
-foreach my $locus_id (sort {$a <=> $b} keys %filtered_fasta_seqs){
+foreach my $locus_id (sort {$a <=> $b} @locus_id_list){
     foreach my $individual_id (sort {$a cmp $b} keys $filtered_fasta_seqs{$locus_id}){
         foreach my $allele_id (sort {$a <=> $b} keys $filtered_fasta_seqs{$locus_id}{$individual_id}){
             print OUTFILE join("\n", @{$filtered_fasta_seqs{$locus_id}{$individual_id}{$allele_id}}) . "\n";
