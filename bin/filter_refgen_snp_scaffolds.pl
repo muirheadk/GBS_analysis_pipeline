@@ -159,4 +159,3 @@ foreach my $locus_id (sort {$a <=> $b} @locus_id_list){
 }
 close(OUTFILE) or die "Couldn't close file $filtered_pop_fasta_outfile";
 
-
