@@ -76,7 +76,7 @@ while(<INFILE>){
             
             $fasta_refgen_ids{$locus_id} = $refgen_seq_id;
             
-            push(@{$filtered_fasta_seqs{$locus_id}{$individual_id}{$allele_id}}, ">$fasta_header");
+            push(@{$filtered_fasta_seqs{$locus_id}{$individual_id}{$allele_id}}, "$fasta_header");
             #die join("\t", $locus_id, $individual_id, $allele_id, $refgen_seq_id, $refgen_seq_start, $refgen_seq_strand) . "\n";
         }else{
             die "Error: $fasta_header is not in the correct format!";
@@ -145,7 +145,7 @@ close(INFILE) or die "Couldn't close file $stacks_refgen_infile";
 close(OUTFILE) or die "Couldn't close file $filtered_refgen_outfile";
 
 # Print out the fasta sequences to the filtered populations stacks outfile.
-my $filtered_pop_fasta_filename = fileparse($stacks_fasta_infile, qr/\.fna|\.fasta|\.fna\.fasta/);
+my $filtered_pop_fasta_filename = fileparse($stacks_fasta_infile, qr/\.fa|\.fna|\.fasta|\.fna\.fasta/);
 my $filtered_pop_fasta_outfile = join('/', $output_dir, join("-", $filtered_pop_fasta_filename, "filtered.fasta"));
 open(OUTFILE, ">$filtered_pop_fasta_outfile") or die "Couldn't open file $filtered_pop_fasta_outfile for writting, $!";
 foreach my $locus_id (sort {$a <=> $b} keys %filtered_fasta_seqs){
