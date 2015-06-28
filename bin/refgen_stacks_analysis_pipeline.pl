@@ -65,9 +65,9 @@ $num_threads = 2 unless defined $num_threads;
 my ($gunzip, $bwa, $pstacks, $cstacks, $sstacks);
 $gunzip				= '/bin/gunzip';
 $bwa				= '/usr/local/bin/bwa';
-$pstacks			= '/usr/local/bin/pstacks';
-$cstacks			= '/usr/local/bin/cstacks';
-$sstacks			= '/usr/local/bin/sstacks';
+$pstacks			= '/global/software/stacks/stacks131/bin/pstacks';
+$cstacks			= '/global/software/stacks/stacks131/bin/cstacks';
+$sstacks			= '/global/software/stacks/stacks131/bin/sstacks';
 
 sub usage {
     
@@ -187,7 +187,7 @@ foreach my $file_name (sort keys %{$bwa_align_files}){
 	bwa_pad_sam_files($bwa_align_infile, $gbs_sequence_length, $sam_mapq_threshold, $padded_sam_output_dir);
 	
 	# Remove the BWA sam file to save space as we do not need the file after this point.
-	unlink($bwa_align_infile) or die "Could not unlink $bwa_align_infile: $!";
+	#unlink($bwa_align_infile) or die "Could not unlink $bwa_align_infile: $!";
 }
 
 # Create the stacks output directory if it doesn't already exist.
@@ -453,7 +453,7 @@ sub bwa_samse{
 	my $bwa_alignment_infile = shift;
 	die "Error lost the BWA SAI formatted alignment (.sai) file" unless defined $bwa_alignment_infile;
 
-    # The sam alignment file mapping quality score threshold.
+    	# The sam alignment file mapping quality score threshold.
 	my $sam_mapq_threshold = shift;
 	die "Error lost the sam alignment file mapping quality score threshold" unless defined $sam_mapq_threshold;
     
@@ -491,16 +491,16 @@ sub bwa_samse{
 				
 				my $optional_fields = join("\t", @optional_fields);
 				
-                # die join("\t", $fastq_header, $bam_bitwise_flag, $rname, $r_pos, $mapq, $cigar, $rnext, $pnext, $tlen, $fastq_sequence, $fastq_quality_scores, $optional_fields);
+                		# die join("\t", $fastq_header, $bam_bitwise_flag, $rname, $r_pos, $mapq, $cigar, $rnext, $pnext, $tlen, $fastq_sequence, $fastq_quality_scores, $optional_fields);
                 
 				# Filter alignment entry if the read is unmapped in the sense and antisense orientation.
 				next if(($bam_bitwise_flag eq 4) or ($bam_bitwise_flag eq 20));
 				
 				# Filter alignment entry if the mapping quality of the read is below this threshold.
-				next if($mapq < $sam_mapq_threshold);
+				#next if($mapq < $sam_mapq_threshold);
 				
 				# Filter alignment entry if the cigar string contains an insertion/deletion in the alignment.
-				next if($cigar !~ m/^\d+M$/);
+				# next if($cigar !~ m/^\d+M$/);
 				
 				# Filter alignment entry if the read is not uniquely mapped to the reference.
 				next if($optional_fields !~ m/XT:A:U/);
@@ -540,7 +540,7 @@ sub bwa_pad_sam_files{
 	my $gbs_sequence_length = shift;
 	die "Error lost the GBS fastq sequence length in base pairs (bps)" unless defined $gbs_sequence_length;
 
-    # The sam alignment file mapping quality score threshold.
+    	# The sam alignment file mapping quality score threshold.
 	my $sam_mapq_threshold = shift;
 	die "Error lost the sam alignment file mapping quality score threshold" unless defined $sam_mapq_threshold;
     
