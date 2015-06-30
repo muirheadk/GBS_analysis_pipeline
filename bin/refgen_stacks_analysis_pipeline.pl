@@ -279,7 +279,7 @@ sub convert_refgen_bwa_input_format{
                     }else{
                         die "Error: $_ is not in the correct format!";
                     }
-                }elsif($_ =~ m/^[ACGTNRYSWKM]+/){
+                }elsif($_ =~ m/^[ACGTNRYSWKM]+/i){
                     my $sequence = $_;
                     push(@{$fasta_seqs{$seq_counter}{"SEQUENCE"}}, $sequence);
                 }else{
