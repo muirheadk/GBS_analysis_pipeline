@@ -64,7 +64,7 @@ $num_threads = 2 unless defined $num_threads;
 # Program dependencies - The absolute paths to gunzip to uncompress fastq.gz input files, BWA alignment program, and Stacks related programs.
 my ($gunzip, $bwa, $pstacks, $cstacks, $sstacks);
 $gunzip				= '/bin/gunzip';
-$bwa				= '/usr/local/bin/bwa';
+$bwa				= '/global/software/bwa/bwa0712/bin/bwa';
 $pstacks			= '/global/software/stacks/stacks131/bin/pstacks';
 $cstacks			= '/global/software/stacks/stacks131/bin/cstacks';
 $sstacks			= '/global/software/stacks/stacks131/bin/sstacks';
@@ -148,18 +148,18 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	if($gbs_fastq_file_type eq "gzfastq"){
 		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
-	}elsif($gbs_fastq_file_type eq "fastq"){ # If the fastq file is not compressed set the resulting fastq filename to be the fastq infile.
-        my ($fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/\.fastq.gz/);
+	}elsif(($gbs_fastq_file_type eq "fastq") and ($gbs_fastq_infile =~ m/trimmed_offset_\d+/)){ # If the fastq file is not compressed set the resulting fastq filename to be the fastq infile.
+        	my ($fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/\.fastq.gz/);
         
-        # Split the fastq filename so that we can get the individual id.
-        my @split_fastq_filename = split(/_/, $fastq_filename);
-        my $individual_id = $split_fastq_filename[0];
+        	# Split the fastq filename so that we can get the individual id.
+       		my @split_fastq_filename = split(/_/, $fastq_filename);
+        	my $individual_id = $split_fastq_filename[0];
         
-        my $fastq_infile = join('/', $fastq_dir, $individual_id . ".fastq");
-        warn "Copying $gbs_fastq_infile to $fastq_infile.....";
+        	my $fastq_infile = join('/', $fastq_dir, $individual_id . ".fastq");
+        	warn "Copying $gbs_fastq_infile to $fastq_infile.....";
 		copy($gbs_fastq_infile, $fastq_infile) or die "Copy failed: $!";
-        $gbs_fastq_infile = $fastq_infile;
-    }
+        	$gbs_fastq_infile = $fastq_infile;
+    	}
 
 	# Creates the BWA alignment file using the GBS fastq input file to align the fastq sequence reads to the reference genome.
 	my $bwa_alignment_outfile = bwa_aln($refgen_fasta_outfile, $gbs_fastq_infile, $num_threads, $bwa_output_dir);
@@ -269,17 +269,11 @@ sub convert_refgen_bwa_input_format{
             if($_ !~ /^$/){
                 if($_ =~ /^>/){
                     # Parse stacks reference genome fasta input file for the reference genome.
-                    if($_ =~ m/^>([\w\s\d\-\_\[\]\(\)]+)/){
                         $seq_counter++;
-                        my $fasta_header = $_;
-                        # warn $fasta_header . "\n";
-                        my $refgen_seq_id = $1;
+			my $refgen_seq_id = substr($_, 1, length $_);
                         $fasta_header{$seq_counter}{"HEADER"} = $refgen_seq_id;
                         print $fasta_header{$seq_counter}{"HEADER"} . "\n";
-                    }else{
-                        die "Error: $_ is not in the correct format!";
-                    }
-                }elsif($_ =~ m/^[ACGTNRYSWKM]+/){
+                }elsif($_ =~ m/^[ACGTNRYSWKM]+/i){
                     my $sequence = $_;
                     push(@{$fasta_seqs{$seq_counter}{"SEQUENCE"}}, $sequence);
                 }else{
@@ -401,10 +395,15 @@ sub bwa_aln{
 	# Get the basename of the fastq filename without the .fastq extension.
 	my $gbs_fastq_filename = fileparse($gbs_fastq_infile, qr/\.fastq/);
 	
-	# Split the GBS fastq filename so that we can get the individual id.
-	my @split_gbs_fastq_filename = split(/_/, $gbs_fastq_filename);
-	my $individual_id = $split_gbs_fastq_filename[0];
-    
+	my $individual_id = "";
+	if($gbs_fastq_filename =~ m/trimmed_offset_\d+/){	
+		# Split the GBS fastq filename so that we can get the individual id.
+		my @split_gbs_fastq_filename = split(/_/, $gbs_fastq_filename);
+		$individual_id = $split_gbs_fastq_filename[0];
+    	}else{
+		$individual_id = $gbs_fastq_filename;
+	}
+
 	# Format the sai file.
 	my $bwa_alignment_outfile = join('/', $bwa_output_dir, $individual_id . ".sai");
 
@@ -464,9 +463,14 @@ sub bwa_samse{
 	# Get the basename of the fastq filename without the .fastq extension.
 	my $gbs_fastq_filename = fileparse($gbs_fastq_infile, qr/\.fastq/);
 	
-	# Split the GBS fastq filename so that we can get the individual id.
-	my @split_gbs_fastq_filename = split(/_/, $gbs_fastq_filename);
-	my $individual_id = $split_gbs_fastq_filename[0];
+	my $individual_id = "";
+	if($gbs_fastq_filename =~ m/trimmed_offset_\d+/){	
+		# Split the GBS fastq filename so that we can get the individual id.
+		my @split_gbs_fastq_filename = split(/_/, $gbs_fastq_filename);
+		my $individual_id = $split_gbs_fastq_filename[0];
+	}else{
+		$individual_id = $gbs_fastq_filename;
+	}
 
 	# Execute the BWA alignment program if the sam alignment file is not already generated.
 	my $bwa_aligned_master_outfile = join('/', $bwa_output_dir, $individual_id . ".sam");
