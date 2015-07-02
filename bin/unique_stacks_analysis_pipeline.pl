@@ -67,9 +67,9 @@ $num_threads = 2 unless defined $num_threads;
 # Program dependencies - The absolute paths to gunzip to uncompress bulk compressed fastq.gz input file if present and stacks related programs.
 my ($gunzip, $ustacks, $cstacks, $sstacks);
 $gunzip				= '/bin/gunzip';
-$ustacks			= '/usr/local/bin/ustacks';
-$cstacks			= '/usr/local/bin/cstacks';
-$sstacks			= '/usr/local/bin/sstacks';
+$ustacks			= '/global/software/stacks/stacks131/bin/ustacks';
+$cstacks			= '/global/software/stacks/stacks131/bin/cstacks';
+$sstacks			= '/global/software/stacks/stacks131/bin/sstacks';
 
 sub usage {
 
@@ -139,7 +139,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	if($gbs_fastq_file_type eq "gzfastq"){
 		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
-	}elsif($gbs_fastq_file_type eq "fastq"){ # If the fastq file is not compressed set the resulting fastq filename to be the fastq infile.
+	}elsif(($gbs_fastq_file_type eq "fastq") and ($gbs_fastq_infile =~ m/trimmed_offset_\d+/)){ # If the fastq file is not compressed set the resulting fastq filename to be the fastq infile.
         my ($fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/\.fastq.gz/);
         
         # Split the fastq filename so that we can get the individual id.
@@ -148,7 +148,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
         
         my $fastq_infile = join('/', $fastq_dir, $individual_id . ".fastq");
         warn "Copying $gbs_fastq_infile to $fastq_infile.....";
-		copy($gbs_fastq_infile, $fastq_infile) or die "Copy failed: $!";
+	copy($gbs_fastq_infile, $fastq_infile) or die "Copy failed: $!";
         $gbs_fastq_infile = $fastq_infile;
     }
 	
@@ -158,7 +158,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	
 	# Remove the uncompressed fastq file to save space as we do not need file after this point.
 	unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if(($gbs_fastq_file_type eq "gzfastq") and ($gbs_fastq_infile =~ m/\.fastq$/));
-    unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if($gbs_fastq_file_type eq "fastq");
+    #unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if($gbs_fastq_file_type eq "fastq");
 	
 	$sql_id++;
 }
