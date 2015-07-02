@@ -139,7 +139,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	if($gbs_fastq_file_type eq "gzfastq"){
 		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
-	}elsif(($gbs_fastq_file_type eq "fastq") and ($gbs_fastq_infile =~ m/trimmed_offset_\d+/))){ # If the fastq file is not compressed set the resulting fastq filename to be the fastq infile.
+	}elsif(($gbs_fastq_file_type eq "fastq") and ($gbs_fastq_infile =~ m/trimmed_offset_\d+/)){ # If the fastq file is not compressed set the resulting fastq filename to be the fastq infile.
         my ($fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/\.fastq.gz/);
         
         # Split the fastq filename so that we can get the individual id.
