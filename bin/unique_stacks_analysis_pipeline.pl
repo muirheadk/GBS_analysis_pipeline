@@ -139,18 +139,13 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	if($gbs_fastq_file_type eq "gzfastq"){
 		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
-	}elsif(($gbs_fastq_file_type eq "fastq") and ($gbs_fastq_infile =~ m/trimmed_offset_\d+/)){ # If the fastq file is not compressed set the resulting fastq filename to be the fastq infile.
-        my ($fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/\.fastq.gz/);
-        
-        # Split the fastq filename so that we can get the individual id.
-        my @split_fastq_filename = split(/_/, $fastq_filename);
-        my $individual_id = $split_fastq_filename[0];
-        
-        my $fastq_infile = join('/', $fastq_dir, $individual_id . ".fastq");
-        warn "Copying $gbs_fastq_infile to $fastq_infile.....";
-	copy($gbs_fastq_infile, $fastq_infile) or die "Copy failed: $!";
-        $gbs_fastq_infile = $fastq_infile;
-    }
+	}elsif(($gbs_fastq_file_type eq "fastq") and ($file_name =~ m/trimmed_offset_\d+/)){ # If the fastq file is not compressed set the resulting fastq filename to be the fastq infile.
+        	my ($fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/_trimmed_offset_\d+\.fastq/);
+        	my $fastq_infile = join('/', $fastq_dir, $fastq_filename . ".fastq");
+		warn "Copying $gbs_fastq_infile to $fastq_infile.....";
+		copy($gbs_fastq_infile, $fastq_infile) or die "Copy failed: $!";
+        	$gbs_fastq_infile = $fastq_infile;
+    	}
 	
 	# Execute the ustacks program, which extracts exact-matching stacks and detects SNPs at each locus using a maximum likelihood framework.
 	ustacks($gbs_fastq_infile, $sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, 
@@ -158,8 +153,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	
 	# Remove the uncompressed fastq file to save space as we do not need file after this point.
 	unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if(($gbs_fastq_file_type eq "gzfastq") and ($gbs_fastq_infile =~ m/\.fastq$/));
-    #unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if($gbs_fastq_file_type eq "fastq");
-	
+	unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if(($gbs_fastq_file_type eq "fastq") and ($file_name =~ m/trimmed_offset_\d+/));
 	$sql_id++;
 }
 
