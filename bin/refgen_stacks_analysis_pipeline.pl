@@ -148,15 +148,10 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	if($gbs_fastq_file_type eq "gzfastq"){
 		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
-	}elsif(($gbs_fastq_file_type eq "fastq") and ($gbs_fastq_infile =~ m/trimmed_offset_\d+/)){ # If the fastq file is not compressed set the resulting fastq filename to be the fastq infile.
-        	my ($fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/\.fastq.gz/);
-        
-        	# Split the fastq filename so that we can get the individual id.
-       		my @split_fastq_filename = split(/_/, $fastq_filename);
-        	my $individual_id = $split_fastq_filename[0];
-        
-        	my $fastq_infile = join('/', $fastq_dir, $individual_id . ".fastq");
-        	warn "Copying $gbs_fastq_infile to $fastq_infile.....";
+	}elsif(($gbs_fastq_file_type eq "fastq") and ($file_name =~ m/trimmed_offset_\d+/)){ # If the fastq file is not compressed set the resulting fastq filename to be the fastq infile.
+        	my ($fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/_trimmed_offset_\d+\.fastq/);
+                my $fastq_infile = join('/', $fastq_dir, $fastq_filename . ".fastq");
+		warn "Copying $gbs_fastq_infile to $fastq_infile.....";
 		copy($gbs_fastq_infile, $fastq_infile) or die "Copy failed: $!";
         	$gbs_fastq_infile = $fastq_infile;
     	}
@@ -169,6 +164,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 	
 	# Remove the uncompressed fastq file to save space as we do not need file after this point.
 	unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if(($gbs_fastq_file_type eq "gzfastq") and ($gbs_fastq_infile =~ m/\.fastq$/));
+	unlink($gbs_fastq_infile) or die "Could not unlink $gbs_fastq_infile: $!" if(($gbs_fastq_file_type eq "fastq") and ($file_name =~ m/trimmed_offset_\d+/));
 }
 
 # Create the padded sam alignment file output directory if it doesn't already exist.
@@ -258,7 +254,7 @@ sub convert_refgen_bwa_input_format{
 	unless(-s $refgen_fasta_outfile and -s $refgen_toc_outfile){
 		warn "Converting $refgen_fasta_filename to BWA input format....\n\n";
 		my $seq_counter = 0;
-        my %fasta_header = ();
+        	my %fasta_header = ();
 		my %fasta_seqs = ();
         
         # Parse the contents of the reference genome fasta file to filter.
