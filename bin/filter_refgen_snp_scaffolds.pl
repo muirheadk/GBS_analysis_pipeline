@@ -115,6 +115,19 @@ if($whitelist_infile eq ""){
     }
     close(INFILE) or die "Couldn't close file $whitelist_infile";
     
+    # Print out the fasta sequences to the filtered populations stacks outfile.
+    my $filtered_pop_fasta_filename = fileparse($stacks_fasta_infile, qr/\.fa|\.fna|\.fasta|\.fna\.fasta/);
+    my $filtered_pop_fasta_outfile = join('/', $output_dir, join("-", $filtered_pop_fasta_filename, "filtered.fasta"));
+    open(OUTFILE, ">$filtered_pop_fasta_outfile") or die "Couldn't open file $filtered_pop_fasta_outfile for writting, $!";
+    foreach my $locus_id (sort {$a <=> $b} @locus_id_list){
+        foreach my $individual_id (sort {$a cmp $b} keys %{$filtered_fasta_seqs{$locus_id}}){
+            foreach my $allele_id (sort {$a <=> $b} keys %{$filtered_fasta_seqs{$locus_id}{$individual_id}}){
+                print OUTFILE join("\n", @{$filtered_fasta_seqs{$locus_id}{$individual_id}{$allele_id}}) . "\n";
+            }
+        }
+    }
+    close(OUTFILE) or die "Couldn't close file $filtered_pop_fasta_outfile";
+    
 }else{
     die "$whitelist_infile does not exist";
 }
@@ -146,16 +159,4 @@ while(<INFILE>){
 close(INFILE) or die "Couldn't close file $stacks_refgen_infile";
 close(OUTFILE) or die "Couldn't close file $filtered_refgen_outfile";
 
-# Print out the fasta sequences to the filtered populations stacks outfile.
-my $filtered_pop_fasta_filename = fileparse($stacks_fasta_infile, qr/\.fa|\.fna|\.fasta|\.fna\.fasta/);
-my $filtered_pop_fasta_outfile = join('/', $output_dir, join("-", $filtered_pop_fasta_filename, "filtered.fasta"));
-open(OUTFILE, ">$filtered_pop_fasta_outfile") or die "Couldn't open file $filtered_pop_fasta_outfile for writting, $!";
-foreach my $locus_id (sort {$a <=> $b} @locus_id_list){
-    foreach my $individual_id (sort {$a cmp $b} keys %{$filtered_fasta_seqs{$locus_id}}){
-        foreach my $allele_id (sort {$a <=> $b} keys %{$filtered_fasta_seqs{$locus_id}{$individual_id}}){
-            print OUTFILE join("\n", @{$filtered_fasta_seqs{$locus_id}{$individual_id}{$allele_id}}) . "\n";
-        }
-    }
-}
-close(OUTFILE) or die "Couldn't close file $filtered_pop_fasta_outfile";
 
