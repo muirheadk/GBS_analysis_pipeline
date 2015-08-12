@@ -23,8 +23,8 @@ GetOptions(
 	'l=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 #'m=s'    => \$adapter_length_min_threshold, # The minimum GBS common adapter sequence length cut-off in base pairs (bps) to retain for trimming if found in a given GBS fastq sequence hit found in the adapter regex searches. Default: 16
 #'t=s'    => \$adapter_trim_offset, # The trimming offset length in base pairs (bps) to trim upstream of the start of the GBS common adapter sequence found in the adapter regex searches. Default: 5
-	'q=s'    => \$min_trimmed_fastq_sequence_length, # The minimum trimmed fastq sequence length in base pairs (bps) to retain after trimming. Default: 32
-	'n=s'    => \$pad_sequences, # The padded sequence controller. Specify true for padded trimmed sequences or false for unpadded trimmed sequences. Default: false
+#	'q=s'    => \$min_trimmed_fastq_sequence_length, # The minimum trimmed fastq sequence length in base pairs (bps) to retain after trimming. Default: 32
+#'n=s'    => \$pad_sequences, # The padded sequence controller. Specify true for padded trimmed sequences or false for unpadded trimmed sequences. Default: false
 	'c=s'    => \$regex_num_cpu, # The number of cpu cores to use for the adapter regex searches. Default: 1
 	's=s'    => \$gzip_files_switch, # The gzip compression switch. Specify true for compressing file or false for not compressing files (saves time). Default: false
 	'o=s'    => \$output_dir, # The absolute path to the output directory to contain the trimmed adapter sequence fastq output files.
@@ -41,13 +41,6 @@ usage() unless (
 
 # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 $gbs_sequence_length = 92 unless defined $gbs_sequence_length;
-
-# The minimum trimmed fastq sequence length in base pairs (bps) to retain after trimming. Keep in mind that this is the minimum trimmed fastq sequence length used before we add the length of the barcode 
-# used for splitting each individual fastq file. Tassel required sequences at least 32 base pairs (bps) plus the length of a particular barcode that can be in the range of 4-8 base pairs (bps) in length. Default: 32
-$min_trimmed_fastq_sequence_length = 32  unless defined $min_trimmed_fastq_sequence_length;
-
-# The padded sequence controller. Specify true for padded trimmed sequences or false for unpadded trimmed sequences. Default: false
-$pad_sequences = 'false' unless defined $pad_sequences;
 
 # The gzip compression switch. Specify true for compressing file or false for not compressing files (saves time). Default: false
 $gzip_files_switch = 'false' unless defined $gzip_files_switch;
@@ -260,19 +253,24 @@ if($regex_num_cpu >= 2){
     
     # Generate a fastq sequence counts file so that we can see the percentages of untrimmed, trimmed, and removed fastq sequences each fastq input file.
     my $filtered_snps_outfile = join("/", $output_dir, join("_", $project_name, "filtered_snps") . ".fasta");
-    open(OUTFILE, ">$filtered_snps_outfile") or die "Couldn't open file $filtered_snps_outfile for writting, $!";
+    open(FILTERED_OUTFILE, ">$filtered_snps_outfile") or die "Couldn't open file $filtered_snps_outfile for writting, $!";
+    my $removed_snps_outfile = join("/", $output_dir, join("_", $project_name, "removed_snps") . ".fasta");
+    open(REMOVED_OUTFILE, ">$removed_snps_outfile") or die "Couldn't open file $removed_snps_outfile for writting, $!";
     foreach my $locus_seq_header (sort keys %all_loci_sequences){
         
         if($locus_seq_header =~ m/^>CLocus_(\d+)_Sample_\d+_Locus_\d+_Allele_(\d+) \[(.+)\]/){
             #warn $fasta_header . "\n";
             ($locus_id, $allele_id, $individual_id) = ($1, $2, $3);
             if(!defined($filtered_locus_ids{$locus_id})){
-                print OUTFILE join("\n", "$locus_seq_header", $all_loci_sequences{$locus_seq_header}) . "\n";
+                print FILTERED_OUTFILE join("\n", "$locus_seq_header", $all_loci_sequences{$locus_seq_header}) . "\n";
+            }else{
+                print REMOVED_OUTFILE join("\n", "$locus_seq_header", $all_loci_sequences{$locus_seq_header}) . "\n";
             }
         }
         
     }
-    close(OUTFILE) or die "Couldn't close file $filtered_snps_outfile";
+    close(FILTERED_OUTFILE) or die "Couldn't close file $filtered_snps_outfile";
+    close(REMOVED_OUTFILE) or die "Couldn't close file $removed_snps_outfile";
     
 	# close parallel loops to free the memory contained in the shared hash variables.
 	undef $parallel;
@@ -301,38 +299,6 @@ if($regex_num_cpu >= 2){
 ## Compress the bulk trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
 #gzip_file($trimmed_seqs_layout_bulk_outfile) if($gzip_files_switch eq "true");
 
-# Generate a fastq sequence counts file so that we can see the percentages of untrimmed, trimmed, and removed fastq sequences each fastq input file.
-#my $fastq_seq_counts_outfile = join("/", $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adapter_trim_offset, "fastq_seq_counts") . ".txt");
-#open(OUTFILE, ">$fastq_seq_counts_outfile") or die "Couldn't open file $fastq_seq_counts_outfile for writting, $!";
-#print OUTFILE join("\t", "fastq_file_name", "total_num_seqs", "num_untrimmed_seqs", "percent_untrimmed_seqs", "num_trimmed_seqs", "percent_trimmed_seqs", "num_removed_seqs", "percent_removed_seqs") . "\n";
-#foreach my $fasta_filename (sort keys %trimmed_fastq_sequence_counter){
-#
-#    # Get the fastq untrimmed, trimmed, and removed counts.
-#    my $num_untrimmed_seqs = $trimmed_fastq_sequence_counter{$fasta_filename}{'UNTRIMMED'};
-#    my $num_trimmed_seqs = $trimmed_fastq_sequence_counter{$fasta_filename}{'TRIMMED'};
-#    my $num_removed_seqs = $trimmed_fastq_sequence_counter{$fasta_filename}{'REMOVED'};
-#
-#
-#    # If trimmed or removed sequence counters how zero count reflect in number of sequence variables.
-#    $num_untrimmed_seqs = 0 unless(defined($num_untrimmed_seqs));
-#    $num_trimmed_seqs = 0 unless(defined($num_trimmed_seqs));
-#    $num_removed_seqs = 0 unless(defined($num_removed_seqs));
-#
-#    # Calculate the total number of sequences.
-#    my $total_num_seqs = $original_fastq_sequence_counter{$fasta_filename};
-#    my $percent_untrimmed_seqs = (($num_untrimmed_seqs/$total_num_seqs) * 100);
-#    my $percent_trimmed_seqs = (($num_trimmed_seqs/$total_num_seqs) * 100);
-#    my $percent_removed_seqs = (($num_removed_seqs/$total_num_seqs) * 100);
-#
-#    # If trimmed or removed sequence counters how zero count reflect in either percent of sequence variables.
-#    $percent_untrimmed_seqs = 0.00 unless(defined($num_untrimmed_seqs));
-#    $percent_trimmed_seqs = 0.00 unless(defined($num_trimmed_seqs));
-#    $percent_removed_seqs = 0.00 unless(defined($num_removed_seqs));
-#
-#    die "The number of sequences are not equal to 100.00 percent.....\n" . join("\t", $percent_untrimmed_seqs, $percent_trimmed_seqs, $percent_removed_seqs, ($percent_untrimmed_seqs + $percent_trimmed_seqs + $percent_removed_seqs)) if(($percent_untrimmed_seqs + $percent_trimmed_seqs + $percent_removed_seqs) ne 100.00);
-#    print OUTFILE join("\t", $fasta_filename, $total_num_seqs, $num_untrimmed_seqs, $percent_untrimmed_seqs, $num_trimmed_seqs, $percent_trimmed_seqs, $num_removed_seqs, $percent_removed_seqs) . "\n";
-#}
-#close(OUTFILE) or die "Couldn't close file $fastq_seq_counts_outfile";
 # (\%files, $file_counter) = find_files($infile_dir) - Find all files in the specified input file directory with the file extension *.suffix.
 #
 # Input paramater(s):
