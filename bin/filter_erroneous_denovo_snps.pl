@@ -91,17 +91,17 @@ unless(-d $output_dir){
 }
 
 my (%original_fastq_sequence_counter, %trimmed_fastq_sequence_counter) = ();
-if($regex_num_cpu >= 2){
+if($regex_num_cpu >= 1){
 
     # Perform the adapter regex searches in parallel.
     require Parallel::Loops;
     
     my $parallel = Parallel::Loops->new($regex_num_cpu);
     
-    my %flagged_trimmed_fastq_seqs = ();
+    my %unique_trimmed_fastq_seqs = ();
     my %flagged_trimmed_fastq_lengths = ();
     
-    $parallel->share(\%flagged_trimmed_fastq_seqs, \%flagged_trimmed_fastq_lengths); # make sure that these are visible in the children.
+    $parallel->share(\%unique_trimmed_fastq_seqs, \%flagged_trimmed_fastq_lengths); # make sure that these are visible in the children.
 
     # Find all files in the specified directory with the extension *.fastq.
     my ($fastq_files, $fastq_file_count) = find_files($fastq_file_dir, "fastq");
@@ -157,13 +157,14 @@ if($regex_num_cpu >= 2){
 				
                 if($fastq_sequence =~ m/N{1,}$/){
                     $fastq_sequence =~ s/N/A/g;
-                    push(@{$flagged_trimmed_fastq_seqs{$fastq_sequence}}, $fastq_header);
+                    push(@{$unique_trimmed_fastq_seqs{$fastq_sequence}}, $fastq_header);
                     
                     my @split_fastq_header = split(/\001/, $fastq_header);
                     #die join("\t", @split_fastq_header);
                     my $length = $split_fastq_header[2];
                     $length =~ s/length=//g;
-                    $flagged_trimmed_fastq_lengths{$fastq_sequence} = $length;
+                    push(@{$flagged_trimmed_fastq_lengths{$fastq_sequence}}, $length);
+                    
                 }
 				
 				$i = 1;
@@ -176,16 +177,25 @@ if($regex_num_cpu >= 2){
 
 	});
 
-#	# Get the fastq untrimmed, trimmed, and removed counts.
-#	foreach my $fasta_filename (sort keys %trimmed_fastq_seq_counter){
-#		$trimmed_fastq_sequence_counter{$fasta_filename}{'UNTRIMMED'} = $trimmed_fastq_seq_counter{$fasta_filename}{'UNTRIMMED'};
-#		$trimmed_fastq_sequence_counter{$fasta_filename}{'TRIMMED'} = $trimmed_fastq_seq_counter{$fasta_filename}{'TRIMMED'};
-#		$trimmed_fastq_sequence_counter{$fasta_filename}{'REMOVED'} = $trimmed_fastq_seq_counter{$fasta_filename}{'REMOVED'};
-#	}
-	
-#    foreach my $fastq_sequence (sort keys %flagged_trimmed_fastq_lengths){
-#        die join("\t", @{$flagged_trimmed_fastq_lengths{$fastq_sequence}});
-#    }
+    my %unique_trimmed_fasta_lengths = ();
+    foreach my $fastq_sequence (sort keys %flagged_trimmed_fastq_lengths){
+        
+        my @flagged_sequence_lengths = ();
+        push(@flagged_sequence_lengths, @{$flagged_trimmed_fastq_lengths{$fastq_sequence}});
+        my @unique_sequence_lengths = do { my %seen; grep { !$seen{$_}++ } @flagged_sequence_lengths };
+        
+        my $uniq_seq_length_size = scalar(@unique_sequence_lengths);
+        my $min_fastq_length = 0;
+        if($uniq_seq_length_size > 1){
+            foreach my $length (sort {$a <=> $b} @unique_sequence_lengths){
+                $min_fastq_length = $length;
+                last;
+            }
+        }elsif($uniq_seq_length_size eq 1){
+            $min_fastq_length = $unique_sequence_lengths[0];
+        }
+        $unique_trimmed_fasta_lengths{$fastq_sequence} = $min_fastq_length;
+    }
     
     # Parse the contents of the Stacks fasta file to obtain the reference genome sequence ids.
     open(INFILE, "<$stacks_fasta_infile") or die "Couldn't open file $stacks_fasta_infile for reading, $!";
@@ -208,14 +218,24 @@ if($regex_num_cpu >= 2){
             }
         }elsif($_ =~ m/[ACGTN]+/){ # The fasta sequence entry.
             my $sequence = $_;
-            if(defined($flagged_trimmed_fastq_seqs{$sequence})){
+            if(defined($unique_trimmed_fastq_seqs{$sequence})){
                 push(@{$flagged_loci_sequences{$locus_id}}, $sequence);
-                $flagged_loci_seq_lengths{$locus_id} = $flagged_trimmed_fastq_lengths{$sequence};
+                push(@{$flagged_loci_seq_lengths{$locus_id}}, $unique_trimmed_fasta_lengths{$sequence});
             }
             $all_loci_sequences{$locus_seq_header} = $sequence;
         }
     }
     close(INFILE) or die "Couldn't close file $stacks_fasta_infile";
+    
+    my %unique_fastq_read_lengths = ();
+    foreach my $locus_id (sort keys %flagged_loci_seq_lengths) {
+        my $min_fastq_length = 0;
+        foreach my $length (sort {$a <=> $b} @{$flagged_loci_seq_lengths{$locus_id}}){
+            $min_fastq_length = $length;
+            $unique_fastq_read_lengths{$locus_id} = $min_fastq_length;
+            last;
+        }
+    }
     
     my %filtered_locus_ids = ();
     foreach my $locus_id (sort keys %flagged_loci_sequences){
@@ -240,7 +260,7 @@ if($regex_num_cpu >= 2){
                     
                     die "Error: $locus_id: flagged_loci_sequence_i_length=$flagged_loci_sequence_i_length bp ne gbs_sequence_length=$gbs_sequence_length bp" if($flagged_loci_sequence_i_length ne $gbs_sequence_length);
                     
-                    for(my $j = $flagged_loci_seq_lengths{$locus_id}; $j < $flagged_loci_sequence_i_length; $j++){
+                    for(my $j = $unique_fastq_read_lengths{$locus_id}; $j < $flagged_loci_sequence_i_length; $j++){
                         if($flagged_loci_sequence_1[$j] ne $flagged_loci_sequence_i[$j]){
                             
                             $filtered_locus_ids{$locus_id} = $locus_id;
@@ -272,32 +292,26 @@ if($regex_num_cpu >= 2){
     close(FILTERED_OUTFILE) or die "Couldn't close file $filtered_snps_outfile";
     close(REMOVED_OUTFILE) or die "Couldn't close file $removed_snps_outfile";
     
+    
+    my $unique_trimmed_seq_outfile = join("/", $output_dir, join("_", $project_name, "unique_sequence_list") . ".txt");
+    open(OUTFILE, ">$unique_trimmed_seq_outfile") or die "Couldn't open file $unique_trimmed_seq_outfile for writting, $!";
+    print OUTFILE join("\t", "fastq_sequence", "flagged_seq_length", "fastq_header_list") . "\n";
+    foreach my $fastq_sequence (sort keys %unique_trimmed_fastq_seqs){
+        print OUTFILE join("\t", $fastq_sequence, $unique_trimmed_fasta_lengths{$fastq_sequence}, join(", ", @{$unique_trimmed_fastq_seqs{$fastq_sequence}})) . "\n";
+    }
+    close(OUTFILE) or die "Couldn't close file $unique_trimmed_seq_outfile";
+    
+    my $removed_locus_id_outfile = join("/", $output_dir, join("_", $project_name, "removed_locus_id_list") . ".txt");
+    open(OUTFILE, ">$removed_locus_id_outfile") or die "Couldn't open file $removed_locus_id_outfile for writting, $!";
+    foreach my $locus_id (sort keys %filtered_locus_ids){
+        print OUTFILE $locus_id . "\n";
+    }
+    close(OUTFILE) or die "Couldn't close file $removed_locus_id_outfile";
+    
+    
 	# close parallel loops to free the memory contained in the shared hash variables.
 	undef $parallel;
-}elsif($regex_num_cpu eq 1){
-
-    
 }
-
-
-
-# Compress the trimmed fastq files using gzip.
-# Find all files in the specified directory with the extension *.fastq.
-#if($gzip_files_switch eq "true"){
-#    my ($trimmed_fastq_files, $trimmed_fastq_file_count) = find_files($trimmed_fastq_output_dir, "fastq");
-#    foreach my $trimmed_fastq_filename (sort keys %{$trimmed_fastq_files}){
-#        
-#        # Get the full path to the trimmed fastq file.
-#        my $trimmed_fastq_infile = $trimmed_fastq_files->{$trimmed_fastq_filename};
-#
-#        # Compress the trimmed fastq file using gzip.
-#        gzip_file($trimmed_fastq_infile);
-#    }
-#}
-
-#
-## Compress the bulk trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
-#gzip_file($trimmed_seqs_layout_bulk_outfile) if($gzip_files_switch eq "true");
 
 # (\%files, $file_counter) = find_files($infile_dir) - Find all files in the specified input file directory with the file extension *.suffix.
 #
