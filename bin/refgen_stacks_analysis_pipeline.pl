@@ -8,6 +8,7 @@ use File::Basename;
 use File::Copy;
 
 #### PROGRAM NAME ####
+#### VERSION 1.19 ####
 # refgen_stacks_analysis_pipeline.pl - Program that aligns quality filtered, demultiplexed, and adapter trimmed GBS data sequences (unpadded) against a reference genome using the BWA alignment program. It then runs the Stacks reference genome pipeline using the pstacks, cstacks, and sstacks programs of the Stacks Software Suite.
 
 #### DESCRIPTION ####
@@ -24,7 +25,7 @@ GetOptions(
     'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
     'd=s'    => \$min_depth_coverage_pstacks, # The minimum depth of coverage to report a stack. Default: 5
     'a=s'    => \$alpha_value_pstacks, # The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
-    's=s'    => \$num_mismatches_tag, # The number of mismatches allowed between sample tags when generating the catalog. Default: 0
+    's=s'    => \$num_mismatches_tag, # The number of mismatches allowed between sample tags when generating the catalog. Default: 1
     'm=s'    => \$sam_mapq_threshold, # The mapping quality score threshold filter for sam alignments. Any mapping quality score below this value is filtered out of the sam alignment files. Default: 20
     'c=s'    => \$num_threads, # The number of cpu threads to use for the stacks programs. Default: 2
     'o=s'    => \$output_dir, # The absolute path to the output directory to contain the renumerated reference genome, BWA sam, padded sam, and Stacks output files and directories.
@@ -52,8 +53,8 @@ $min_depth_coverage_pstacks = 5 unless defined $min_depth_coverage_pstacks;
 # The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 $alpha_value_pstacks = 0.05 unless defined $alpha_value_pstacks;
 
-# The number of mismatches allowed between sample tags when generating the catalog. Default: 0
-$num_mismatches_tag = 0 unless defined $num_mismatches_tag;
+# The number of mismatches allowed between sample tags when generating the catalog. Default: 1
+$num_mismatches_tag = 1 unless defined $num_mismatches_tag;
 
 # The mapping quality score threshold filter for sam alignments. Any mapq score below this value is filtered out of the sam alignment files. Default: 20
 $sam_mapq_threshold = 20 unless defined $sam_mapq_threshold;
@@ -74,6 +75,9 @@ sub usage {
 die <<"USAGE";
     
 Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -g refgen_infile -l gbs_sequence_length -b stacks_sql_id -d min_depth_coverage_pstacks -a alpha_value_pstacks -s num_mismatches_tag -m sam_mapq_threshold -c num_threads -o output_dir
+   
+    
+VERSION 1.19
     
 DESCRIPTION - This program takes the quality filtered, demultiplexed, and adapter trimmed *.fastq input files (unpadded) and reference genome fasta input files as input. Converts the reference genome fasta file to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers. It then performs a BWA alignment to align the GBS fastq sequences to the reference genome. It then executes the pstacks program, which extracts sequence stacks that were aligned to the reference genome using the BWA alignment program and identifies SNPs. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
     
@@ -93,7 +97,7 @@ OPTIONS:
 
 -a alpha_value_pstacks - The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
 
--s num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog. Default: 0
+-s num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog. Default: 1
 
 -m sam_mapq_threshold - The mapping quality score threshold filter for sam alignments. Any mapq score below this value is filtered out of the sam alignment files. Default: 20
 
@@ -149,12 +153,12 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 		my $uncompressed_fastq_file = gunzip_fastq_file($gbs_fastq_infile);
 		$gbs_fastq_infile = $uncompressed_fastq_file;
 	}elsif(($gbs_fastq_file_type eq "fastq") and ($file_name =~ m/trimmed_offset_\d+/)){ # If the fastq file is not compressed set the resulting fastq filename to be the fastq infile.
-        	my ($fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/_trimmed_offset_\d+\.fastq/);
-                my $fastq_infile = join('/', $fastq_dir, $fastq_filename . ".fastq");
-		warn "Copying $gbs_fastq_infile to $fastq_infile.....";
-		copy($gbs_fastq_infile, $fastq_infile) or die "Copy failed: $!";
-        	$gbs_fastq_infile = $fastq_infile;
-    	}
+        my ($fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/_trimmed_offset_\d+\.fastq/);
+        my $fastq_infile = join('/', $fastq_dir, $fastq_filename . ".fastq");
+        warn "Copying $gbs_fastq_infile to $fastq_infile.....";
+        copy($gbs_fastq_infile, $fastq_infile) or die "Copy failed: $!";
+        $gbs_fastq_infile = $fastq_infile;
+    }
 
 	# Creates the BWA alignment file using the GBS fastq input file to align the fastq sequence reads to the reference genome.
 	my $bwa_alignment_outfile = bwa_aln($refgen_fasta_outfile, $gbs_fastq_infile, $num_threads, $bwa_output_dir);
@@ -254,7 +258,7 @@ sub convert_refgen_bwa_input_format{
 	unless(-s $refgen_fasta_outfile and -s $refgen_toc_outfile){
 		warn "Converting $refgen_fasta_filename to BWA input format....\n\n";
 		my $seq_counter = 0;
-        	my %fasta_header = ();
+        my %fasta_header = ();
 		my %fasta_seqs = ();
         
         # Parse the contents of the reference genome fasta file to filter.
@@ -265,10 +269,10 @@ sub convert_refgen_bwa_input_format{
             if($_ !~ /^$/){
                 if($_ =~ /^>/){
                     # Parse stacks reference genome fasta input file for the reference genome.
-                        $seq_counter++;
-			my $refgen_seq_id = substr($_, 1, length $_);
-                        $fasta_header{$seq_counter}{"HEADER"} = $refgen_seq_id;
-                        print $fasta_header{$seq_counter}{"HEADER"} . "\n";
+                    $seq_counter++;
+                    my $refgen_seq_id = substr($_, 1, length $_);
+                    $fasta_header{$seq_counter}{"HEADER"} = $refgen_seq_id;
+                    print $fasta_header{$seq_counter}{"HEADER"} . "\n";
                 }elsif($_ =~ m/^[ACGTNRYSWKM]+/i){
                     my $sequence = $_;
                     push(@{$fasta_seqs{$seq_counter}{"SEQUENCE"}}, $sequence);
@@ -372,47 +376,46 @@ sub bwa_index{
 #bwa aln -t 4 ./refgen/renumbered_Msequence.fasta ./mergedTagCounts/mpbGBSTags.cnt.fq > ./mergedTagCounts/AlignedGBSTags1.sai
 sub bwa_aln{
 
-	# The renumerated reference genome input fasta file.
-	my $renum_refgen_fasta_infile = shift;
-	die "Error lost the renumbered reference genome input fasta file" unless defined $renum_refgen_fasta_infile;
-    
-	# The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
-	my $gbs_fastq_infile = shift;
-	die "Error lost the GBS fastq input file" unless defined $gbs_fastq_infile;
-    
-	# The number of threads to use for BWA.
-	my $num_threads = shift;
-	die "Error lost the number of cores for BWA" unless defined $num_threads;
+    # The renumerated reference genome input fasta file.
+    my $renum_refgen_fasta_infile = shift;
+    die "Error lost the renumbered reference genome input fasta file" unless defined $renum_refgen_fasta_infile;
 
-	# The BWA alignment output directory that contains the sai alignment files.
-	my $bwa_output_dir = shift;
-	die "Error lost the bwa output directory" unless defined $bwa_output_dir;
+    # The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
+    my $gbs_fastq_infile = shift;
+    die "Error lost the GBS fastq input file" unless defined $gbs_fastq_infile;
 
-	# Get the basename of the fastq filename without the .fastq extension.
-	my $gbs_fastq_filename = fileparse($gbs_fastq_infile, qr/\.fastq/);
-	
-	my $individual_id = "";
-	if($gbs_fastq_filename =~ m/trimmed_offset_\d+/){	
-		# Split the GBS fastq filename so that we can get the individual id.
-		my @split_gbs_fastq_filename = split(/_/, $gbs_fastq_filename);
-		$individual_id = $split_gbs_fastq_filename[0];
-    	}else{
-		$individual_id = $gbs_fastq_filename;
-	}
+    # The number of threads to use for BWA.
+    my $num_threads = shift;
+    die "Error lost the number of cores for BWA" unless defined $num_threads;
 
-	# Format the sai file.
-	my $bwa_alignment_outfile = join('/', $bwa_output_dir, $individual_id . ".sai");
+    # The BWA alignment output directory that contains the sai alignment files.
+    my $bwa_output_dir = shift;
+    die "Error lost the bwa output directory" unless defined $bwa_output_dir;
 
-	# Execute the BWA alignment program if the SAI file is not already generated.
-	unless(-s $bwa_alignment_outfile){
-		warn "Generating the bwa alignment file.....\n\n";
-		my $bwaAlnCmd  = "$bwa aln -t $num_threads $renum_refgen_fasta_infile $gbs_fastq_infile > $bwa_alignment_outfile";
-		warn $bwaAlnCmd . "\n\n";
-		system($bwaAlnCmd) == 0 or die "Error calling $bwaAlnCmd: $?";
-	}
-    
-	# Return the BWA sai alignment output file.
-	return $bwa_alignment_outfile;
+    my $individual_id = "";
+    if($gbs_fastq_filename =~ m/trimmed_offset_\d+/){
+        # Get the basename of the fastq filename without the _trimmed_offset_\d+\.fastq extension.
+        my ($gbs_fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/_trimmed_offset_\d+\.fastq);
+        $individual_id = $gbs_fastq_filename;
+    }else{
+        # Get the basename of the fastq filename without the .fastq extension.
+        my ($gbs_fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/\.fastq/);
+        $individual_id = $gbs_fastq_filename;
+    }
+
+    # Format the sai file.
+    my $bwa_alignment_outfile = join('/', $bwa_output_dir, $individual_id . ".sai");
+
+    # Execute the BWA alignment program if the SAI file is not already generated.
+    unless(-s $bwa_alignment_outfile){
+        warn "Generating the bwa alignment file.....\n\n";
+        my $bwaAlnCmd  = "$bwa aln -t $num_threads $renum_refgen_fasta_infile $gbs_fastq_infile > $bwa_alignment_outfile";
+        warn $bwaAlnCmd . "\n\n";
+        system($bwaAlnCmd) == 0 or die "Error calling $bwaAlnCmd: $?";
+    }
+
+    # Return the BWA sai alignment output file.
+    return $bwa_alignment_outfile;
 }
 
 # $bwa_aligned_master_outfile = bwa_samse($renum_refgen_fasta_infile, $gbs_fastq_infile, $bwa_alignment_infile, $sam_mapq_threshold, $bwa_output_dir) - Executes the BWA alignment program using the samse option to generate sam alignment files from a renumerated reference genome, BWA sai, and quality filtered and trimmed adapter GBS fastq input files.
@@ -436,37 +439,36 @@ sub bwa_aln{
 #bwa samse ./refgen/renumbered_Msequence.fasta ./mergedTagCounts/AlignedGBSTags1.sai ./mergedTagCounts/mpbGBSTags.cnt.fq > mergedTagCounts/AlignedMasterTagsMPB.sam
 sub bwa_samse{
 
-	# The renumerated reference genome input fasta file.
-	my $renum_refgen_fasta_infile = shift;
-	die "Error lost the renumbered reference genome input file" unless defined $renum_refgen_fasta_infile;
+    # The renumerated reference genome input fasta file.
+    my $renum_refgen_fasta_infile = shift;
+    die "Error lost the renumbered reference genome input file" unless defined $renum_refgen_fasta_infile;
 
-	# The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
-	my $gbs_fastq_infile = shift;
-	die "Error lost the GBS fastq input file" unless defined $gbs_fastq_infile;
+    # The quality filtered and adapter trimmed GBS fastq input file for an individual within the Genotyping by Sequencing (GBS) project.
+    my $gbs_fastq_infile = shift;
+    die "Error lost the GBS fastq input file" unless defined $gbs_fastq_infile;
 
-	# The BWA alignment index input file.
-	my $bwa_alignment_infile = shift;
-	die "Error lost the BWA SAI formatted alignment (.sai) file" unless defined $bwa_alignment_infile;
+    # The BWA alignment index input file.
+    my $bwa_alignment_infile = shift;
+    die "Error lost the BWA SAI formatted alignment (.sai) file" unless defined $bwa_alignment_infile;
 
-    	# The sam alignment file mapping quality score threshold.
-	my $sam_mapq_threshold = shift;
-	die "Error lost the sam alignment file mapping quality score threshold" unless defined $sam_mapq_threshold;
-    
-	# The BWA alignment output directory that contains the sam alignment files.
-	my $bwa_output_dir = shift;
-	die "Error lost the bwa output directory" unless defined $bwa_output_dir;
+    # The sam alignment file mapping quality score threshold.
+    my $sam_mapq_threshold = shift;
+    die "Error lost the sam alignment file mapping quality score threshold" unless defined $sam_mapq_threshold;
 
-	# Get the basename of the fastq filename without the .fastq extension.
-	my $gbs_fastq_filename = fileparse($gbs_fastq_infile, qr/\.fastq/);
-	
-	my $individual_id = "";
-	if($gbs_fastq_filename =~ m/trimmed_offset_\d+/){	
-		# Split the GBS fastq filename so that we can get the individual id.
-		my @split_gbs_fastq_filename = split(/_/, $gbs_fastq_filename);
-		my $individual_id = $split_gbs_fastq_filename[0];
-	}else{
-		$individual_id = $gbs_fastq_filename;
-	}
+    # The BWA alignment output directory that contains the sam alignment files.
+    my $bwa_output_dir = shift;
+    die "Error lost the bwa output directory" unless defined $bwa_output_dir;
+
+    my $individual_id = "";
+    if($gbs_fastq_filename =~ m/trimmed_offset_\d+/){
+        # Get the basename of the fastq filename without the _trimmed_offset_\d+\.fastq extension.
+        my ($gbs_fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/_trimmed_offset_\d+\.fastq);
+        $individual_id = $gbs_fastq_filename;
+    }else{
+        # Get the basename of the fastq filename without the .fastq extension.
+        my ($gbs_fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/\.fastq/);
+        $individual_id = $gbs_fastq_filename;
+    }
 
 	# Execute the BWA alignment program if the sam alignment file is not already generated.
 	my $bwa_aligned_master_outfile = join('/', $bwa_output_dir, $individual_id . ".sam");
@@ -491,7 +493,7 @@ sub bwa_samse{
 				
 				my $optional_fields = join("\t", @optional_fields);
 				
-                		# die join("\t", $fastq_header, $bam_bitwise_flag, $rname, $r_pos, $mapq, $cigar, $rnext, $pnext, $tlen, $fastq_sequence, $fastq_quality_scores, $optional_fields);
+                # die join("\t", $fastq_header, $bam_bitwise_flag, $rname, $r_pos, $mapq, $cigar, $rnext, $pnext, $tlen, $fastq_sequence, $fastq_quality_scores, $optional_fields);
                 
 				# Filter alignment entry if the read is unmapped in the sense and antisense orientation.
 				next if(($bam_bitwise_flag eq 4) or ($bam_bitwise_flag eq 20));
@@ -540,7 +542,7 @@ sub bwa_pad_sam_files{
 	my $gbs_sequence_length = shift;
 	die "Error lost the GBS fastq sequence length in base pairs (bps)" unless defined $gbs_sequence_length;
 
-    	# The sam alignment file mapping quality score threshold.
+    # The sam alignment file mapping quality score threshold.
 	my $sam_mapq_threshold = shift;
 	die "Error lost the sam alignment file mapping quality score threshold" unless defined $sam_mapq_threshold;
     
