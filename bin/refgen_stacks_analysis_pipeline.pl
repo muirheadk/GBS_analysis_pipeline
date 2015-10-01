@@ -393,9 +393,9 @@ sub bwa_aln{
     die "Error lost the bwa output directory" unless defined $bwa_output_dir;
 
     my $individual_id = "";
-    if($gbs_fastq_filename =~ m/trimmed_offset_\d+/){
+    if($gbs_fastq_infile =~ m/trimmed_offset_\d+\.fastq/){
         # Get the basename of the fastq filename without the _trimmed_offset_\d+\.fastq extension.
-        my ($gbs_fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/_trimmed_offset_\d+\.fastq);
+        my ($gbs_fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/_trimmed_offset_\d+\.fastq/);
         $individual_id = $gbs_fastq_filename;
     }else{
         # Get the basename of the fastq filename without the .fastq extension.
@@ -460,9 +460,9 @@ sub bwa_samse{
     die "Error lost the bwa output directory" unless defined $bwa_output_dir;
 
     my $individual_id = "";
-    if($gbs_fastq_filename =~ m/trimmed_offset_\d+/){
+    if($gbs_fastq_infile =~ m/trimmed_offset_\d+\.fastq/){
         # Get the basename of the fastq filename without the _trimmed_offset_\d+\.fastq extension.
-        my ($gbs_fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/_trimmed_offset_\d+\.fastq);
+        my ($gbs_fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/_trimmed_offset_\d+\.fastq/);
         $individual_id = $gbs_fastq_filename;
     }else{
         # Get the basename of the fastq filename without the .fastq extension.
