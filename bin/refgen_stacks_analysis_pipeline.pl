@@ -975,15 +975,15 @@ sub gunzip_fastq_file{
 	my $fastq_file = shift;
 	die "Error lost the fastq file to uncompress using gunzip" unless defined $fastq_file;
 
-	my ($gbs_fastq_filename, $fastq_dir, $individual_id) = "";
-	if($gbs_fastq_infile =~ m/trimmed_offset_\d+\.fastq/){
+	my ($fastq_filename, $fastq_dir, $individual_id) = "";
+	if($fastq_file =~ m/trimmed_offset_\d+\.fastq/){
         	# Get the basename of the fastq filename without the _trimmed_offset_\d+\.fastq extension.
-        	($gbs_fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/_trimmed_offset_\d+\.fastq/);
-        	$individual_id = $gbs_fastq_filename;
+        	($fastq_filename, $fastq_dir) = fileparse($fastq_file, qr/_trimmed_offset_\d+\.fastq/);
+        	$individual_id = $fastq_filename;
         }else{
 		# Get the basename of the fastq filename without the \.fastq extension.
-		($gbs_fastq_filename, $fastq_dir) = fileparse($gbs_fastq_infile, qr/\.fastq/);
-		$individual_id = $gbs_fastq_filename;
+		($fastq_filename, $fastq_dir) = fileparse($fastq_file, qr/\.fastq/);
+		$individual_id = $fastq_filename;
 	}         	
 	my $uncompressed_fastq_file = join('/', $fastq_dir, $individual_id . ".fastq");
 	
