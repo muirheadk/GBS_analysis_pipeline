@@ -15,16 +15,18 @@ use File::Copy;
 # This program takes the quality filtered, demultiplexed, and adapter trimmed *.fastq input files (unpadded) and a reference genome fasta input file as input. Converts a reference genome fasta file to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers. It then performs a BWA alignment to align the GBS fastq sequences to a reference genome. It then executes the pstacks program, which extracts sequence stacks that were aligned to a reference genome using the BWA alignment program and identifies SNPs. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
 
 #### SAMPLE COMMANDS ####
+
+## Standard example
 # perl refgen_stacks_analysis_pipeline.pl -i ~/workspace/GBS_data-08-10-2013/PROCESSED_RADTAGS/TRIMMED_OFFSET_3_ADAPTOR_REGEX_PARALLEL_FASTQ_DIR_UNPADDED/STEPHEN_TREVOY/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -g ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_sequence_data/DendPond_male_1.0/Primary_Assembly/unplaced_scaffolds/FASTA/DendPond_male_1.0_unplaced.scaf.fa -c 7 -o ~/workspace/GBS_data-08-10-2013/MPB_GBS_Data-08-10-2013/MPB_MALE_GBS_ANALYSIS_TRIMMED_OFFSET_3
 
-# perl refgen_stacks_analysis_pipeline.pl -i ~/scratch/JASMINE_JANES_GBS_Data-2015-09-15/MPB_GBS_Data/MPB_TRIMMED_GBS_SEQS/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -g ~/scratch/JASMINE_JANES_GBS_Data-2015-09-15/MPB_GBS_Data/MPB_MALE_GBS_STACKS/REFERENCE_GENOME/DendPond_male_1.0_unplaced.scaf.fa.fasta -p ~/scratch/JASMINE_JANES_GBS_Data-2015-09-15/MPB_GBS_Data/MPB_FEMALE_GBS_STACKS/STACKS_OUTFILES/batch_1.catalog.tags.tsv -t fastq -l 92 -b 1 -d 5 -a 0.05 -s 1 -m 20 -c 24 -o ~/scratch/JASMINE_JANES_GBS_Data-2015-09-15/MPB_GBS_Data/MPB_FEMALE_CATALOG_MALE_REFGEN_STACKS
-
-my ($gbs_fastq_dir, $gbs_fastq_file_type, $refgen_infile, $cstacks_tags_infile, $gbs_sequence_length, $stacks_sql_id, $min_depth_coverage_pstacks, $alpha_value_pstacks, $num_mismatches_tag, $sam_mapq_threshold, $num_threads, $output_dir);
+## Using the cstacks catalog prefix path.
+# perl ~/refgen_stacks_analysis_pipeline.pl -i ~/scratch/JASMINE_JANES_GBS_Data-2015-09-15/MPB_GBS_Data/MPB_TRIMMED_GBS/TRIMMED_OUTPUT_FILES/TRIMMED_FASTQ_FILES -g ~/scratch/JASMINE_JANES_GBS_Data-2015-09-15/MPB_GBS_Data/MPB_MALE_GBS_STACKS/REFERENCE_GENOME/DendPond_male_1.0_unplaced.scaf.fa.fasta -p ~/scratch/JASMINE_JANES_GBS_Data-2015-09-15/MPB_GBS_Data/MPB_MALE_GBS_STACKS/STACKS_OUTFILES/batch_1 -t fastq -l 92 -b 1 -d 5 -a 0.05 -s 1 -m 20 -c 24 -o ~/scratch/JASMINE_JANES_GBS_Data-2015-09-15/MPB_GBS_Data/test_output_dir/
+my ($gbs_fastq_dir, $gbs_fastq_file_type, $refgen_infile, $cstacks_catalog_prefix, $gbs_sequence_length, $stacks_sql_id, $min_depth_coverage_pstacks, $alpha_value_pstacks, $num_mismatches_tag, $sam_mapq_threshold, $num_threads, $output_dir);
 GetOptions(
     'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (unpadded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
     't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
     'g=s'    => \$refgen_infile, # The absolute path to the reference genome input fasta file to align GBS fastq sequences.
-    'p=s'    => \$cstacks_tags_infile, # The cstacks generated catalog tags input file consisting of a set of consensus loci built from a set of samples processed by the pstacks program.
+    'p=s'    => \$cstacks_catalog_prefix, # The cstacks catalog prefix file path consisting of a set of consensus loci built from a set of samples processed by the pstacks program.
     'l=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
     'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
     'd=s'    => \$min_depth_coverage_pstacks, # The minimum depth of coverage to report a stack. Default: 5
@@ -45,8 +47,8 @@ usage() unless (
 # The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
 $gbs_fastq_file_type = 'gzfastq' unless defined $gbs_fastq_file_type;
 
-# The cstacks generated catalog tags input file consisting of a set of consensus loci built from a set of samples processed by the pstacks program.
-$cstacks_tags_infile = "" unless defined $cstacks_tags_infile;
+# The cstacks catalog prefix file path consisting of a set of consensus loci built from a set of samples processed by the pstacks program.
+$cstacks_catalog_prefix = "" unless defined $cstacks_catalog_prefix;
 
 # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 $gbs_sequence_length = 92 unless defined $gbs_sequence_length;
@@ -81,7 +83,7 @@ sub usage {
     
 die <<"USAGE";
     
-Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -g refgen_infile -p cstacks_tags_infile -l gbs_sequence_length -b stacks_sql_id -d min_depth_coverage_pstacks -a alpha_value_pstacks -s num_mismatches_tag -m sam_mapq_threshold -c num_threads -o output_dir
+Usage: $0 -i gbs_fastq_dir -t gbs_fastq_file_type -g refgen_infile -p cstacks_catalog_prefix -l gbs_sequence_length -b stacks_sql_id -d min_depth_coverage_pstacks -a alpha_value_pstacks -s num_mismatches_tag -m sam_mapq_threshold -c num_threads -o output_dir
    
     
 VERSION 1.20
@@ -96,7 +98,7 @@ OPTIONS:
 
 -g refgen_infile - The absolute path to the reference genome input fasta file to align GBS fastq sequences using the BWA alignment program.
 
--p cstacks_tags_infile - The cstacks generated catalog tags input file consisting of a set of consensus loci built from a set of samples processed by the pstacks program.
+-p cstacks_catalog_prefix - The cstacks catalog prefix file path consisting of a set of consensus loci built from a set of samples processed by the pstacks program.
     
 -l gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
 
@@ -222,12 +224,12 @@ foreach my $file_name (sort keys %{$padded_sam_files}){
 
 # Execute the cstacks program to build a catalog from a set of samples processed by the pstacks program if a catalog tags file was not specified. The cstacks program creates a set of consensus loci, merging alleles together. If a catalog tags file was specified, then skip the execution of the cstacks program and use the catalog when executing sstacks.
 my $cstacks_file = "";
-if($cstacks_tags_infile eq ""){
+if($cstacks_catalog_prefix eq ""){
     $cstacks_file = cstacks($stacks_output_dir, $stacks_sql_id, $num_mismatches_tag, $num_threads);
     
-}elsif($cstacks_tags_infile =~ m/batch_\d+\.catalog\.tags\.tsv/){
+}elsif($cstacks_catalog_prefix =~ m/batch_\d+\.catalog\.tags\.tsv/){
     
-    $cstacks_file = $cstacks_tags_infile;
+    $cstacks_file = $cstacks_catalog_prefix;
 }
 
 # Find all pstacks tags output files from the stacks output directory with the extension *.tags.tsv.
