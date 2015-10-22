@@ -227,7 +227,7 @@ my $cstacks_file = "";
 if($cstacks_catalog_prefix eq ""){
     $cstacks_file = cstacks($stacks_output_dir, $stacks_sql_id, $num_mismatches_tag, $num_threads);
     
-}elsif($cstacks_catalog_prefix =~ m/batch_\d+\.catalog\.tags\.tsv/){
+}elsif($cstacks_catalog_prefix =~ m/batch_\d+$/){
     
     $cstacks_file = $cstacks_catalog_prefix;
 }
