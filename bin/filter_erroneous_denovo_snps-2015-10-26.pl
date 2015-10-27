@@ -6,20 +6,18 @@ use Getopt::Long;
 use File::Basename;
 
 #### PROGRAM NAME ####
-# filter_erroneous_denovo_snps.pl - A program that filters erroneous SNPs called within the denovo stacks analysis pipeline. SNPs called within the artifical poly-A sequence are flagged and filtered from the fasta formatted file generated from population stacks program. The program generates a filtered fasta formatted file and locus id list as output. It also generates a locus id list of locus ids that were removed from the original fasta file and a fasta formatted file containing all locus sequences that were flagged and removed.
+# filter_erroneous_denovo_snps.pl - A program that filters erroneous SNPs called within the denovo stacks analysis pipeline. SNPs called within the artificial poly-A sequence are flagged and filtered from the fasta formatted file that was generated from population stacks program. The program generates a filtered fasta formatted file and locus id list as output. It also generates a list of locus ids that were removed from the original fasta file and a fasta formatted file containing all locus sequences that were flagged and removed.
 
 #### VERSION 1.20 ####
 
 #### DESCRIPTION ####
-# This program filters erroneous SNPs called within the denovo stacks analysis pipeline. SNPs called within the artifical poly-A sequence are flagged and filtered from the fasta formatted file generated from population stacks program. The program generates a filtered fasta formatted file and locus id list as output. It also generates a locus id list of locus ids that were removed from the original fasta file and a fasta formatted file containing all locus sequences that were flagged and removed.
-
-
+# This program filters erroneous SNPs called within the denovo stacks analysis pipeline. SNPs called within the artificial poly-A sequence are flagged and filtered from the fasta formatted file that was generated from population stacks program. The program generates a filtered fasta formatted file and locus id list as output. It also generates a list of locus ids that were removed from the original fasta file and a fasta formatted file containing all locus sequences that were flagged and removed.
 
 #### SAMPLE COMMAND ####
 # perl ~/filter_erroneous_denovo_snps.pl -i ~/scratch/SBW20INDIVS -f ~/scratch/SBW20INDIVS/POPULATIONS_FASTA_DIR/batch_1.fa -p SBW20IndvsFiltered -l 92 -c 24 -o ~/output_dir
 my ($fastq_file_dir, $stacks_fasta_infile, $project_name, $gbs_sequence_length, $trim_polyA, $num_cpu_cores, $output_dir);
 GetOptions(
-	'i=s'    => \$fastq_file_dir, # The absolute path to the *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+	'i=s'    => \$fastq_file_dir, # The absolute path to the trimmed *.fastq input file directory that contains files trimmed of the common adapter sequence with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 	'f=s'    => \$stacks_fasta_infile, # The absolute path to the fasta formatted input file generated from the Stacks populations program.
 	'p=s'    => \$project_name, # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
 	'l=s'    => \$gbs_sequence_length, # The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
@@ -56,7 +54,7 @@ DESCRIPTION - This program filters erroneous SNPs called within the denovo stack
 
 OPTIONS:
 
--i fastq_file_dir - The absolute path to the *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+-i fastq_file_dir - The absolute path to the trimmed *.fastq input file directory that contains files trimmed of the common adapter sequence with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
 	e.g. /path/to/fastq_file_dir
 
 -f stacks_fasta_infile - The absolute path to the fasta formatted input file generated from the Stacks populations program.
