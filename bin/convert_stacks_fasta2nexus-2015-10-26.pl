@@ -84,9 +84,6 @@ while(<INFILE>){
 }
 close(INFILE) or die "Couldn't close file $stacks_popmap_infile";
 
-# If the nexus locus catolog is already generated then skip, otherwise generate the nexus locus catalog.
-my $locus_catalog_outfile = join('/', $output_dir, join("_", $project_name, "nexus_locus_catalog.txt"));
-unless(-s $locus_catalog_outfile){
 
     # Parse the contents of the Stacks fasta file to generate the nexus files.
     open(INFILE, "<$stacks_fasta_infile") or die "Couldn't open file $stacks_fasta_infile for reading, $!";
@@ -140,6 +137,10 @@ unless(-s $locus_catalog_outfile){
         }
     } 
     %locus_seq_lengths = ();
+
+# If the nexus locus catolog is already generated then skip, otherwise generate the nexus locus catalog.
+my $locus_catalog_outfile = join('/', $output_dir, join("_", $project_name, "nexus_locus_catalog.txt"));
+unless(-s $locus_catalog_outfile){
 
     # Iterate through each locus id to obtain the metadata for that locus and print out the contents in nexus file format.
     my (%processed_loci, %snp_loci_positions) = ();
@@ -223,7 +224,7 @@ unless(-s $locus_catalog_outfile){
     }
 
     # Print out the locus metadata contents to the nexus locus catalog.
-    my $locus_catalog_outfile = join('/', $output_dir, join("_", $project_name, "nexus_locus_catalog.txt");
+    my $locus_catalog_outfile = join('/', $output_dir, join("_", $project_name, "nexus_locus_catalog.txt"));
     open(OUTFILE, ">$locus_catalog_outfile") or die "Couldn't open file $locus_catalog_outfile for writting, $!";
     print OUTFILE join("\t", "locus_id", "refgen_seq_id", "refgen_seq_start", "strand", "individual_id", "snp_position", "sequence") . "\n";
     foreach my $locus_id (sort {$a <=> $b} keys %locus_metadata){
