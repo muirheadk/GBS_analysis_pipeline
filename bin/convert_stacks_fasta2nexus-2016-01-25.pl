@@ -20,7 +20,7 @@ GetOptions(
 	'n=s'    => \$project_name,  # The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output file names.
 	'w=s'    => \$whitelist_infile, # The whitelist input file containing the locus ids to keep after passing the present data filter. If not specified all locus ids that passed the present data filter will be used to generate the nexus file.
 	'p=s'    => \$percent_present_locus_data, # The percent of present data at a locus across all individuals. percent_present_locus_data = (present_data_locus/(present_data_locus + missing_data_locus)) Default: 0.75
-	'd=s'    => \$percent_present_indiv_data, # The percent of present data for an individual across all loci. percent_present_indiv_data = (present_data_indiv/(present_data_indiv + missing_data_indiv)) Default: 0.75
+	'd=s'    => \$percent_present_indiv_data, # The percent of present data for an individual across all characters. percent_present_indiv_data = (present_data_indiv/(present_data_indiv + missing_data_indiv)) Default: 0.75
 	'o=s'    => \$output_dir, # The directory to contain all the output files.
 );
 
@@ -38,7 +38,7 @@ $whitelist_infile = "" unless defined $whitelist_infile;
 # The percent of present data at a locus across all individuals. percent_present_locus_data = (present_data_locus/(present_data_locus + missing_data_locus)) Default: 0.75
 $percent_present_locus_data = 0.75 unless defined $percent_present_locus_data;
 
-# The percent of present data for an individual across all loci. percent_present_indiv_data = (present_data_indiv/(present_data_indiv + missing_data_indiv)) Default: 0.75
+# The percent of present data for an individual across all characters. percent_present_indiv_data = (present_data_indiv/(present_data_indiv + missing_data_indiv)) Default: 0.75
 $percent_present_indiv_data = 0.75 unless defined $percent_present_indiv_data;
 
 sub usage {
@@ -62,9 +62,9 @@ OPTIONS:
 
 -p percent_present_locus_data - The percent of present data at a locus across all individuals. percent_present_locus_data = (present_data_locus/(present_data_locus + missing_data_locus)) Default: 0.75
     
--d percent_present_indiv_data - The percent of present data for an individual across all loci. percent_present_indiv_data = (present_data_indiv/(present_data_indiv + missing_data_indiv)) Default: 0.75
+-d percent_present_indiv_data - The percent of present data for an individual across all characters. percent_present_indiv_data = (present_data_indiv/(present_data_indiv + missing_data_indiv)) Default: 0.75
 
-    -o output_dir - The directory to contain all the output files.
+-o output_dir - The directory to contain all the output files.
 
 USAGE
 }
@@ -288,12 +288,15 @@ close(INFILE) or die "Couldn't close file $locus_catalog_outfile";
 
 # Calculating the percentage of missing data to present data. Using the amount of present data we calculate percent present data as $perc_present_locus_data = ($present_data_locus_count/$total_data_locus_count).
 my %nexus_loci_list = ();
-my $locus_list_outfile = join('/', $output_dir, join("_", $project_name, "filtered_locus_list.txt"));
-open(OUTFILE1, ">$locus_list_outfile") or die "Couldn't open file $locus_list_outfile for writting, $!";
+my $present_locus_list_outfile = join('/', $output_dir, join("_", $project_name, "filtered_locus_list.txt"));
+open(OUTFILE1, ">$present_locus_list_outfile") or die "Couldn't open file $present_locus_list_outfile for writting, $!";
+
+my $missing_locus_list_outfile = join('/', $output_dir, join("_", $project_name, "removed_locus_list.txt"));
+open(OUTFILE2, ">$missing_locus_list_outfile") or die "Couldn't open file $missing_locus_list_outfile for writting, $!";
 
 my $present_locus_data_outfile = join('/', $output_dir, join("_", $project_name, "present_locus_data.txt"));
-open(OUTFILE2, ">$present_locus_data_outfile") or die "Couldn't open file $present_locus_data_outfile for writting, $!";
-print OUTFILE2 join("\t", "locus_id", "percent_present_data", "percent_missing_data", "present_data_count", "missing_data_count", "total_data_count") . "\n";
+open(OUTFILE3, ">$present_locus_data_outfile") or die "Couldn't open file $present_locus_data_outfile for writting, $!";
+print OUTFILE3 join("\t", "locus_id", "percent_present_data", "percent_missing_data", "present_data_count", "missing_data_count", "total_data_count") . "\n";
 foreach my $locus_id (sort {$a <=> $b} keys %locus_catalog_counts){
     
     my $present_data_locus_count = 0;
@@ -317,94 +320,28 @@ foreach my $locus_id (sort {$a <=> $b} keys %locus_catalog_counts){
     if($perc_present_locus_data >= $percent_present_locus_data){
         print OUTFILE1 $locus_id . "\n";
         $nexus_loci_list{$locus_id} = $locus_id;
+    }else{
+        print OUTFILE2 $locus_id . "\n";
     }
     
-    print OUTFILE2 join("\t", $locus_id, ($perc_present_locus_data * 100), ($perc_missing_locus_data * 100), $present_data_locus_count, $missing_data_locus_count, $total_data_locus_count) . "\n";
+    print OUTFILE3 join("\t", $locus_id, ($perc_present_locus_data * 100), ($perc_missing_locus_data * 100), $present_data_locus_count, $missing_data_locus_count, $total_data_locus_count) . "\n";
 }
-close(OUTFILE1) or die "Couldn't close file $locus_list_outfile";
-close(OUTFILE2) or die "Couldn't close file $present_locus_data_outfile";
-
-# Get the present, missing, and total number of loci in the data set for each individual.
-my %locus_counts_indivs = ();
-my $num_loci = 0;
-foreach my $locus_id (sort {$a <=> $b} keys %nexus_loci_list){
-    
-    my $gbs_sequence_length = $locus_id_seq_length{$locus_id};
-    
-    foreach my $individual_id (sort {$a cmp $b} keys %sample_names){
-        
-        my $sequence = $locus_catalog_data{$locus_id}{$individual_id};
-        
-        if($sequence =~ m/^[ACGTNRYSWKM]+$/){
-            
-            #warn join("\t", $locus_id, $individual_id, "$sequence is DNA characters");
-            
-            $locus_counts_indivs{$individual_id}{"PRESENT_DATA"}++;
-            
-        }elsif($sequence =~ m/^\?{$gbs_sequence_length}$/){
-            
-            #warn join("\t", $locus_id, $individual_id, "$sequence is ?s");
-            
-            $locus_counts_indivs{$individual_id}{"MISSING_DATA"}++;
-        }
-    }
-    $num_loci++;
-}
-
-# Calculating the percentage of missing data to present data. Using the amount of present data we calculate percent present data as $perc_present_indiv_data = ($present_data_indiv_count/$total_data_indiv_count).
-my %nexus_indiv_list = ();
-my $indiv_list_outfile = join('/', $output_dir, join("_", $project_name, "filtered_indiv_list.txt"));
-open(OUTFILE1, ">$indiv_list_outfile") or die "Couldn't open file $indiv_list_outfile for writting, $!";
-
-my $present_indiv_data_outfile = join('/', $output_dir, join("_", $project_name, "present_indiv_data.txt"));
-open(OUTFILE2, ">$present_indiv_data_outfile") or die "Couldn't open file $present_indiv_data_outfile for writting, $!";
-print OUTFILE2 join("\t", "individual_id", "percent_present_data", "percent_missing_data", "present_data_count", "missing_data_count", "total_data_count") . "\n";
-my $num_indivs = 0;
-foreach my $individual_id (sort {$a cmp $b} keys %locus_counts_indivs){
-    
-    my $present_data_indiv_count = 0;
-    if(defined($locus_counts_indivs{$individual_id}{"PRESENT_DATA"})){
-        $present_data_indiv_count = $locus_counts_indivs{$individual_id}{"PRESENT_DATA"};
-    }
-    
-    my $missing_data_indiv_count = 0;
-    if(defined($locus_counts_indivs{$individual_id}{"MISSING_DATA"})){
-        $missing_data_indiv_count = $locus_counts_indivs{$individual_id}{"MISSING_DATA"};
-    }
-    
-    my $total_data_indiv_count = ($present_data_indiv_count + $missing_data_indiv_count);
-    die "individual id: $individual_id total data: $total_data_indiv_count ne locus counts: $num_loci" if($total_data_indiv_count ne $num_loci);
-    my $perc_present_indiv_data = ($present_data_indiv_count/$total_data_indiv_count);
-    my $perc_missing_indiv_data = ($missing_data_indiv_count/$total_data_indiv_count);
-    #warn "$individual_id ($present_data_indiv_count/$total_data_indiv_count) * 100" . " " . ($present_data_indiv_count/$total_data_indiv_count) . " " . $present_data_indiv_count . " missing data = $missing_data_indiv_count";
-    
-    # Grab the locus ids that pass the present data filter test.
-    if($perc_present_indiv_data >= $percent_present_indiv_data){
-        #warn $individual_id . "\n";
-        print OUTFILE1 $individual_id . "\n";
-        $nexus_indiv_list{$individual_id} = $individual_id;
-        $num_indivs++;
-    }
-    
-    print OUTFILE2 join("\t", $individual_id, ($perc_present_indiv_data * 100), ($perc_missing_indiv_data * 100), $present_data_indiv_count, $missing_data_indiv_count, $total_data_indiv_count) . "\n";
-}
-close(OUTFILE1) or die "Couldn't close file $indiv_list_outfile";
-close(OUTFILE2) or die "Couldn't close file $present_indiv_data_outfile";
+close(OUTFILE1) or die "Couldn't close file $present_locus_list_outfile";
+close(OUTFILE2) or die "Couldn't close file $missing_locus_list_outfile";
+close(OUTFILE3) or die "Couldn't close file $present_locus_data_outfile";
 
 # Adding locus sequences in a hash array in order to concatenate the sequences.
 my %nexus_seqs = ();
-my @nexus_loci_list = ();
 if($whitelist_infile eq ""){
     foreach my $locus_id (sort {$a <=> $b} keys %nexus_loci_list){
-        foreach my $individual_id (sort {$a cmp $b} keys %nexus_indiv_list){
+        foreach my $individual_id (sort {$a cmp $b} keys %sample_names){
             push(@{$nexus_seqs{$individual_id}}, $locus_catalog_data{$locus_id}{$individual_id});
-            push(@nexus_loci_list, $locus_id);
         }
     }
 }elsif(-s $whitelist_infile){
     
     open(INFILE, "<$whitelist_infile") or die "Couldn't open file $whitelist_infile for reading, $!";
-    
+    my @nexus_loci_list = (); 
     while(<INFILE>){
         chomp $_;
         
@@ -418,7 +355,7 @@ if($whitelist_infile eq ""){
     
     foreach my $locus_id (sort {$a <=> $b} @nexus_loci_list){
         
-        foreach my $individual_id (sort {$a cmp $b} keys %nexus_indiv_list){
+        foreach my $individual_id (sort {$a cmp $b} keys %sample_names){
             push(@{$nexus_seqs{$individual_id}}, $locus_catalog_data{$locus_id}{$individual_id});
         }
     }
@@ -426,12 +363,82 @@ if($whitelist_infile eq ""){
     die "$whitelist_infile does not exist";
 }
 
-# Print out the locus metadata contents in nexus file format.
+# Get the number of characters based on the unique length of each locus sequence.
 my $nexus_nchar_length = 0;
-foreach my $locus_id (sort {$a <=> $b} @nexus_loci_list){
+foreach my $locus_id (sort {$a <=> $b} keys %nexus_loci_list){
 	$nexus_nchar_length += $locus_id_seq_length{$locus_id};
 }
 
+# Get the present, missing, and total number of characaters in the data set for each individual.
+my %locus_counts_indivs = ();
+    foreach my $individual_id (sort {$a cmp $b} keys %sample_names){
+
+	my $nexus_concat_seq = join("", @{$nexus_seqs{$individual_id}});
+    	my $concat_seq_length = length($nexus_concat_seq);
+	my @sequence_characters = split('', $nexus_concat_seq);
+	foreach my $character (@sequence_characters) {
+        	if($character =~ m/[ACGTNRYSWKM]/){
+
+            		#warn join("\t", $locus_id, $individual_id, "$sequence is DNA characters");
+
+            		$locus_counts_indivs{$individual_id}{"PRESENT_DATA"}++;
+
+        	}elsif($character eq '?'){
+
+            		#warn join("\t", $locus_id, $individual_id, "$sequence is ?s");
+
+            		$locus_counts_indivs{$individual_id}{"MISSING_DATA"}++;
+        	}
+	}
+}
+
+# Calculating the percentage of missing data to present data. Using the amount of present data we calculate percent present data as $perc_present_indiv_data = ($present_data_indiv_count/$total_data_indiv_count).
+my %nexus_indiv_list = ();
+my $present_indiv_list_outfile = join('/', $output_dir, join("_", $project_name, "filtered_indivs_list.txt"));
+open(OUTFILE1, ">$present_indiv_list_outfile") or die "Couldn't open file $present_indiv_list_outfile for writting, $!";
+
+my $missing_indiv_list_outfile = join('/', $output_dir, join("_", $project_name, "removed_indivs_list.txt"));
+open(OUTFILE2, ">$missing_indiv_list_outfile") or die "Couldn't open file $missing_indiv_list_outfile for writting, $!";
+
+my $present_indiv_data_outfile = join('/', $output_dir, join("_", $project_name, "present_indivs_data.txt"));
+open(OUTFILE3, ">$present_indiv_data_outfile") or die "Couldn't open file $present_indiv_data_outfile for writting, $!";
+print OUTFILE3 join("\t", "individual_id", "percent_present_data", "percent_missing_data", "present_data_count", "missing_data_count", "total_data_count") . "\n";
+my $num_indivs = 0;
+foreach my $individual_id (sort {$a cmp $b} keys %locus_counts_indivs){
+
+    my $present_data_indiv_count = 0;
+    if(defined($locus_counts_indivs{$individual_id}{"PRESENT_DATA"})){
+        $present_data_indiv_count = $locus_counts_indivs{$individual_id}{"PRESENT_DATA"};
+    }
+
+    my $missing_data_indiv_count = 0;
+    if(defined($locus_counts_indivs{$individual_id}{"MISSING_DATA"})){
+        $missing_data_indiv_count = $locus_counts_indivs{$individual_id}{"MISSING_DATA"};
+    }
+
+    my $total_data_indiv_count = ($present_data_indiv_count + $missing_data_indiv_count);
+    die "individual id: $individual_id total data: $total_data_indiv_count ne number of characters: $nexus_nchar_length" if($total_data_indiv_count ne $nexus_nchar_length);
+    my $perc_present_indiv_data = ($present_data_indiv_count/$total_data_indiv_count);
+    my $perc_missing_indiv_data = ($missing_data_indiv_count/$total_data_indiv_count);
+    #warn "$individual_id ($present_data_indiv_count/$total_data_indiv_count) * 100" . " " . ($present_data_indiv_count/$total_data_indiv_count) . " " . $present_data_indiv_count . " missing data = $missing_data_indiv_count";
+
+    # Grab the individual ids that pass the present data filter test.
+    if($perc_present_indiv_data >= $percent_present_indiv_data){
+        #warn $individual_id . "\n";
+        print OUTFILE1 $individual_id . "\n";
+        $nexus_indiv_list{$individual_id} = $individual_id;
+        $num_indivs++;
+    }else{
+        print OUTFILE2 $individual_id . "\n";
+    }
+
+    print OUTFILE3 join("\t", $individual_id, ($perc_present_indiv_data * 100), ($perc_missing_indiv_data * 100), $present_data_indiv_count, $missing_data_indiv_count, $total_data_indiv_count) . "\n";
+}
+close(OUTFILE1) or die "Couldn't close file $present_indiv_list_outfile";
+close(OUTFILE2) or die "Couldn't close file $missing_indiv_list_outfile";
+close(OUTFILE3) or die "Couldn't close file $present_indiv_data_outfile";
+
+# Print out the locus metadata contents in nexus file format.
 my $nexus_outfile = join('/', $output_dir, join("_", $project_name, "stacks_nexus_file.nex"));
 open(OUTFILE, ">$nexus_outfile") or die "Couldn't open file $nexus_outfile for writting, $!";
 print OUTFILE "#NEXUS" . "\n";
