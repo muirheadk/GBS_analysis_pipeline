@@ -617,24 +617,28 @@ sub find_files{
 #
 # $uncompressed_fastq_file - The uncompressed fastq file path.
 sub gunzip_fastq_file{
-	
-	# The fastq file to uncompress using gunzip.
-	my $fastq_file = shift;
-	die "Error lost the fastq file to uncompress using gunzip" unless defined $fastq_file;
-	
-	my ($fastq_filename, $fastq_dir) = fileparse($fastq_file, qr/\.fastq.gz/);
-
-	# Split the fastq filename so that we can get the individual id.
-	my @split_fastq_filename = split(/_/, $fastq_filename);
-	my $individual_id = $split_fastq_filename[0];
-	
-	my $uncompressed_fastq_file = join('/', $fastq_dir, $individual_id . ".fastq");
-	
-	unless(-s $uncompressed_fastq_file){
-		warn "Calling gunzip for $fastq_file....\n";
-		my $gunzipCmd  = "$gunzip -c $fastq_file > $uncompressed_fastq_file";
-		warn $gunzipCmd . "\n\n";
-		system($gunzipCmd) == 0 or die "Error calling $gunzipCmd: $?";
-	}
-	return $uncompressed_fastq_file;
+    
+    # The fastq file to uncompress using gunzip.
+    my $fastq_file = shift;
+    die "Error lost the fastq file to uncompress using gunzip" unless defined $fastq_file;
+    
+    my ($fastq_filename, $fastq_dir, $individual_id) = "";
+    if($fastq_file =~ m/trimmed_offset_\d+\.fastq\.gz/){
+        # get the basename of the fastq filename without the _trimmed_offset_\d+\.fastq extension.
+        ($fastq_filename, $fastq_dir) = fileparse($fastq_file, qr/_trimmed_offset_\d+\.fastq\.gz/);
+        $individual_id = $fastq_filename;
+    }else{
+        # get the basename of the fastq filename without the \.fastq extension.
+        ($fastq_filename, $fastq_dir) = fileparse($fastq_file, qr/\.fastq/);
+        $individual_id = $fastq_filename;
+    }
+    my $uncompressed_fastq_file = join('/', $fastq_dir, $individual_id . ".fastq");
+    
+    unless(-s $uncompressed_fastq_file){
+        warn "calling gunzip for $fastq_file....\n";
+        my $gunzipCmd  = "$gunzip -c $fastq_file > $uncompressed_fastq_file";
+        warn $gunzipCmd . "\n\n";
+        system($gunzipCmd) == 0 or die "Error calling $gunzipCmd: $?";
+    }
+    return $uncompressed_fastq_file;
 }
