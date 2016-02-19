@@ -19,9 +19,9 @@ my ($gbs_fastq_dir, $gbs_fastq_file_type, $cstacks_catalog_prefix, $use_existing
 
 GetOptions(
 	'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (padded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
-    't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
-    'p=s'    => \$cstacks_catalog_prefix, # The cstacks catalog prefix file path consisting of a set of consensus loci built from a set of samples processed by the pstacks program. i.e. /path/to/catalog/batch_1
-    'e=s'    => \$use_existing_catalog, # The use existing catalog bitwise flag. If true add data to the existing catalog, Otherwise run the default cstacks program. Default: false
+    	't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
+    	'p=s'    => \$cstacks_catalog_prefix, # The cstacks catalog prefix file path consisting of a set of consensus loci built from a set of samples processed by the pstacks program. i.e. /path/to/catalog/batch_1
+    	'e=s'    => \$use_existing_catalog, # The use existing catalog bitwise flag. If true add data to the existing catalog, Otherwise run the default cstacks program. Default: false
 	'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
 	'd=s'    => \$min_depth_coverage_ustacks, # The minimum depth of coverage to report a stack. Default: 5
 	'm=s'    => \$max_nuc_distance_ustacks, # The maximum distance (in nucleotides) allowed between stacks. Default: 2
@@ -529,15 +529,18 @@ sub sstacks{
     my @sstacks_soptions = ();
     # Iterate through each ustacks tags output file with extension *.tags.tsv and execute the cstacks program.
     foreach my $file_name (sort keys %{$ustacks_tags_files}){
-        my $ustacks_tags_infile = $ustacks_tags_files->{$file_name};
+    	
+	if($file_name !~ m/batch_\d+\.catalog\.tags\.tsv/){ # If *.tags.tsv file does not match batch_*.catalog.tags.tsv.
+        	my $ustacks_tags_infile = $ustacks_tags_files->{$file_name};
         
-        # Get the basename of the tags filename without the .tags.tsv extension.
-        my $ustacks_filename = fileparse($ustacks_tags_infile, qr/\.tags.tsv/);
+        	# Get the basename of the tags filename without the .tags.tsv extension.
+        	my $ustacks_filename = fileparse($ustacks_tags_infile, qr/\.tags.tsv/);
         
-        # Obtain a list of all the file prefix paths specifed by the -s option for cstacks.
-        warn "Processing " . $ustacks_filename . ".....\n";
-        my $sstacks_infile = join('/', $stacks_output_dir, $ustacks_filename);
-        push(@sstacks_soptions, "-s $sstacks_infile ");
+        	# Obtain a list of all the file prefix paths specifed by the -s option for cstacks.
+        	warn "Processing " . $ustacks_filename . ".....\n";
+        	my $sstacks_infile = join('/', $stacks_output_dir, $ustacks_filename);
+        	push(@sstacks_soptions, "-s $sstacks_infile ");
+	}
     }
     
 	#### USED PARAMETERS ####
