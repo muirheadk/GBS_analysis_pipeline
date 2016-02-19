@@ -409,15 +409,17 @@ sub sstacks{
     my @sstacks_soptions = ();
     # Iterate through each ustacks tags output file with extension *.tags.tsv and execute the cstacks program.
     foreach my $file_name (sort keys %{$ustacks_tags_files}){
-        my $ustacks_tags_infile = $ustacks_tags_files->{$file_name};
+    	if($file_name !~ m/batch_\d+\.catalog\.tags\.tsv/){ # If *.tags.tsv file does not match batch_*.catalog.tags.tsv.
+        	my $ustacks_tags_infile = $ustacks_tags_files->{$file_name};
         
-        # Get the basename of the tags filename without the .tags.tsv extension.
-        my $ustacks_filename = fileparse($ustacks_tags_infile, qr/\.tags.tsv/);
+        	# Get the basename of the tags filename without the .tags.tsv extension.
+        	my $ustacks_filename = fileparse($ustacks_tags_infile, qr/\.tags.tsv/);
         
-        # Obtain a list of all the file prefix paths specifed by the -s option for cstacks.
-        warn "Processing " . $ustacks_filename . ".....\n";
-        my $sstacks_infile = join('/', $stacks_output_dir, $ustacks_filename);
-        push(@sstacks_soptions, "-s $sstacks_infile ");
+        	# Obtain a list of all the file prefix paths specifed by the -s option for cstacks.
+        	warn "Processing " . $ustacks_filename . ".....\n";
+        	my $sstacks_infile = join('/', $stacks_output_dir, $ustacks_filename);
+        	push(@sstacks_soptions, "-s $sstacks_infile ");
+    	}
     }
     
 	#### USED PARAMETERS ####
