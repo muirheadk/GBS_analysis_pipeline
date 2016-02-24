@@ -44,28 +44,17 @@ $percent_present_indiv_data = 0.75 unless defined $percent_present_indiv_data;
 sub usage {
 
 die <<"USAGE";
-
-
 Usage: $0 -i stacks_input_dir -f stacks_fasta_infile -n project_name -w whitelist_infile -p percent_present_locus_data -d percent_present_indiv_data -o output_dir
-
 DESCRIPTION - This program generates a file in NEXUS file format from a Stacks fasta formatted file from population stacks.
-
 OPTIONS:
-
 -i stacks_fasta_infile - The Population Stacks write_single_snp fasta formatted input file.
-
 -m stacks_popmap_infile - The Stacks population map formatted input file.
-
 -n project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output file names.
-
 -w whitelist_infile - The whitelist input file containing the locus ids to keep after passing the present data filter. If not specified all locus ids that passed the present data filter will be used to generate the nexus file.    
-
 -p percent_present_locus_data - The percent of present data at a locus across all individuals. percent_present_locus_data = (present_data_locus/(present_data_locus + missing_data_locus)) Default: 0.75
     
 -d percent_present_indiv_data - The percent of present data for an individual across all characters. percent_present_indiv_data = (present_data_indiv/(present_data_indiv + missing_data_indiv)) Default: 0.75
-
 -o output_dir - The directory to contain all the output files.
-
 USAGE
 }
 
@@ -317,7 +306,7 @@ foreach my $locus_id (sort {$a <=> $b} keys %locus_catalog_counts){
     #warn "$locus_id ($present_data_locus_count/$total_data_locus_count) * 100" . " " . ($present_data_locus_count/$total_data_locus_count) . " " . $present_data_locus_count . " missing data = $missing_data_locus_count";
 
     # Grab the locus ids that pass the present data filter test.
-    if($perc_present_locus_data >= $percent_present_locus_data){
+    if(($perc_present_locus_data >= $percent_present_locus_data) and ($perc_present_locus_data <= 1)){
         print OUTFILE1 $locus_id . "\n";
         $nexus_loci_list{$locus_id} = $locus_id;
     }else{
@@ -332,11 +321,14 @@ close(OUTFILE3) or die "Couldn't close file $present_locus_data_outfile";
 
 # Adding locus sequences in a hash array in order to concatenate the sequences.
 my %nexus_seqs = ();
+# Get the number of characters based on the unique length of each locus sequence.
+my $nexus_nchar_length = 0;
 if($whitelist_infile eq ""){
     foreach my $locus_id (sort {$a <=> $b} keys %nexus_loci_list){
         foreach my $individual_id (sort {$a cmp $b} keys %sample_names){
             push(@{$nexus_seqs{$individual_id}}, $locus_catalog_data{$locus_id}{$individual_id});
         }
+        $nexus_nchar_length += $locus_id_seq_length{$locus_id};
     }
 }elsif(-s $whitelist_infile){
     
@@ -358,38 +350,37 @@ if($whitelist_infile eq ""){
         foreach my $individual_id (sort {$a cmp $b} keys %sample_names){
             push(@{$nexus_seqs{$individual_id}}, $locus_catalog_data{$locus_id}{$individual_id});
         }
+        $nexus_nchar_length += $locus_id_seq_length{$locus_id};
     }
 }else{
     die "$whitelist_infile does not exist";
 }
 
-# Get the number of characters based on the unique length of each locus sequence.
-my $nexus_nchar_length = 0;
-foreach my $locus_id (sort {$a <=> $b} keys %nexus_loci_list){
-	$nexus_nchar_length += $locus_id_seq_length{$locus_id};
-}
-
 # Get the present, missing, and total number of characaters in the data set for each individual.
 my %locus_counts_indivs = ();
-    foreach my $individual_id (sort {$a cmp $b} keys %sample_names){
+foreach my $individual_id (sort {$a cmp $b} keys %sample_names){
 
-	my $nexus_concat_seq = join("", @{$nexus_seqs{$individual_id}});
-    	my $concat_seq_length = length($nexus_concat_seq);
-	my @sequence_characters = split('', $nexus_concat_seq);
-	foreach my $character (@sequence_characters) {
-        	if($character =~ m/[ACGTNRYSWKM]/){
+    if(defined(@{$nexus_seqs{$individual_id}})){
+        my $nexus_concat_seq = join("", @{$nexus_seqs{$individual_id}});
+        my $concat_seq_length = length($nexus_concat_seq);
+        my @sequence_characters = split('', $nexus_concat_seq);
+        foreach my $character (@sequence_characters) {
+                if($character =~ m/[ACGTNRYSWKM]/){
 
-            		#warn join("\t", $locus_id, $individual_id, "$sequence is DNA characters");
+                        #warn join("\t", $locus_id, $individual_id, "$sequence is DNA characters");
 
-            		$locus_counts_indivs{$individual_id}{"PRESENT_DATA"}++;
+                        $locus_counts_indivs{$individual_id}{"PRESENT_DATA"}++;
 
-        	}elsif($character eq '?'){
+                }elsif($character eq '?'){
 
-            		#warn join("\t", $locus_id, $individual_id, "$sequence is ?s");
+                        #warn join("\t", $locus_id, $individual_id, "$sequence is ?s");
 
-            		$locus_counts_indivs{$individual_id}{"MISSING_DATA"}++;
-        	}
-	}
+                        $locus_counts_indivs{$individual_id}{"MISSING_DATA"}++;
+                }
+        }
+    }else{
+        die "Cannot process number of characters at an individual due to an insufficient number of locus sequences present. There were no locus ids that passed the percent_present_locus_data filter constraint. Please see the \$present_locus_list_outfile and rerun the script using at least the minimum percent_present_locus_data value in the file.\n$present_locus_list_outfile";
+    }
 }
 
 # Calculating the percentage of missing data to present data. Using the amount of present data we calculate percent present data as $perc_present_indiv_data = ($present_data_indiv_count/$total_data_indiv_count).
@@ -423,7 +414,7 @@ foreach my $individual_id (sort {$a cmp $b} keys %locus_counts_indivs){
     #warn "$individual_id ($present_data_indiv_count/$total_data_indiv_count) * 100" . " " . ($present_data_indiv_count/$total_data_indiv_count) . " " . $present_data_indiv_count . " missing data = $missing_data_indiv_count";
 
     # Grab the individual ids that pass the present data filter test.
-    if($perc_present_indiv_data >= $percent_present_indiv_data){
+    if(($perc_present_indiv_data >= $percent_present_indiv_data) and ($perc_present_indiv_data <= 1)){
         #warn $individual_id . "\n";
         print OUTFILE1 $individual_id . "\n";
         $nexus_indiv_list{$individual_id} = $individual_id;
