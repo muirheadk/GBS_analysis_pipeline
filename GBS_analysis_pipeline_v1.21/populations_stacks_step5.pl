@@ -58,6 +58,8 @@ sub usage {
 
 die <<"USAGE";
 
+Usage: $0 -P stacks_dir -M pop_map_infile -b batch_num -p min_num_pops_locus -r min_percent_indvs_pop -m min_stack_depth -a min_allele_freq -f outfile_type -t num_cpu_cores -o output_dir
+
 VERSION 1.21
 
 DESCRIPTION – Program that executes the Stacks populations program that analyzes a population of individual samples given a population map file that designates what individual belongs to what population. The populations program computes a number of population genetics statistics as well as exporting a variety of standard output formats such as fasta and structure formats.
