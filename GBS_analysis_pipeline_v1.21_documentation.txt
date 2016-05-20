@@ -1,0 +1,426 @@
+# Generate Barcode Files
+
+# Program Dependencies - None
+
+# Input - GBS_shipment_infile (example https://github.com/muirheadk/GBS_analysis_pipeline/blob/master/FILES_FOR_GBS_ANALYSIS/PstI_MspI_Datasets/SBW_GBS_Analysis_tutorial/SBW_GBS_Shipment_file.txt)
+
+# Input - barcodes_legend_infile (example https://github.com/muirheadk/GBS_analysis_pipeline/blob/master/FILES_FOR_GBS_ANALYSIS/PstI_MspI_Datasets/SBW_GBS_Analysis_tutorial/PstI_MspI_barcodes_legend.txt)
+  
+Usage: generate_barcode_files_step1.pl -i GBS_shipment_infile -l barcodes_legend_infile -o barcodes_output_dir
+
+VERSION 1.21
+    
+DESCRIPTION - This program generates barcode input files for input into the Stacks fastq_quality_barcode_splitter.pl script. Takes a GBS shipment file and barcode legend file as input. Generates a barcode file for each GBS plate listed in the GBS shipment file.
+
+OPTIONS:
+
+-i GBS_shipment_infile - The GBS shipment file in tab-delimited format (i.e. GBS_Shipment_GQ03122013_5.txt)
+
+	e.g. /path/to/GBS_Shipment_GQ03122013_5.txt
+
+-l barcodes_legend_infile - The barcodes legend file in tab-delimited format (i.e. PstI_MspI_barcodes_legend.txt)
+
+	e.g. /path/to/PstI_MspI_barcodes_legend.txt
+
+-o barcodes_output_dir - The absolute path to the output directory to contain the barcodes output files
+
+	e.g. /path/to/barcodes_output_dir
+
+
+
+# Filter Raw FASTQ files based on phred quality scores and demultiplex into individual sample FASTQ files.
+
+
+# Program Dependencies - Perl Modules File::Basename and File::Copy
+# Can download and install using CPAN
+# cpan install File::Basename
+# cpan install File::Copy
+
+Usage: fastq_quality_barcode_splitter_step2a.pl -i single_end_fastq_infile -1 first_paired_end_fastq_infile -2 second_paired_end_fastq_infile -r restriction_enzymes -e encoded_phred_offset -w sliding_window_size -s quality_score_limit -l gbs_sequence_length -b barcode_infile -c barcode_option -n num_mismatches -o output_dir
+
+VERSION 1.21
+    
+DESCRIPTION - This program performs a quality assessment and quality control filtering step to filter out GBS fastq reads that do not meet the quality threshold given in the quality scores. It also demultiplexes the original raw bulk GBS fastq file based on barcode into separate samples that include the barcode in the filename. The quality filtering and quality threshold steps are performed using the process_radtags program in the STACKS software suite. Once the raw fastq file is demultiplexed by barcode the resulting files are renamed corresponding to the individual name, plate/well number, and barcode sequence and copied to the corresponding project leader directory.
+
+OPTIONS:
+
+-i single_end_fastq_infile - The absolute path to the bulk fastq input file to split sequences based on barcode sequences if processing single-end seqeunces. Can either be *.fastq or *.fastq.gz extension.
+
+-1 first_paired_end_fastq_infile - The absolute path to the first bulk fastq input file in a set of paired-end sequences to split sequences based on barcode sequences. Can either be *.fastq or *.fastq.gz extension.
+
+-2 second_paired_end_fastq_infile - The absolute path to the second bulk fastq input file in a set of paired-end sequences to split sequences based on barcode sequences. Can either be *.fastq or *.fastq.gz extension.
+
+-r restriction_enzymes - The restriction enzyme(s) used to digest the genomic sequences. Can be ApeKI, PstI/MspI, or SbfI/MspI. Default: PstI/MspI
+
+-e encoded_phred_offset - The fastq quality score encoding used in the Illumina sequencing run.  Use phred33 for Illumina 1.8+ and Sanger or phred64 for Illumina 1.3 to 1.5. Default: phred33
+
+-w sliding_window_size - The size of the sliding window as a fraction of the read length between 0 and 1. Default: 0.15
+
+-s quality_score_limit - The quality score limit. If the average score within the sliding window drops below this value, the read is discarded. Default: 20
+
+-t gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
+
+-b barcode_infile - The absolute path to the barcodes input file used to split sequences into individual fastq output files.
+
+-c barcode_option - The barcode option for whether or not single-end or paired-end barcodes are within the FASTQ header or inline with sequence. Default: inline_null
+
+	Can be one of the following;
+
+	inline_null: barcode is inline with sequence, occurs only on single-end read (default).
+	index_null: barcode is provded in FASTQ header, occurs only on single-end read.
+	inline_inline: barcode is inline with sequence, occurs on single and paired-end read.
+	index_index: barcode is provded in FASTQ header, occurs on single and paired-end read.
+	inline_index: barcode is inline with sequence on single-end read, occurs in FASTQ header for paired-end read.
+	index_inline: barcode occurs in FASTQ header for single-end read, is inline with sequence on paired-end read.
+
+-n num_mismatches - The number of mismatches allowed within the barcode sequences. Default: 0
+
+-o output_dir - The absolute path to the output directory to contain the split *.fastq output files.
+
+
+# Filter Multiple Raw FASTQ files based on phred quality scores and demultiplex into individual sample FASTQ files.
+
+# Program Dependencies - Perl Modules File::Basename
+# Can download and install using CPAN
+# cpan install File::Basename
+
+Usage: execute_multi_fastq_barcode_splitter_step2b.pl -i GBS_barcode_sample_index_file -r restriction_enzymes -e encoded_phred_offset -w sliding_window_size -s quality_score_limit -l gbs_sequence_length -b barcode_infile -c barcode_option -n num_mismatches -c num_threads -o output_dir
+
+VERSION 1.21
+    
+DESCRIPTION - This program performs a quality assessment and quality control filtering step to filter out GBS fastq reads that do not meet the quality threshold given in the quality scores. It also demultiplexes the original raw bulk GBS fastq file based on barcode into separate samples that include the barcode in the filename. The quality filtering and quality threshold steps are performed using the process_radtags program in the STACKS software suite. Once the raw fastq file is demultiplexed by barcode the resulting files are renamed corresponding to the individual name, plate/well number, and barcode sequence and copied to the corresponding project leader directory.
+        
+-i GBS_barcode_sample_index_file - The GBS barcode sample index input file.
+    
+    
+-r restriction_enzymes - The restriction enzyme(s) used to digest the genomic sequences. Can be ApeKI, PstI/MspI, or SbfI/MspI. Default: PstI/MspI
+
+-e encoded_phred_offset - The fastq quality score encoding used in the Illumina sequencing run.  Use phred33 for Illumina 1.8+ and Sanger or phred64 for Illumina 1.3 to 1.5. Default: phred33
+
+-w sliding_window_size - The size of the sliding window as a fraction of the read length between 0 and 1. Default: 0.15
+
+-s quality_score_limit - The quality score limit. If the average score within the sliding window drops below this value, the read is discarded. Default: 20
+
+-t gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
+
+-c barcode_option - The barcode option for whether or not single-end or paired-end barcodes are within the FASTQ header or inline with sequence. Default: inline_null
+
+Can be one of the following;
+    
+inline_null: barcode is inline with sequence, occurs only on single-end read (default).
+index_null: barcode is provded in FASTQ header, occurs only on single-end read.
+inline_inline: barcode is inline with sequence, occurs on single and paired-end read.
+index_index: barcode is provded in FASTQ header, occurs on single and paired-end read.
+inline_index: barcode is inline with sequence on single-end read, occurs in FASTQ header for paired-end read.
+index_inline: barcode occurs in FASTQ header for single-end read, is inline with sequence on paired-end read.
+        
+-n num_mismatches - The number of mismatches allowed within the barcode sequences. Default: 0
+
+-h num_threads - The number of cpu threads to use for the stacks programs. Default: 1
+        
+-o output_dir - The absolute path to the output directory to contain the split *.fastq output files.
+
+
+# Trim the common adapter off the 3’ end of each read for all individual sample FASTQ files.
+
+# Program Dependencies - Perl Modules File::Basename and Parallel::Loops
+# Can download and install using CPAN
+# cpan install File::Basename
+# cpan install Parallel::Loops
+
+# Program dependencies - The absolute path to gzip to compress all project leader *.fastq input files. Edit the following on line 66 of the script.
+
+line 66: my $gzip 				= '/bin/gzip';
+
+Usage: trim_adapter_fastq_parallel_regex_step3.pl -i fastq_file_dir -p project_name -r restriction_enzymes -l gbs_sequence_length -m adapter_length_min_threshold -t adapter_trim_offset -q min_trimmed_fastq_sequence_length -s gzip_files_switch -c regex_num_cpu -o output_dir
+
+VERSION 1.21
+
+DESCRIPTION - This program trims the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
+
+OPTIONS:
+
+-i fastq_file_dir - The *.fastq input file directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+	e.g. /path/to/fastq_file_dir
+	
+-p project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
+	e.g. SBW_TUTORIAL
+	
+-r restriction_enzymes - The restriction enzyme(s) used to digest the genomic sequences. Can be ApeKI, PstI/MspI, or SbfI/MspI. Default: PstI/MspI
+
+-l gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
+
+-m adapter_length_min_threshold - The minimum GBS common adapter sequence length cut-off in base pairs (bps) to retain for trimming if found in a given GBS fastq sequence hit found in the adapter regex searches. Default: 16
+
+-t adapter_trim_offset - The trimming offset length in base pairs (bps) to trim upstream of the start of the GBS common adapter sequence found in the adapter regex searches. Default: 5
+
+-q min_trimmed_fastq_sequence_length - The minimum trimmed fastq sequence length in base pairs (bps) to retain after trimming. Keep in mind that this is the minimum trimmed fastq sequence length used before we add the 
+length of the barcode used for splitting each individual fastq file. Tassel required sequences at least 32 base pairs (bps) plus the length of a particular barcode that can be in the range of 4-8 base pairs (bps) in 
+length. Default: 32
+
+-n pad_sequences - The padded sequence controller. Specify true for padded trimmed sequences or false for unpadded trimmed sequences. Default: false
+    
+-s gzip_files_switch - The gzip compression switch. Specify true for compressing file or false for not compressing files (saves time). Default: false
+    
+-c regex_num_cpu - The number of cpu cores to use for the adapter regex searches. Default: 1
+
+-o output_dir - The absolute path to the output directory to contain the trimmed adapter sequence fastq output files.
+
+	e.g. /path/to/output_dir
+    
+
+# Align quality filtered, demultiplexed, and trimmed FASTQ files to the reference genome specified, remove unmapped and non unique aligned reads, filter by mapping quality, and execute stacks to generate a locus catalog and match each locus of each individual sample to the catalog in preparation for variant calling with populations
+
+# Program Dependencies - Perl Modules IPC::Open2, File::Basename, and File::Copy
+# Can download and install using CPAN
+# cpan install File::Basename
+# cpan install File::Copy
+# cpan install IPC::Open2
+
+# Program dependencies - The absolute paths to gunzip to uncompress fastq.gz input files, BWA alignment program, and Stacks related programs. Edit the following on lines 81 - 85 of the script to reflect the absolute path location of the programs on your computer. 
+
+# Download gunzip
+
+# Ubuntu
+apt-get install gunzip
+
+# MacOSX
+brew install gunzip
+
+Download BWA (http://bio-bwa.sourceforge.net/)
+
+Download Stacks (http://catchenlab.life.illinois.edu/stacks/)
+
+line 81: $gunzip				= '/bin/gunzip';
+line 82: $bwa				= '/global/software/bwa/bwa0712/bin/bwa';
+line 83: $pstacks			= '/global/software/stacks/stacks131/bin/pstacks';
+line 84: $cstacks			= '/global/software/stacks/stacks131/bin/cstacks';
+line 85: $sstacks			= '/global/software/stacks/stacks131/bin/sstacks';
+
+Usage: refgen_stacks_analysis_pipeline_step4a.pl -i gbs_fastq_dir -t gbs_fastq_file_type -g refgen_infile -p cstacks_catalog_prefix -e use_existing_catalog -l gbs_sequence_length -b stacks_sql_id -d min_depth_coverage_pstacks -a alpha_value_pstacks -s num_mismatches_tag -m sam_mapq_threshold -c num_threads -o output_dir
+   
+    
+VERSION 1.21
+    
+DESCRIPTION - This program takes the quality filtered, demultiplexed, and adapter trimmed *.fastq input files (unpadded) and reference genome fasta input files as input. Converts the reference genome fasta file to BWA input format by renumerating the fasta headers and generates a table of contents file referencing the sequence headers to the new BWA input format sequence headers. It then performs a BWA alignment to align the GBS fastq sequences to the reference genome. It then executes the pstacks program, which extracts sequence stacks that were aligned to the reference genome using the BWA alignment program and identifies SNPs. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
+    
+OPTIONS:
+    
+-i gbs_fastq_dir - The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (unpadded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+
+-t gbs_fastq_file_type - The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
+
+-g refgen_infile - The absolute path to the reference genome input fasta file to align GBS fastq sequences using the BWA alignment program.
+
+-p cstacks_catalog_prefix - The cstacks catalog prefix file path consisting of a set of consensus loci built from a set of samples processed by the pstacks program. i.e. /path/to/catalog/batch_1
+
+-e use_existing_catalog - The use existing catalog bitwise flag. If true add data to the existing catalog, Otherwise run the default cstacks program. Default: false
+
+-l gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
+
+-b stacks_sql_id - The SQL ID to insert into the output to identify this sample. Default: 1
+
+-d min_depth_coverage_pstacks - The minimum depth of coverage to report a stack. Default: 5
+
+-a alpha_value_pstacks - The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
+
+-s num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog. Default: 1
+
+-m sam_mapq_threshold - The mapping quality score threshold filter for sam alignments. Any mapq score below this value is filtered out of the sam alignment files. Default: 20
+
+-c num_threads - The number of cpu cores to use for the stacks programs. Default: 2
+
+-o output_dir - The absolute path to the output directory to contain the renumerated reference genome, BWA, and Stacks output files and directories.
+
+
+# Execute stacks to perform a denovo assembly on the quality filtered, demultiplexed, and trimmed FASTQ files to generate a locus catalog and match each locus of each individual sample to the catalog in preparation for variant calling with populations.
+
+# Program Dependencies - Perl Modules File::Basename and File::Copy
+# Can download and install using CPAN
+# cpan install File::Basename
+# cpan install File::Copy
+
+# Program dependencies - The absolute paths to gunzip to uncompress bulk compressed fastq.gz input file if present and stacks related programs. Edit the following on lines 79 - 82 of the script to reflect the absolute path location of the programs on your computer. 
+
+# Download gunzip
+
+# Ubuntu
+apt-get install gunzip
+
+# MacOSX
+brew install gunzip
+
+Download Stacks (http://catchenlab.life.illinois.edu/stacks/)
+
+line 79: $gunzip				= '/bin/gunzip';
+line 80: $ustacks			= '/global/software/stacks/stacks131/bin/ustacks';
+line 81: $cstacks			= '/global/software/stacks/stacks131/bin/cstacks';
+line 82: $sstacks			= '/global/software/stacks/stacks131/bin/stacks'; 
+
+
+Usage: unique_stacks_analysis_pipeline_step4b.pl -i gbs_fastq_dir -t gbs_fastq_file_type -p cstacks_catalog_prefix -e use_existing_catalog -b stacks_sql_id -d min_depth_coverage_pstacks -m max_nuc_distance_ustacks -n max_align_distance_ustacks -a alpha_value_ustacks -l max_locus_stacks -s num_mismatches_tag -c num_threads -o output_dir
+
+VERSION 1.21
+
+DESCRIPTION - This program takes the quality filtered, demultiplexed, and adapter trimmed GBS *.fastq files (padded) as input. It executes the ustacks program, which extracts sequence stacks using a denovo assembly approach to form exact matching stacks. Comparing the stacks it will form a set of loci and detect SNPs at each locus using a maximum likelihood framework. These sequence stacks are then processed using cstacks and sstacks to obtain the filtered SNP stacks output files.
+
+OPTIONS:
+
+-i gbs_fastq_dir - The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (padded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+
+-t gbs_fastq_file_type - The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
+    
+-g refgen_infile - The absolute path to the reference genome input fasta file to align GBS fastq sequences using the BWA alignment program.
+    
+-p cstacks_catalog_prefix - The cstacks catalog prefix file path consisting of a set of consensus loci built from a set of samples processed by the pstacks program. i.e. /path/to/catalog/batch_1
+
+-b stacks_sql_id - The SQL ID to insert into the output to identify this sample.
+
+-d min_depth_coverage_pstacks - The minimum depth of coverage to report a stack. Default: 5
+
+-m max_nuc_distance_ustacks - Maximum distance (in nucleotides) allowed between stacks. Default: 2
+    
+-n max_align_distance_ustacks - The maximum distance allowed to align secondary reads to primary stacks. Default: 3
+    
+-a alpha_value_ustacks - The chi square significance level required to call a heterozygote or homozygote, either 0.1, 0.05, 0.01, or 0.001. Default: 0.05
+
+-l max_locus_stacks - The maximum number of stacks at a single de novo locus. Default: 6
+
+-s num_mismatches_tag - The number of mismatches allowed between sample tags when generating the catalog. Default: 1
+
+-c num_threads - The number of cpu cores to use for the stacks programs. Default: 2
+
+-o output_dir - The absolute path to the output directory to contain the Stacks output files and directories.
+
+
+# Run population on the stacks output directory to call variants (SNPs).
+
+# Program Dependencies - Perl Modules File::Basename and File::Copy
+# Can download and install using CPAN
+# cpan install File::Basename
+# cpan install File::Copy
+
+# Program dependencies - The absolute paths to stacks populations program. Edit the following on line 55 of the script to reflect the absolute path location of the programs on your computer. 
+
+Download Stacks (http://catchenlab.life.illinois.edu/stacks/)
+
+line 55: my $populations			= '/usr/local/bin/populations';stacks'; 
+
+Usage: populations_stacks_step5.pl -P stacks_dir -M pop_map_infile -b batch_num -p min_num_pops_locus -r min_percent_indvs_pop -m min_stack_depth -a min_allele_freq -f outfile_type -t num_cpu_cores -o output_dir
+
+VERSION 1.21
+
+DESCRIPTION – Program that executes the Stacks populations program that analyzes a population of individual samples given a population map file that designates what individual belongs to what population. The populations program computes a number of population genetics statistics as well as exporting a variety of standard output formats such as fasta and structure formats.
+
+OPTIONS:
+
+-P stacks_dir - The absolute path to the Stacks output files.
+
+-M pop_map_infile - The  absolute path to the population map, a tab separated file describing which individuals belong in which population.
+
+-b batch_num - The batch ID to examine when exporting from the catalog.
+
+-p min_num_pops_locus - The minimum number of populations a locus must be present in to process a locus. Default: 2
+
+-r min_percent_indvs_pop - The minimum percentage of individuals in a population required to process a locus for that population.  Default: 0
+
+-m min_stack_depth - The minimum stack depth required for individuals at a locus. Default: 10
+
+-a min_allele_freq - The minimum minor allele frequency required before calculating Fst at a locus (0 < a < 0.5). Default: 0.05
+
+-f outfile_type – The output file format type. Outputs the full sequence for each allele, from each sample locus in FASTA format, Population structure for each allele, from each sample locus in Structure format, etc. Can be either fasta, structure, fasta_single_snp, structure_single_snp, write_singleDefault: 'fasta'
+
+-t num_cpu_cores - The number of threads to run in parallel sections of code. Default: 2
+
+-o output_dir - The absolute path to the output directory to contain the populations stacks output files and directories.
+
+# Program to filter out erroneous SNPs generated within the artificial poly-A tail. Usually occurs right before the poly-A tail starts.
+
+# Program Dependencies - Perl Modules Parallel::Loops
+# Can download and install using CPAN
+# cpan install Parallel::Loops
+
+Usage: filter_erroneous_denovo_snps_step6b.pl -i fastq_file_dir -f stacks_fasta_infile -p project_name -l gbs_sequence_length -t trim_polyA -c num_cpu_cores -o output_dir
+
+VERSION 1.21
+
+DESCRIPTION - This program filters erroneous SNPs called within the denovo stacks analysis pipeline. SNPs called within the artifical poly-A sequence are flagged and filtered from the fasta formatted file generated from population stacks program. The program generates a filtered fasta formatted file and locus id list as output. It also generates a locus id list of locus ids that were removed from the original fasta file and a fasta formatted file containing all locus sequences that were flagged and removed.
+
+OPTIONS:
+
+-i fastq_file_dir - The absolute path to the trimmed *.fastq input file directory that contains files trimmed of the common adapter sequence with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+	e.g. /path/to/fastq_file_dir
+
+-f stacks_fasta_infile - The absolute path to the fasta formatted input file generated from the Stacks populations program.
+
+-p project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output directories and files with the specifed output directory.
+	e.g. SBW_TUTORIAL
+	
+-l gbs_sequence_length - The GBS fastq sequence length in base pairs (bps) common to all GBS fastq sequences. Default: 92
+
+-t trim_polyA - The trim poly-A sequence flag. If true, trim the poly-A sequence off the 3' end of the locus sequence of each individual. Otherwise, do not trim the poly-A sequence at a particular locus sequence. Default: true
+
+-c num_cpu_cores - The number of cpu cores to use for filtering erroneous SNPs. Default: 1
+
+-o output_dir - The absolute path to the output directory to write the filtered and removed SNPs locus id lists and fasta files.
+
+	e.g. /path/to/output_dir
+
+
+Usage: convert_stacks_fasta2nexus.pl -i stacks_input_dir -f stacks_fasta_infile -n project_name -w whitelist_infile -p percent_present_locus_data -d percent_present_indiv_data -o output_dir
+
+VERSION 1.21
+
+DESCRIPTION - This program generates a file in NEXUS file format from a Stacks fasta formatted file from population stacks.
+
+OPTIONS:
+
+ -i stacks_fasta_infile - The Population Stacks write_single_snp fasta formatted input file.
+ 
+-m stacks_popmap_infile - The Stacks population map formatted input file.
+ 
+-n project_name - The name of the Genotyping by Sequencing (GBS) project, which is used to generate the output file names.
+
+-w whitelist_infile - The whitelist input file containing the locus ids to keep after passing the present data filter. If not specified all locus ids that passed the present data filter will be used to generate the nexus file.    
+
+-p percent_present_locus_data - The percent of present data at a locus across all individuals. percent_present_locus_data = (present_data_locus/(present_data_locus + missing_data_locus)) Default: 0.75
+    
+-d percent_present_indiv_data - The percent of present data for an individual across all characters. percent_present_indiv_data = (present_data_indiv/(present_data_indiv + missing_data_indiv)) Default: 0.75
+ 
+-o output_dir - The directory to contain all the output files.
+
+    
+    
+Usage: filter_refgen_snp_scaffolds.pl -i stacks_fasta_infile -f stacks_refgen_infile -w whitelist_infile -o output_dir
+
+VERSION 1.21
+
+DESCRIPTION - A Program that generates a reference genome fasta file filtered to only contain sequences that contain SNPs generated from the refgen_stacks_analysis_pipeline.pl and populations_stacks.pl scripts. Requires a reference genome that was formatted by the refgen_stacks_analysis_pipeline.pl script so that we can grab the SNPs by the reference sequence ID found in the populations Stacks write_single_snp fasta formatted input file. You can also used a whitelist of locus ids to get only the reference genome scaffolds that pass the present data filter in convert_fasta2nexus.pl. Also prints out the populations fasta sequences that passed the present data filter to an output file.
+    
+OPTIONS:
+    
+    -i stacks_fasta_infile - The Population Stacks write_single_snp fasta formatted input file.
+    
+    -r stacks_refgen_infile - The Stacks reference genome fasta formatted input file.
+    
+    -w whitelist_infile - The whitelist input file containing the locus ids to keep after passing the present data filter. If not specified all locus ids that passed the present data filter will be used to generate the filter reference genome fasta file.
+    
+    -o output_dir - The directory to contain all the output files.
+    
+
+# A Program that generates a fasta file based on the stacks catalog.  
+    
+Usage: grab_catalog_loci.pl -i stacks_catalog_infile -w whitelist_infile -o output_dir
+    
+VERSION 1.21
+
+DESCRIPTION - A Program that generates a fasta file based on the stacks catalog.
+    
+OPTIONS:
+    
+    -i stacks_catalog_infile - The Population Stacks write_single_snp fasta formatted input file.
+    
+    -w whitelist_infile - The whitelist input file containing the locus ids to keep after passing the present data filter. If not specified all locus ids that passed the present data filter will be used to generate the filter reference genome fasta file.
+    
+    -o output_dir - The directory to contain all the output files.
+    
