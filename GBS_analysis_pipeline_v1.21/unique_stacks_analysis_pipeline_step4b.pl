@@ -20,10 +20,10 @@ use File::Copy;
 my ($gbs_fastq_dir, $gbs_fastq_file_type, $cstacks_catalog_prefix, $use_existing_catalog, $stacks_sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, $alpha_value_ustacks, $max_locus_stacks, $num_mismatches_tag, $num_threads, $output_dir);
 
 GetOptions(
-	'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (padded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
-    	't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
-    	'p=s'    => \$cstacks_catalog_prefix, # The cstacks catalog prefix file path consisting of a set of consensus loci built from a set of samples processed by the pstacks program. i.e. /path/to/catalog/batch_1
-    	'e=s'    => \$use_existing_catalog, # The use existing catalog bitwise flag. If true add data to the existing catalog, Otherwise run the default cstacks program. Default: false
+    'i=s'    => \$gbs_fastq_dir, # The absolute path to the quality filtered, demultiplexed, and adapter trimmed *.fastq input file (padded) directory that contains files with the extension .fastq for each individual within the Genotyping by Sequencing (GBS) project.
+    't=s'    => \$gbs_fastq_file_type, # The fastq input file type. Can be either fastq or gzfastq. Default: gzfastq
+    'p=s'    => \$cstacks_catalog_prefix, # The cstacks catalog prefix file path consisting of a set of consensus loci built from a set of samples processed by the pstacks program. i.e. /path/to/catalog/batch_1
+    'e=s'    => \$use_existing_catalog, # The use existing catalog bitwise flag. If true add data to the existing catalog, Otherwise run the default cstacks program. Default: false
 	'b=s'    => \$stacks_sql_id, # The SQL ID to insert into the output to identify this sample. Default: 1
 	'd=s'    => \$min_depth_coverage_ustacks, # The minimum depth of coverage to report a stack. Default: 5
 	'm=s'    => \$max_nuc_distance_ustacks, # The maximum distance (in nucleotides) allowed between stacks. Default: 2
@@ -161,7 +161,7 @@ foreach my $file_name (sort keys %{$gbs_fastq_files}){
 		warn "Copying $gbs_fastq_infile to $fastq_infile.....";
 		copy($gbs_fastq_infile, $fastq_infile) or die "Copy failed: $!";
         	$gbs_fastq_infile = $fastq_infile;
-    	}
+    }
 	
 	# Execute the ustacks program, which extracts exact-matching stacks and detects SNPs at each locus using a maximum likelihood framework.
 	ustacks($gbs_fastq_infile, $sql_id, $min_depth_coverage_ustacks, $max_nuc_distance_ustacks, $max_align_distance_ustacks, 
@@ -364,9 +364,11 @@ sub cstacks{
     # The standard out log file for the cstacks program.
     my $cstacks_log_outfile = join('/', $stacks_log_output_dir, "cstacks.log");
     
+    # The cstacks batch file variable.
+    my $cstacks_file = "";
     if($cstacks_catalog_prefix eq ""){
         # The cstacks batch file prefix file path.
-        my $cstacks_file = join('/', $stacks_output_dir, join("_", "batch", $stacks_sql_id));
+        $cstacks_file = join('/', $stacks_output_dir, join("_", "batch", $stacks_sql_id));
         
         # The cstacks catalog alleles, snps, and tags file paths.
         my ($cstacks_alleles_file, $cstacks_snps_file, $cstacks_tags_file);
@@ -427,7 +429,7 @@ sub cstacks{
         $existing_cstacks_tags_file = $cstacks_catalog_prefix . '.catalog.tags.tsv';
         
         # The cstacks batch file prefix file path.
-        my $cstacks_file = join('/', $stacks_output_dir, join("_", "batch", $stacks_sql_id));
+        $cstacks_file = join('/', $stacks_output_dir, join("_", "batch", $stacks_sql_id));
         
         # The cstacks catalog alleles, snps, and tags file paths.
         my ($cstacks_alleles_file, $cstacks_snps_file, $cstacks_tags_file);
