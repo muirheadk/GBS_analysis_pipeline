@@ -844,9 +844,11 @@ sub cstacks{
     # The standard out log file for the cstacks program.
     my $cstacks_log_outfile = join('/', $stacks_log_output_dir, "cstacks.log");
     
+    # The cstacks batch file variable.
+    my $cstacks_file = "";
     if($cstacks_catalog_prefix eq ""){
         # The cstacks batch file prefix file path.
-        my $cstacks_file = join('/', $stacks_output_dir, join("_", "batch", $stacks_sql_id));
+        $cstacks_file = join('/', $stacks_output_dir, join("_", "batch", $stacks_sql_id));
         
         # The cstacks catalog alleles, snps, and tags file paths.
         my ($cstacks_alleles_file, $cstacks_snps_file, $cstacks_tags_file);
@@ -907,7 +909,7 @@ sub cstacks{
         $existing_cstacks_tags_file = $cstacks_catalog_prefix . '.catalog.tags.tsv';
         
         # The cstacks batch file prefix file path.
-        my $cstacks_file = join('/', $stacks_output_dir, join("_", "batch", $stacks_sql_id));
+        $cstacks_file = join('/', $stacks_output_dir, join("_", "batch", $stacks_sql_id));
         
         # The cstacks catalog alleles, snps, and tags file paths.
         my ($cstacks_alleles_file, $cstacks_snps_file, $cstacks_tags_file);
