@@ -1033,49 +1033,52 @@ if($debug_switch eq "true"){
     }
     close(TRIMMED_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_layout_outfile";
 }
-    # The $removed_seqs_layout_outfile contains the trimmed coordinates layout for each sequence trimmed of the GBS common adapter sequence that failed the retaining criteria and was therefore removed.
-    # Find all files in the specified directory with the extension *.txt.
-    my ($removed_seqs_layout_files, $removed_seqs_layout_file_count) = find_files($removed_layout_output_dir, "txt");
-    if($debug_switch eq "true"){
-        my $removed_seqs_layout_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adapter_trim_offset, "removed_seqs_layout") . ".txt");
-        open(REMOVED_LAYOUT_OUTFILE, ">$removed_seqs_layout_outfile") or die "Couldn't open file $removed_seqs_layout_outfile for writting, $!";
-        print REMOVED_LAYOUT_OUTFILE join("\t", "sequence_id", "trimmed_fastq_start", "trimmed_fastq_end", "trimmed_fastq_length", "trimmed_adapter_start", "trimmed_adapter_end",
-        "trimmed_adapter_length", "adapter_seq_start", "adapter_seq_end", "adapter_seq_length") . "\n";
-        foreach my $removed_seqs_layout_filename (sort keys %{$removed_seqs_layout_files}){
 
-            # Get the full path to the removed sequence layout file.
-            my $removed_seqs_layout_infile = $removed_seqs_layout_files->{$removed_seqs_layout_filename};
-            
-            # Parse removed sequence layout file and concatenate to the bulk sequence layout output file for this project.
-            open(INFILE, "<$removed_seqs_layout_infile") or die "Couldn't open file $removed_seqs_layout_infile for reading, $!";
-            my $i = 0;
-            while(<INFILE>){
-                chomp $_;
-                if($i ne 0){
-                    print REMOVED_LAYOUT_OUTFILE $_ . "\n";
-                    print TRIMMED_BULK_LAYOUT_OUTFILE $_ . "\n";
-                }
-                $i++;
+# The $removed_seqs_layout_outfile contains the trimmed coordinates layout for each sequence trimmed of the GBS common adapter sequence that failed the retaining criteria and was therefore removed.
+# Find all files in the specified directory with the extension *.txt.
+my ($removed_seqs_layout_files, $removed_seqs_layout_file_count) = find_files($removed_layout_output_dir, "txt");
+
+my $removed_seqs_layout_outfile = join('/', $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adapter_trim_offset, "removed_seqs_layout") . ".txt");
+if($debug_switch eq "true"){
+    open(REMOVED_LAYOUT_OUTFILE, ">$removed_seqs_layout_outfile") or die "Couldn't open file $removed_seqs_layout_outfile for writting, $!";
+    print REMOVED_LAYOUT_OUTFILE join("\t", "sequence_id", "trimmed_fastq_start", "trimmed_fastq_end", "trimmed_fastq_length", "trimmed_adapter_start", "trimmed_adapter_end",
+    "trimmed_adapter_length", "adapter_seq_start", "adapter_seq_end", "adapter_seq_length") . "\n";
+    foreach my $removed_seqs_layout_filename (sort keys %{$removed_seqs_layout_files}){
+
+        # Get the full path to the removed sequence layout file.
+        my $removed_seqs_layout_infile = $removed_seqs_layout_files->{$removed_seqs_layout_filename};
+        
+        # Parse removed sequence layout file and concatenate to the bulk sequence layout output file for this project.
+        open(INFILE, "<$removed_seqs_layout_infile") or die "Couldn't open file $removed_seqs_layout_infile for reading, $!";
+        my $i = 0;
+        while(<INFILE>){
+            chomp $_;
+            if($i ne 0){
+                print REMOVED_LAYOUT_OUTFILE $_ . "\n";
+                print TRIMMED_BULK_LAYOUT_OUTFILE $_ . "\n";
             }
-            close(INFILE) or die "Couldn't close file $removed_seqs_layout_infile";
-            
-            # Compress the trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
-            gzip_file($removed_seqs_layout_infile) if($gzip_files_switch eq "true");
+            $i++;
         }
-        close(REMOVED_LAYOUT_OUTFILE) or die "Couldn't close file $removed_seqs_layout_outfile";
-        close(TRIMMED_BULK_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_layout_bulk_outfile";
-    }
-    if($debug_switch eq "true"){
+        close(INFILE) or die "Couldn't close file $removed_seqs_layout_infile";
+        
         # Compress the trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
-        gzip_file($trimmed_seqs_layout_outfile) if($gzip_files_switch eq "true");
-
-        # Compress the trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
-        gzip_file($removed_seqs_layout_outfile) if($gzip_files_switch eq "true");
-
-        # Compress the bulk trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
-        gzip_file($trimmed_seqs_layout_bulk_outfile) if($gzip_files_switch eq "true");
+        gzip_file($removed_seqs_layout_infile) if($gzip_files_switch eq "true");
     }
+    close(REMOVED_LAYOUT_OUTFILE) or die "Couldn't close file $removed_seqs_layout_outfile";
+    close(TRIMMED_BULK_LAYOUT_OUTFILE) or die "Couldn't close file $trimmed_seqs_layout_bulk_outfile";
 }
+
+if($debug_switch eq "true"){
+    # Compress the trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
+    gzip_file($trimmed_seqs_layout_outfile) if($gzip_files_switch eq "true");
+
+    # Compress the trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
+    gzip_file($removed_seqs_layout_outfile) if($gzip_files_switch eq "true");
+
+    # Compress the bulk trimmed sequence layout file using gzip if $gzip_files_switch eq "true".
+    gzip_file($trimmed_seqs_layout_bulk_outfile) if($gzip_files_switch eq "true");
+}
+
 
 # Generate a fastq sequence counts file so that we can see the percentages of untrimmed, trimmed, and removed fastq sequences each fastq input file.
 my $fastq_seq_counts_outfile = join("/", $trimmed_output_dir, join("_", $project_name, "trimmed_offset", $adapter_trim_offset, "fastq_seq_counts") . ".txt");
