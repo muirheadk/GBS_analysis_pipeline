@@ -249,16 +249,16 @@ foreach my $file_name (sort keys %{$bwa_align_files}){
 	my $padded_sam_outfile = bwa_pad_sam_files($bwa_align_infile, $gbs_sequence_length, $sam_mapq_threshold, $padded_sam_output_dir);
     
     my $filename_prefix = fileparse($padded_sam_outfile, qr/\.sam/);
-    my $bwa_sai_file = join("/", $bwa_output_dir, "$filename_prefix.sai") if($keep_sam_output_files eq "false");
-    if(-s $padded_sam_outfile){
+    my $bwa_sai_file = join("/", $bwa_output_dir, "$filename_prefix.sai");
+    if((-s $padded_sam_outfile) and ($keep_sam_output_files eq "false")){
         
         # Remove the BWA sam file to save space as we do not need the file after this point.
         if(-s $bwa_align_infile){
-            unlink($bwa_align_infile) or die "Could not unlink $bwa_align_infile: $!" if($keep_sam_output_files eq "false");
+            unlink($bwa_align_infile) or die "Could not unlink $bwa_align_infile: $!";
         }
         # Remove the BWA sai file to save space as we do not need the file after this point.
         if(-s $bwa_sai_file){
-            unlink($bwa_sai_file) or die "Could not unlink $bwa_sai_file: $!" if($keep_sam_output_files eq "false");
+            unlink($bwa_sai_file) or die "Could not unlink $bwa_sai_file: $!";
         }
     }
     
