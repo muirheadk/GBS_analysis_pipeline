@@ -145,7 +145,7 @@ OPTIONS:
 USAGE
 }
 
-die "Error: keep_sam_output_files option cannot be set to \"false\" when pstacks_input_file_type is specified" if($pstacks_infile_type eq "sam");
+die "Error: keep_sam_output_files option cannot be set to \"false\" when pstacks_input_file_type is specified" if(($pstacks_infile_type eq "sam") and ($keep_sam_output_files eq "false"));
 
 # Create output directory if it doesn't already exist.
 unless(-d $output_dir){
