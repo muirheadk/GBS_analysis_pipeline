@@ -75,7 +75,7 @@ die <<"USAGE";
 
 Usage: $0 -i fastq_file_dir -p project_name -r restriction_enzymes -l gbs_sequence_length -m adapter_length_min_threshold -t adapter_trim_offset -q min_trimmed_fastq_sequence_length -s gzip_files_switch -d debug_switch -c regex_num_cpu -o output_dir
 
-VERSION 1.22
+VERSION 1.23
 
 DESCRIPTION - This program trims the GBS common adapter sequence from each GBS fastq file within a particular Genotyping by Sequencing (GBS) project. Fixes the misprimming issue where the GBS common adapter is sequenced along with the DNA of an individual
 
