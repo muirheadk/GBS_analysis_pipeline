@@ -27,11 +27,11 @@ cd $samtools_dir
 make
 make install
 
-# Install Stacks Version 1.47
-stacks_dir="$software_dir/stacks-1.47"
+# Install Stacks Version 1.44
+stacks_dir="$software_dir/stacks-1.44"
 cd $software_dir
-wget http://catchenlab.life.illinois.edu/stacks/source/stacks-1.47.tar.gz
-tar xvzf stacks-1.47.tar.gz
+wget http://catchenlab.life.illinois.edu/stacks/source/stacks-1.44.tar.gz
+tar xvzf stacks-1.44.tar.gz
 cd $stacks_dir
 ./configure --prefix="$stacks_dir"
 make

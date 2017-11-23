@@ -93,9 +93,9 @@ my ($gunzip, $bwa, $samtools, $pstacks, $cstacks, $sstacks);
 $gunzip				= '/bin/gunzip';
 $bwa				= $ENV{"HOME"} . '/software/bwa-0.7.15/bwa';
 $samtools			= $ENV{"HOME"} . '/software/samtools-1.3.1/samtools';
-$pstacks			= $ENV{"HOME"} . '/software/stacks-1.47/pstacks';
-$cstacks			= $ENV{"HOME"} . '/software/stacks-1.47/cstacks';
-$sstacks			= $ENV{"HOME"} . '/software/stacks-1.47/sstacks';
+$pstacks			= $ENV{"HOME"} . '/software/stacks-1.44/pstacks';
+$cstacks			= $ENV{"HOME"} . '/software/stacks-1.44/cstacks';
+$sstacks			= $ENV{"HOME"} . '/software/stacks-1.44/sstacks';
 
 sub usage {
     

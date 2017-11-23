@@ -84,9 +84,9 @@ $num_threads = 2 unless defined $num_threads;
 
 # Program dependencies - The absolute paths to the Stacks related programs.
 my ($pstacks, $cstacks, $sstacks);
-$pstacks			= $ENV{"HOME"} . '/software/stacks-1.47/pstacks';
-$cstacks			= $ENV{"HOME"} . '/software/stacks-1.47/cstacks';
-$sstacks			= $ENV{"HOME"} . '/software/stacks-1.47/sstacks';
+$pstacks			= $ENV{"HOME"} . '/software/stacks-1.44/pstacks';
+$cstacks			= $ENV{"HOME"} . '/software/stacks-1.44/cstacks';
+$sstacks			= $ENV{"HOME"} . '/software/stacks-1.44/sstacks';
 
 sub usage {
     

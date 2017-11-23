@@ -77,9 +77,9 @@ $num_threads = 2 unless defined $num_threads;
 # Program dependencies - The absolute paths to gunzip to uncompress bulk compressed fastq.gz input file if present and stacks related programs.
 my ($gunzip, $ustacks, $cstacks, $sstacks);
 $gunzip				= '/bin/gunzip';
-$ustacks			= $ENV{"HOME"} . '/software/stacks-1.47/bin/ustacks';
-$cstacks			= $ENV{"HOME"} . '/software/stacks-1.47/bin/cstacks';
-$sstacks			= $ENV{"HOME"} . '/software/stacks-1.47/bin/sstacks';
+$ustacks			= $ENV{"HOME"} . '/software/stacks-1.44/bin/ustacks';
+$cstacks			= $ENV{"HOME"} . '/software/stacks-1.44/bin/cstacks';
+$sstacks			= $ENV{"HOME"} . '/software/stacks-1.44/bin/sstacks';
 
 sub usage {
 

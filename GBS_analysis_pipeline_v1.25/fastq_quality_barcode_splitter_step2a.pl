@@ -71,7 +71,7 @@ $barcode_option = 'inline_null' unless defined $barcode_option;
 $num_mismatches = 0 unless defined $num_mismatches;
 
 # Program dependencies - process_radtags program from the Stacks Software Suite.
-my $process_radtags 				= $ENV{"HOME"} . '/software/stacks-1.47/process_radtags';
+my $process_radtags 				= $ENV{"HOME"} . '/software/stacks-1.44/process_radtags';
 
 sub usage {
     

@@ -52,7 +52,7 @@ $num_cpu_cores = 2 unless defined $num_cpu_cores;
 $outfile_type = 'fasta' unless defined $outfile_type;
 
 # Program dependencies - The stacks populations program.
-my $populations			= $ENV{"HOME"} . '/software/stacks-1.47/bin/populations';
+my $populations			= $ENV{"HOME"} . '/software/stacks-1.44/bin/populations';
 
 sub usage {
 
